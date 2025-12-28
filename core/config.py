@@ -43,11 +43,9 @@ Available scriptures: {available_scriptures}
 
 Remember: Base every answer on the sacred texts. Do not speculate or add personal interpretations beyond what the scriptures teach."""
 
-
 # UI Configuration
 BOT_EMOJI = "🕉️"
 USER_EMOJI = "🧘"
-
 
 # Theme colors (will be overridden by actual theme detection)
 LIGHT_THEME = {

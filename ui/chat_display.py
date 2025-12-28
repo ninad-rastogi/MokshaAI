@@ -1,5 +1,5 @@
 """
-Chat message display and rendering with safe HTML handling
+Chat message display with simulated typing effect for complete responses
 """
 
 import html
@@ -32,10 +32,13 @@ class ChatDisplay:
 
     def _escape_and_format(self, content: str) -> str:
         """Escape HTML but preserve line breaks"""
+
         # Escape HTML entities
         safe_content = html.escape(content)
+
         # Convert newlines to <br> for display
         safe_content = safe_content.replace("\n", "<br>")
+
         return safe_content
 
     def _format_user_message(self, content: str) -> str:
@@ -80,15 +83,51 @@ class ChatDisplay:
 
     def create_message_placeholder(self):
         """Create a placeholder for streaming messages"""
+
         return st.empty()
+
+    def display_complete_response(
+        self, full_response: str, placeholder, words_per_update: int = 5
+    ):
+        """
+        Display complete response with simulated typing effect
+        Args:
+            full_response: The complete response text
+            placeholder: Streamlit placeholder to update
+            words_per_update: Number of words to show per update
+        """
+
+        # Split response into words
+        words = full_response.split()
+
+        # Display words progressively for typing effect
+        displayed_text = ""
+
+        for i in range(0, len(words), words_per_update):
+            # Get next batch of words
+            word_batch = words[i : i + words_per_update]
+            displayed_text += " " + " ".join(word_batch)
+
+            # Update display
+            display_html = self._format_bot_message(displayed_text.strip())
+            placeholder.markdown(display_html, unsafe_allow_html=True)
+
+            # Small delay for typing effect
+            time.sleep(0.05)
+
+        # Final update with complete response
+        display_html = self._format_bot_message(full_response)
+        placeholder.markdown(display_html, unsafe_allow_html=True)
 
     def stream_bot_response(
         self, response_gen, placeholder, chunk_size: int = 2048
     ) -> str:
         """
         Stream bot response to placeholder with safe HTML handling
+        (Kept for backwards compatibility, but not used with .invoke())
         Returns: Full response text
         """
+
         full_response = ""
 
         try:
@@ -96,16 +135,19 @@ class ChatDisplay:
                 # Handle different chunk formats
                 if hasattr(chunk, "content"):
                     chunk_text = chunk.content
+
                 elif hasattr(chunk, "response"):
                     chunk_text = chunk.response
+
                 elif isinstance(chunk, str):
                     chunk_text = chunk
+
                 else:
                     chunk_text = str(chunk)
 
                 full_response += chunk_text
 
-                # Update placeholder with formatted message (HTML is escaped in _format_bot_message)
+                # Update placeholder with formatted message
                 display_html = self._format_bot_message(full_response)
                 placeholder.markdown(display_html, unsafe_allow_html=True)
 
@@ -122,10 +164,11 @@ class ChatDisplay:
 
     def display_sources(self, sources: List[Dict]):
         """Display scripture sources/citations"""
+
         if not sources:
             return
 
-        st.markdown("---")
+        st.divider()
         st.markdown("### 📜 Scripture References")
 
         for idx, source in enumerate(sources, 1):
@@ -143,6 +186,7 @@ class ChatDisplay:
 
     def show_thinking_animation(self, placeholder):
         """Show thinking animation"""
+
         thinking_html = f"""
         <div style="display: flex; align-items: flex-start; margin-bottom: 1rem;">
             <span style="font-size: 24px; margin-right: 0.5rem;">{self.bot_emoji}</span>
@@ -160,16 +204,14 @@ class ChatDisplay:
             </div>
         </div>
         """
+
         placeholder.markdown(thinking_html, unsafe_allow_html=True)
 
     def display_welcome_message(self):
         """Display welcome message for new chat"""
-        welcome_html = f"""
+
+        welcome_html = """
         <div style="text-align: center; padding: 2rem; color: #666;">
-            <h2 style="margin-bottom: 1rem;">{self.bot_emoji} Welcome to Moksha AI</h2>
-            <p style="font-size: 1.1rem; margin-bottom: 2rem;">
-                Your spiritual guide rooted in Vedic wisdom
-            </p>
             <div style="text-align: left; max-width: 600px; margin: 0 auto;">
                 <p><strong>You can ask about:</strong></p>
                 <ul style="list-style-type: none; padding-left: 0;">
@@ -180,10 +222,8 @@ class ChatDisplay:
                     <li>📚 Scripture teachings and interpretations</li>
                     <li>💭 General spiritual guidance</li>
                 </ul>
-                <p style="margin-top: 1rem; font-size: 0.9rem; font-style: italic;">
-                    Note: I intelligently determine whether to search scriptures or provide general guidance based on your question.
-                </p>
             </div>
         </div>
         """
+
         st.markdown(welcome_html, unsafe_allow_html=True)

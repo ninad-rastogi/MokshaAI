@@ -1,7 +1,3 @@
-"""
-User interface components for Moksha AI
-"""
-
 __version__ = "1.0.0"
 
 from .chat_display import ChatDisplay

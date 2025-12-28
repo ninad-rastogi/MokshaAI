@@ -7,6 +7,7 @@ import streamlit as st
 
 def inject_custom_css():
     """Inject custom CSS for better UI"""
+
     st.markdown(
         """
         <style>
@@ -195,6 +196,7 @@ def inject_custom_css():
 
 def get_theme_colors(theme: str) -> dict:
     """Get color scheme based on theme"""
+
     if theme == "light":
         return {
             "bot_bg": "#b2f7ef",
@@ -202,6 +204,7 @@ def get_theme_colors(theme: str) -> dict:
             "user_bg": "#7bdff2",
             "user_font": "#4d0810",
         }
+
     else:
         return {
             "bot_bg": "#124336",

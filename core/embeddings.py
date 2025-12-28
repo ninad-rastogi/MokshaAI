@@ -47,32 +47,40 @@ class EmbeddingsManager:
 
     def _scan_docs_metadata(self, docs_dir: Path) -> dict:
         """Scan documents and create metadata based on file stats"""
+
         meta = {}
+
         if not docs_dir.exists():
             return meta
 
         for item in docs_dir.rglob("*.pdf"):
             stat = item.stat()
             meta[str(item)] = {"mtime": stat.st_mtime, "size": stat.st_size}
+
         return meta
 
     def _load_stored_metadata(self) -> dict:
         """Load previously stored metadata"""
+
         if not self.meta_file.exists():
             return {}
 
         try:
             with open(self.meta_file, "r") as f:
                 return json.load(f)
+
         except Exception as e:
             logger.warning(f"Failed to load metadata: {e}")
+
             return {}
 
     def _save_metadata(self, metadata: dict):
         """Save metadata to file"""
+
         try:
             with open(self.meta_file, "w") as f:
                 json.dump(metadata, f, indent=2)
+
         except Exception as e:
             logger.error(f"Failed to save metadata: {e}")
 
@@ -80,6 +88,7 @@ class EmbeddingsManager:
         """Check if embeddings need to be rebuilt"""
         current_meta = self._scan_docs_metadata(docs_dir)
         stored_meta = self._load_stored_metadata()
+
         return current_meta != stored_meta
 
     def build_index(
@@ -93,6 +102,7 @@ class EmbeddingsManager:
             # Clear old embeddings
             if self.embeddings_dir.exists():
                 shutil.rmtree(self.embeddings_dir)
+
             self.embeddings_dir.mkdir(parents=True, exist_ok=True)
 
             # Save new metadata
@@ -111,11 +121,14 @@ class EmbeddingsManager:
                     embed_model=Settings.embed_model,
                     storage_context=storage_context,
                 )
+
                 logger.info("Embeddings built successfully")
+
             else:
                 index = VectorStoreIndex.from_vector_store(
                     vector_store, storage_context=storage_context
                 )
+
                 logger.warning("No documents found, created empty index")
         else:
             logger.info("Using cached embeddings")
