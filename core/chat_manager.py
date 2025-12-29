@@ -48,6 +48,7 @@ class ChatManager:
 
         self._save_chat(chat_id, chat_data)
         logger.info(f"Created new chat: {chat_id}")
+
         return chat_id
 
     def _save_chat(self, chat_id: str, chat_data: dict):
@@ -86,6 +87,7 @@ class ChatManager:
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     chat_data = json.load(f)
+
                     chats.append(
                         {
                             "id": chat_data.get("id", file_path.stem),
@@ -123,10 +125,10 @@ class ChatManager:
 
     def rename_chat(self, chat_id: str, new_name: str) -> bool:
         """Rename a chat session"""
+
         chat_data = self.load_chat(chat_id)
 
         if not chat_data:
-
             return False
 
         chat_data["name"] = new_name[: self.max_name_length]
@@ -138,6 +140,7 @@ class ChatManager:
 
     def add_message(self, chat_id: str, role: str, content: str, mode: str = None):
         """Add a message to chat history"""
+
         chat_data = self.load_chat(chat_id)
 
         if not chat_data:
@@ -205,6 +208,7 @@ Generate ONLY the title, nothing else. Make it spiritual and relevant."""
 
     def get_messages(self, chat_id: str) -> List[Dict]:
         """Get all messages from a chat"""
+
         chat_data = self.load_chat(chat_id)
 
         if not chat_data:
@@ -214,6 +218,7 @@ Generate ONLY the title, nothing else. Make it spiritual and relevant."""
 
     def clear_all_chats(self) -> int:
         """Clear all chat history (use with caution)"""
+
         count = 0
 
         for file_path in self.chats_dir.glob("*.json"):

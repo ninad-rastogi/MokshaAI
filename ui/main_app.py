@@ -1,5 +1,5 @@
 """
-Main Streamlit application with intelligent routing and auto-refresh
+Main Streamlit application with .invoke() method to avoid memory issues
 """
 
 import logging
@@ -8,17 +8,6 @@ import warnings
 
 import streamlit as st
 from streamlit_theme import st_theme
-
-# Suppress warnings
-warnings.filterwarnings("ignore")
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("moksha_ai.main")
 
 # Import core modules
 from core.chat_manager import ChatManager
@@ -46,6 +35,18 @@ from ui.chat_display import ChatDisplay
 from ui.sidebar import Sidebar
 from ui.styles import get_theme_colors, inject_custom_css
 
+# Suppress warnings
+warnings.filterwarnings("ignore")
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+logger = logging.getLogger("moksha_ai.main")
+
 
 class MokshaAIApp:
     """Main application class"""
@@ -58,6 +59,7 @@ class MokshaAIApp:
 
     def setup_page_config(self):
         """Configure Streamlit page"""
+
         st.set_page_config(
             page_title="Moksha AI - Spiritual Guide",
             layout="centered",
@@ -67,10 +69,12 @@ class MokshaAIApp:
 
     def setup_theme(self):
         """Setup theme and styling"""
+
         theme_dict = st_theme()
         self.theme = (
             theme_dict.get("base", "dark") if isinstance(theme_dict, dict) else "dark"
         )
+
         self.colors = get_theme_colors(self.theme)
 
         # Inject custom CSS
@@ -87,12 +91,14 @@ class MokshaAIApp:
 
         try:
             st.logo(image=logo_path, size="large")
-        except:
+
+        except Exception as e:
             pass  # Logo file might not exist yet
 
     @st.cache_resource(show_spinner=False, ttl=300)  # Cache for 5 minutes, then recheck
     def initialize_components(_self):
         """Initialize core components (cached with auto-refresh)"""
+
         logger.info("Initializing Moksha AI components...")
 
         # 1. Document Loader
@@ -136,6 +142,7 @@ class MokshaAIApp:
 
     def initialize_session_state(self):
         """Initialize session state variables"""
+
         # Chat Manager (not cached, needed for session state init)
         chat_manager = ChatManager(
             chats_dir=CHATS_DIR,
@@ -154,6 +161,7 @@ class MokshaAIApp:
                 st.session_state.current_chat_id = last_chat["id"]
                 st.session_state.messages = chat_manager.get_messages(last_chat["id"])
                 logger.info(f"Loaded last chat: {last_chat['name']}")
+
             else:
                 # Create new chat if none exist
                 st.session_state.current_chat_id = chat_manager.create_new_chat()
@@ -167,16 +175,20 @@ class MokshaAIApp:
 
     def run(self):
         """Main application loop"""
+
         # Header with logo
         col1, col2 = st.columns([1, 5])
+
         with col1:
             try:
-                st.image(self.logo_path, width=80)
-            except:
+                st.image(self.logo_path, width=100)
+
+            except Exception as e:
                 st.markdown(
                     f"<h1 style='font-size: 3rem;'>{BOT_EMOJI}</h1>",
                     unsafe_allow_html=True,
                 )
+
         with col2:
             st.title("Moksha AI")
             st.caption("Your Vedic Spiritual Guide")
@@ -213,6 +225,7 @@ class MokshaAIApp:
         # Show welcome or history
         if not st.session_state.messages:
             chat_display.display_welcome_message()
+
         else:
             chat_display.render_message_history(st.session_state.messages)
 
@@ -233,6 +246,7 @@ class MokshaAIApp:
         self, user_input: str, chat_manager: ChatManager, chat_display: ChatDisplay
     ):
         """Handle new user input - show immediately"""
+
         # Add to messages
         st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -253,11 +267,12 @@ class MokshaAIApp:
         chat_display: ChatDisplay,
         has_docs: bool,
     ):
-        """Generate and stream bot response with intelligent routing"""
+        """Generate bot response with intelligent routing using .invoke()"""
+
         last_query = st.session_state.messages[-1]["content"]
         response_placeholder = chat_display.create_message_placeholder()
 
-        # Show thinking animation briefly
+        # Show thinking animation
         chat_display.show_thinking_animation(response_placeholder)
 
         try:
@@ -270,15 +285,13 @@ class MokshaAIApp:
 
             if route == "rag" and has_docs:
                 # Use RAG for scripture-based queries
-                response_gen, sources = rag_engine.query_with_rag(
-                    query=last_query,
-                    session_id=st.session_state.current_chat_id,
-                    streaming=True,
+                full_response, sources = rag_engine.query_with_rag(
+                    query=last_query, session_id=st.session_state.current_chat_id
                 )
 
-                # Stream response
-                full_response = chat_display.stream_bot_response(
-                    response_gen, response_placeholder, RESPONSE_CHUNK_SIZE
+                # Display response with typing effect
+                chat_display.display_complete_response(
+                    full_response, response_placeholder
                 )
 
                 # Display sources
@@ -287,14 +300,13 @@ class MokshaAIApp:
 
             else:
                 # Use general conversation mode
-                response_gen = rag_engine.query_without_rag(
-                    query=last_query,
-                    messages_history=st.session_state.messages[:-1],
-                    streaming=True,
+                full_response = rag_engine.query_without_rag(
+                    query=last_query, messages_history=st.session_state.messages[:-1]
                 )
 
-                full_response = chat_display.stream_bot_response(
-                    response_gen, response_placeholder, RESPONSE_CHUNK_SIZE
+                # Display response with typing effect
+                chat_display.display_complete_response(
+                    full_response, response_placeholder
                 )
 
             # Add to session state

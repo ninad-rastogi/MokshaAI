@@ -1,9 +1,10 @@
 """
 RAG engine with intelligent query routing using LangGraph
+Using .invoke() method to avoid memory issues
 """
 
 import logging
-from typing import Dict, Generator, List, Literal
+from typing import Dict, List, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
@@ -103,6 +104,12 @@ class RAGEngine:
                 "suggest",
                 "think",
                 "opinion",
+                "hello",
+                "hi",
+                "good morning",
+                "good evening",
+                "thanks",
+                "thank you",
             ]
 
             # Check for scripture references
@@ -113,9 +120,11 @@ class RAGEngine:
             if requires_scripture:
                 state["route"] = "rag"
                 state["requires_scripture"] = True
+
             elif is_general and not requires_scripture:
                 state["route"] = "general"
                 state["requires_scripture"] = False
+
             else:
                 # Default to RAG if ambiguous and we have documents
                 state["route"] = "rag" if self.has_documents() else "general"
@@ -124,6 +133,7 @@ class RAGEngine:
             logger.info(
                 f"Query classified: route={state['route']}, requires_scripture={state['requires_scripture']}"
             )
+
             return state
 
         # Create graph
@@ -136,6 +146,7 @@ class RAGEngine:
 
     def route_query(self, query: str) -> tuple[str, bool]:
         """Route query to appropriate handler"""
+
         initial_state: QueryState = {
             "query": query,
             "route": "general",
@@ -143,25 +154,25 @@ class RAGEngine:
         }
 
         result = self.routing_graph.invoke(initial_state)
+
         return result["route"], result["requires_scripture"]
 
     def get_chat_memory(self, session_id: str) -> ChatMemoryBuffer:
         """Get or create chat memory for a session"""
+
         return ChatMemoryBuffer.from_defaults(
             chat_store=self.chat_store, chat_store_key=session_id
         )
 
-    def query_with_rag(
-        self, query: str, session_id: str, streaming: bool = True
-    ) -> tuple[Generator, List[Dict]]:
-        """Query using RAG with scripture context"""
+    def query_with_rag(self, query: str, session_id: str) -> tuple[str, List[Dict]]:
+        """Query using RAG with scripture context - returns complete response"""
 
         chat_memory = self.get_chat_memory(session_id)
 
-        # Create chat engine WITHOUT system_prompt (not supported by CondenseQuestionChatEngine)
+        # Create chat engine WITHOUT streaming
         chat_engine = self.index.as_chat_engine(
             chat_mode="condense_question",
-            streaming=streaming,
+            streaming=False,  # Disable streaming to save memory
             chat_memory=chat_memory,
             similarity_top_k=3,
             verbose=True,
@@ -170,14 +181,18 @@ class RAGEngine:
         # Prepend system instructions to the query
         enhanced_query = f"{self.system_prompt}\n\nUser question: {query}"
 
-        # Stream response
-        response_stream = chat_engine.stream_chat(enhanced_query)
+        # Get complete response (non-streaming)
+        response = chat_engine.chat(enhanced_query)
+
+        # Extract response text
+        response_text = str(response.response)
 
         # Extract source nodes for citations
         sources = []
+
         try:
-            if hasattr(response_stream, "source_nodes"):
-                for node in response_stream.source_nodes:
+            if hasattr(response, "source_nodes"):
+                for node in response.source_nodes:
                     metadata = node.metadata
                     sources.append(
                         {
@@ -194,17 +209,14 @@ class RAGEngine:
                             ),
                         }
                     )
+
         except Exception as e:
             logger.error(f"Failed to extract sources: {e}")
 
-        response_gen = getattr(response_stream, "response_gen", response_stream)
+        return response_text, sources
 
-        return response_gen, sources
-
-    def query_without_rag(
-        self, query: str, messages_history: List[Dict], streaming: bool = True
-    ) -> Generator:
-        """Query without RAG (general spiritual guidance)"""
+    def query_without_rag(self, query: str, messages_history: List[Dict]) -> str:
+        """Query without RAG - returns complete response"""
 
         # Build message history
         chat_msgs = [SystemMessage(content=self.system_prompt)]
@@ -212,6 +224,7 @@ class RAGEngine:
         for msg in messages_history:
             if msg["role"] == "user":
                 chat_msgs.append(HumanMessage(content=msg["content"]))
+
             elif msg["role"] == "assistant":
                 chat_msgs.append(SystemMessage(content=msg["content"]))
 
@@ -223,25 +236,34 @@ class RAGEngine:
             model=self.ollama_model,
             base_url=self.ollama_server,
             temperature=0.7,
-            streaming=streaming,
+            streaming=False,  # Disable streaming
         )
 
-        # Stream response
-        response_gen = llm.stream(chat_msgs)
+        # Get complete response using invoke
+        response = llm.invoke(chat_msgs)
 
-        return response_gen
+        # Extract text from response
+        response_text = (
+            response.content if hasattr(response, "content") else str(response)
+        )
+
+        return response_text
 
     def has_documents(self) -> bool:
         """Check if index has any documents"""
+
         try:
             retriever = self.index.as_retriever(similarity_top_k=1)
             results = retriever.retrieve("test")
             return len(results) > 0
-        except:
+
+        except Exception as e:
+            logger.error(f"Error checking documents in index: {e}")
             return False
 
     def get_scripture_info(self) -> str:
         """Get formatted string of available scriptures"""
+
         if not self.available_scriptures:
             return "No scriptures currently loaded. Please add PDF files to the docs folder."
 

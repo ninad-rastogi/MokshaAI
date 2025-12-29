@@ -6,7 +6,6 @@ from typing import Optional
 
 import streamlit as st
 
-from typing import Optional
 from core.chat_manager import ChatManager
 from core.document_loader import ScriptureDocumentLoader
 
@@ -25,11 +24,26 @@ class Sidebar:
         Render sidebar with chat history
         Returns: Selected chat ID or None for new chat
         """
+
         with st.sidebar:
             # Logo/Header
             st.markdown("### 🕉️ Moksha AI")
             st.markdown("*Your Spiritual Guide*")
-            st.divider()
+
+            # Available Scriptures Section
+            if self.doc_loader:
+                with st.expander("📚 Available Scriptures", expanded=False):
+                    scripture_summary = self.doc_loader.get_scripture_summary()
+
+                    if scripture_summary:
+                        for scripture, count in scripture_summary.items():
+                            st.markdown(f"**{scripture}**: {count} file(s)")
+
+                    else:
+                        st.info("No scriptures loaded. Add PDFs to data/docs/")
+
+            # Chat History Section
+            st.markdown("### 💬 Chat History")
 
             # New Chat Button
             if st.button(
@@ -40,27 +54,11 @@ class Sidebar:
                 st.session_state.messages = []
                 st.rerun()
 
-            st.divider()
-
-            # Available Scriptures Section
-            if self.doc_loader:
-                with st.expander("📚 Available Scriptures", expanded=False):
-                    scripture_summary = self.doc_loader.get_scripture_summary()
-                    if scripture_summary:
-                        for scripture, count in scripture_summary.items():
-                            st.markdown(f"**{scripture}**: {count} file(s)")
-                    else:
-                        st.info("No scriptures loaded. Add PDFs to data/docs/")
-
-                st.divider()
-
-            # Chat History Section
-            st.markdown("### 💬 Chat History")
-
             chats = self.chat_manager.get_all_chats()
 
             if not chats:
                 st.info("No previous conversations")
+
                 return current_chat_id
 
             # Display chats with better alignment
@@ -115,6 +113,7 @@ class Sidebar:
                                     new_id = self.chat_manager.create_new_chat()
                                     st.session_state.current_chat_id = new_id
                                     st.session_state.messages = []
+
                                 st.rerun()
 
                     # Rename dialog
@@ -147,9 +146,7 @@ class Sidebar:
                     if message_count > 0:
                         st.caption(f"  {message_count} messages")
 
-                    st.markdown("---")  # Separator between chats
-
-            st.divider()
+                    st.divider()  # Separator between chats
 
             # Info section
             with st.expander("ℹ️ About", expanded=False):
