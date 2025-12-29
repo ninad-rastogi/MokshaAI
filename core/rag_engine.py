@@ -1,32 +1,23 @@
 """
-RAG engine with intelligent query routing using LangGraph
-Using .invoke() method to avoid memory issues
+RAG engine with AI-powered intelligent query routing
+No hardcoded keywords - LLM decides the routing
 """
 
+import json
 import logging
 from typing import Dict, List, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
-from langgraph.graph import END, StateGraph
 from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.core.storage.chat_store import SimpleChatStore
-from typing_extensions import TypedDict
 
 logger = logging.getLogger("moksha_ai.rag_engine")
 
 
-class QueryState(TypedDict):
-    """State for query routing"""
-
-    query: str
-    route: Literal["rag", "general"]
-    requires_scripture: bool
-
-
 class RAGEngine:
-    """RAG-based question answering with intelligent routing"""
+    """RAG-based question answering with AI-powered intelligent routing"""
 
     def __init__(
         self,
@@ -53,109 +44,143 @@ class RAGEngine:
         # Chat store for memory
         self.chat_store = SimpleChatStore()
 
-        # Setup routing graph
-        self.routing_graph = self._create_routing_graph()
-
-    def _create_routing_graph(self) -> StateGraph:
-        """Create LangGraph for intelligent query routing"""
-
-        def classify_query(state: QueryState) -> QueryState:
-            """Classify if query needs scripture lookup or general conversation"""
-            query = state["query"].lower()
-
-            # Keywords that suggest scripture lookup
-            scripture_keywords = [
-                "scripture",
-                "shloka",
-                "verse",
-                "chapter",
-                "gita",
-                "bhagavad",
-                "mahabharata",
-                "ramayana",
-                "upanishad",
-                "veda",
-                "purana",
-                "says",
-                "according to",
-                "in the",
-                "quote",
-                "what does",
-                "meaning of",
-                "explain",
-                "reference",
-                "citation",
-                "page",
-            ]
-
-            # Keywords for general spiritual guidance
-            general_keywords = [
-                "how to",
-                "should i",
-                "can you help",
-                "advice",
-                "guidance",
-                "what if",
-                "is it okay",
-                "feeling",
-                "problem",
-                "issue",
-                "recommend",
-                "suggest",
-                "think",
-                "opinion",
-                "hello",
-                "hi",
-                "good morning",
-                "good evening",
-                "thanks",
-                "thank you",
-            ]
-
-            # Check for scripture references
-            requires_scripture = any(kw in query for kw in scripture_keywords)
-            is_general = any(kw in query for kw in general_keywords)
-
-            # Route decision
-            if requires_scripture:
-                state["route"] = "rag"
-                state["requires_scripture"] = True
-
-            elif is_general and not requires_scripture:
-                state["route"] = "general"
-                state["requires_scripture"] = False
-
-            else:
-                # Default to RAG if ambiguous and we have documents
-                state["route"] = "rag" if self.has_documents() else "general"
-                state["requires_scripture"] = self.has_documents()
-
-            logger.info(
-                f"Query classified: route={state['route']}, requires_scripture={state['requires_scripture']}"
-            )
-
-            return state
-
-        # Create graph
-        workflow = StateGraph(QueryState)
-        workflow.add_node("classify", classify_query)
-        workflow.set_entry_point("classify")
-        workflow.add_edge("classify", END)
-
-        return workflow.compile()
+        # Create classifier LLM
+        self.classifier_llm = ChatOllama(
+            model=ollama_model,
+            base_url=ollama_server,
+            temperature=0.1,  # Low temperature for consistent classification
+            streaming=False,
+        )
 
     def route_query(self, query: str) -> tuple[str, bool]:
-        """Route query to appropriate handler"""
+        """
+        Use LLM to intelligently route query to appropriate handler
+        Returns: (route: "rag" or "general", requires_scripture: bool)
+        """
+        # Get list of available scriptures for context
+        scriptures_list = (
+            ", ".join(self.available_scriptures)
+            if self.available_scriptures
+            else "None"
+        )
 
-        initial_state: QueryState = {
-            "query": query,
-            "route": "general",
-            "requires_scripture": False,
-        }
+        # Classification prompt
+        classification_prompt = f"""You are a query classifier for a spiritual AI assistant called Moksha AI.
 
-        result = self.routing_graph.invoke(initial_state)
+Your job is to classify user queries into one of these categories:
 
-        return result["route"], result["requires_scripture"]
+1. **SCRIPTURE** - User is asking about specific scriptures, teachings, verses, or quotes
+   Examples:
+   - "What does Bhagavad Gita say about karma?"
+   - "Tell me about the story of Rama"
+   - "Quote a shloka about dharma"
+   - "Explain Chapter 2 of the Gita"
+   
+2. **GUIDANCE** - User is asking for spiritual guidance, life advice, or philosophical discussion within the scope of spirituality
+   Examples:
+   - "How can I find inner peace?"
+   - "What should I do when I feel stressed?"
+   - "How to practice meditation?"
+   - "What is the meaning of life?"
+   
+3. **CASUAL** - User is just chatting casually, saying hello, or asking about non-spiritual topics
+   Examples:
+   - "Hi", "Hello", "How are you?"
+   - "Thank you", "Thanks"
+   - "How to bake a cake?"
+   - "What's the weather?"
+   - "Tell me a joke"
+
+Available scriptures in the database: {scriptures_list}
+
+**IMPORTANT RULES:**
+- If query asks about specific scriptures, verses, quotes, or teachings → SCRIPTURE
+- If query asks for spiritual guidance, life advice, or philosophical questions → GUIDANCE
+- If query is casual chat, gratitude, or about non-spiritual topics (cooking, coding, weather, etc.) → CASUAL
+- If scriptures are available and query mentions them, prefer SCRIPTURE over GUIDANCE
+- If no scriptures available, SCRIPTURE queries should be treated as GUIDANCE
+
+User Query: "{query}"
+
+Respond with ONLY a JSON object:
+{{
+  "category": "SCRIPTURE" or "GUIDANCE" or "CASUAL",
+  "reasoning": "brief explanation of why you chose this category"
+}}"""
+
+        try:
+            # Get classification from LLM
+            messages = [
+                SystemMessage(
+                    content="You are an expert query classifier. Always respond with valid JSON only."
+                ),
+                HumanMessage(content=classification_prompt),
+            ]
+
+            response = self.classifier_llm.invoke(messages)
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
+
+            # Parse JSON response
+            # Remove markdown code blocks if present
+            response_text = response_text.strip()
+
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+
+            response_text = response_text.strip()
+
+            classification = json.loads(response_text)
+            category = classification.get("category", "GUIDANCE")
+            reasoning = classification.get("reasoning", "No reasoning provided")
+
+            logger.info(f"Query classified as: {category} - Reasoning: {reasoning}")
+
+            # Determine routing based on category
+            if category == "SCRIPTURE" and self.has_documents():
+                route = "rag"
+                requires_scripture = True
+
+            elif category == "SCRIPTURE" and not self.has_documents():
+                # No documents available, treat as general guidance
+                route = "general"
+                requires_scripture = False
+                logger.warning(
+                    "SCRIPTURE query but no documents available, routing to GENERAL"
+                )
+
+            elif category in ["GUIDANCE", "CASUAL"]:
+
+                route = "general"
+                requires_scripture = False
+
+            else:
+                # Fallback to general
+                route = "general"
+                requires_scripture = False
+
+            return route, requires_scripture
+
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"Failed to parse classification JSON: {e}, Response: {response_text}"
+            )
+
+            # Fallback to general mode
+            return "general", False
+
+        except Exception as e:
+            logger.error(f"Error in query routing: {e}")
+            # Fallback to general mode
+
+            return "general", False
 
     def get_chat_memory(self, session_id: str) -> ChatMemoryBuffer:
         """Get or create chat memory for a session"""
@@ -189,7 +214,6 @@ class RAGEngine:
 
         # Extract source nodes for citations
         sources = []
-
         try:
             if hasattr(response, "source_nodes"):
                 for node in response.source_nodes:
@@ -258,7 +282,6 @@ class RAGEngine:
             return len(results) > 0
 
         except Exception as e:
-            logger.error(f"Error checking documents in index: {e}")
             return False
 
     def get_scripture_info(self) -> str:
