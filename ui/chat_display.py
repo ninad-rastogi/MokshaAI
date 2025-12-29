@@ -24,6 +24,7 @@ class ChatDisplay:
         for msg in messages:
             if msg["role"] == "user":
                 conversation_html += self._format_user_message(msg["content"])
+
             elif msg["role"] == "assistant":
                 conversation_html += self._format_bot_message(msg["content"])
 
@@ -43,6 +44,7 @@ class ChatDisplay:
 
     def _format_user_message(self, content: str) -> str:
         """Format user message bubble with safe HTML"""
+
         safe_content = self._escape_and_format(content)
 
         return f"""
@@ -63,6 +65,7 @@ class ChatDisplay:
 
     def _format_bot_message(self, content: str) -> str:
         """Format bot message bubble with safe HTML"""
+
         safe_content = self._escape_and_format(content)
 
         return f"""
@@ -127,11 +130,11 @@ class ChatDisplay:
         (Kept for backwards compatibility, but not used with .invoke())
         Returns: Full response text
         """
-
         full_response = ""
 
         try:
             for chunk in response_gen:
+
                 # Handle different chunk formats
                 if hasattr(chunk, "content"):
                     chunk_text = chunk.content
@@ -168,7 +171,7 @@ class ChatDisplay:
         if not sources:
             return
 
-        st.divider()
+        st.markdown("---")
         st.markdown("### 📜 Scripture References")
 
         for idx, source in enumerate(sources, 1):
@@ -204,14 +207,17 @@ class ChatDisplay:
             </div>
         </div>
         """
-
         placeholder.markdown(thinking_html, unsafe_allow_html=True)
 
     def display_welcome_message(self):
         """Display welcome message for new chat"""
 
-        welcome_html = """
+        welcome_html = f"""
         <div style="text-align: center; padding: 2rem; color: #666;">
+            <h2 style="margin-bottom: 1rem;">{self.bot_emoji} Welcome to Moksha AI</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 2rem;">
+                Your spiritual guide rooted in Vedic wisdom
+            </p>
             <div style="text-align: left; max-width: 600px; margin: 0 auto;">
                 <p><strong>You can ask about:</strong></p>
                 <ul style="list-style-type: none; padding-left: 0;">
@@ -222,6 +228,9 @@ class ChatDisplay:
                     <li>📚 Scripture teachings and interpretations</li>
                     <li>💭 General spiritual guidance</li>
                 </ul>
+                <p style="margin-top: 1rem; font-size: 0.9rem; font-style: italic;">
+                    Note: I intelligently determine whether to search scriptures or provide general guidance based on your question.
+                </p>
             </div>
         </div>
         """

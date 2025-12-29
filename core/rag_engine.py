@@ -1,17 +1,15 @@
 """
 RAG engine with AI-powered intelligent query routing
-No hardcoded keywords - LLM decides the routing
+Custom RAG implementation using .invoke() to avoid memory issues
 """
 
 import json
 import logging
-from typing import Dict, List, Literal
+from typing import Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from llama_index.core import Settings, VectorStoreIndex
-from llama_index.core.memory import ChatMemoryBuffer
-from llama_index.core.storage.chat_store import SimpleChatStore
 
 logger = logging.getLogger("moksha_ai.rag_engine")
 
@@ -41,15 +39,14 @@ class RAGEngine:
             )
         )
 
-        # Chat store for memory
-        self.chat_store = SimpleChatStore()
-
         # Create classifier LLM
         self.classifier_llm = ChatOllama(
-            model=ollama_model,
-            base_url=ollama_server,
-            temperature=0.1,  # Low temperature for consistent classification
-            streaming=False,
+            model=ollama_model, base_url=ollama_server, temperature=0.1, streaming=False
+        )
+
+        # Create response LLM
+        self.response_llm = ChatOllama(
+            model=ollama_model, base_url=ollama_server, temperature=0.7, streaming=False
         )
 
     def route_query(self, query: str) -> tuple[str, bool]:
@@ -57,14 +54,13 @@ class RAGEngine:
         Use LLM to intelligently route query to appropriate handler
         Returns: (route: "rag" or "general", requires_scripture: bool)
         """
-        # Get list of available scriptures for context
+
         scriptures_list = (
             ", ".join(self.available_scriptures)
             if self.available_scriptures
             else "None"
         )
 
-        # Classification prompt
         classification_prompt = f"""You are a query classifier for a spiritual AI assistant called Moksha AI.
 
 Your job is to classify user queries into one of these categories:
@@ -109,7 +105,6 @@ Respond with ONLY a JSON object:
 }}"""
 
         try:
-            # Get classification from LLM
             messages = [
                 SystemMessage(
                     content="You are an expert query classifier. Always respond with valid JSON only."
@@ -118,12 +113,12 @@ Respond with ONLY a JSON object:
             ]
 
             response = self.classifier_llm.invoke(messages)
+
             response_text = (
                 response.content if hasattr(response, "content") else str(response)
             )
 
             # Parse JSON response
-            # Remove markdown code blocks if present
             response_text = response_text.strip()
 
             if response_text.startswith("```json"):
@@ -143,13 +138,11 @@ Respond with ONLY a JSON object:
 
             logger.info(f"Query classified as: {category} - Reasoning: {reasoning}")
 
-            # Determine routing based on category
             if category == "SCRIPTURE" and self.has_documents():
                 route = "rag"
                 requires_scripture = True
 
             elif category == "SCRIPTURE" and not self.has_documents():
-                # No documents available, treat as general guidance
                 route = "general"
                 requires_scripture = False
                 logger.warning(
@@ -157,12 +150,10 @@ Respond with ONLY a JSON object:
                 )
 
             elif category in ["GUIDANCE", "CASUAL"]:
-
                 route = "general"
                 requires_scripture = False
 
             else:
-                # Fallback to general
                 route = "general"
                 requires_scripture = False
 
@@ -173,71 +164,92 @@ Respond with ONLY a JSON object:
                 f"Failed to parse classification JSON: {e}, Response: {response_text}"
             )
 
-            # Fallback to general mode
             return "general", False
 
         except Exception as e:
             logger.error(f"Error in query routing: {e}")
-            # Fallback to general mode
 
             return "general", False
 
-    def get_chat_memory(self, session_id: str) -> ChatMemoryBuffer:
-        """Get or create chat memory for a session"""
+    def query_with_rag(
+        self, query: str, session_id: str, messages_history: List[Dict] = None
+    ) -> tuple[str, List[Dict]]:
+        """
+        Custom RAG implementation using .invoke() to avoid memory issues
+        Returns: (response_text, sources)
+        """
 
-        return ChatMemoryBuffer.from_defaults(
-            chat_store=self.chat_store, chat_store_key=session_id
-        )
+        # Step 1: Retrieve relevant documents
+        retriever = self.index.as_retriever(similarity_top_k=3)
+        nodes = retriever.retrieve(query)
 
-    def query_with_rag(self, query: str, session_id: str) -> tuple[str, List[Dict]]:
-        """Query using RAG with scripture context - returns complete response"""
-
-        chat_memory = self.get_chat_memory(session_id)
-
-        # Create chat engine WITHOUT streaming
-        chat_engine = self.index.as_chat_engine(
-            chat_mode="condense_question",
-            streaming=False,  # Disable streaming to save memory
-            chat_memory=chat_memory,
-            similarity_top_k=3,
-            verbose=True,
-        )
-
-        # Prepend system instructions to the query
-        enhanced_query = f"{self.system_prompt}\n\nUser question: {query}"
-
-        # Get complete response (non-streaming)
-        response = chat_engine.chat(enhanced_query)
-
-        # Extract response text
-        response_text = str(response.response)
-
-        # Extract source nodes for citations
+        # Step 2: Format context from retrieved nodes
+        context_parts = []
         sources = []
+
+        for i, node in enumerate(nodes):
+            context_parts.append(f"[Context {i+1}]\n{node.text}\n")
+
+            # Extract metadata for citations
+            metadata = node.metadata
+            sources.append(
+                {
+                    "scripture": metadata.get("scripture", "Unknown"),
+                    "page": metadata.get("page", "N/A"),
+                    "file_name": metadata.get("file_name", "Unknown"),
+                    "score": round(node.score, 2) if hasattr(node, "score") else 0.0,
+                    "text_preview": (
+                        node.text[:200] + "..." if len(node.text) > 200 else node.text
+                    ),
+                }
+            )
+
+        context_str = "\n".join(context_parts)
+
+        # Step 3: Build conversation history
+        chat_msgs = [SystemMessage(content=self.system_prompt)]
+
+        # Add previous messages if available
+        if messages_history:
+            for msg in messages_history:
+                if msg["role"] == "user":
+                    chat_msgs.append(HumanMessage(content=msg["content"]))
+
+                elif msg["role"] == "assistant":
+                    chat_msgs.append(SystemMessage(content=msg["content"]))
+
+        # Step 4: Create prompt with context
+        rag_prompt = f"""Based on the following context from sacred scriptures, please answer the user's question.
+
+Context from Scriptures:
+{context_str}
+
+User Question: {query}
+
+Instructions:
+- Answer based STRICTLY on the provided context
+- Quote relevant Sanskrit shlokas if present in the context
+- Cite the scripture name and page number
+- If the context doesn't contain the answer, say so honestly
+- Be clear, concise, and respectful"""
+
+        chat_msgs.append(HumanMessage(content=rag_prompt))
+
+        # Step 5: Get response using .invoke() (no streaming)
         try:
-            if hasattr(response, "source_nodes"):
-                for node in response.source_nodes:
-                    metadata = node.metadata
-                    sources.append(
-                        {
-                            "scripture": metadata.get("scripture", "Unknown"),
-                            "page": metadata.get("page", "N/A"),
-                            "file_name": metadata.get("file_name", "Unknown"),
-                            "score": (
-                                round(node.score, 2) if hasattr(node, "score") else 0.0
-                            ),
-                            "text_preview": (
-                                node.text[:200] + "..."
-                                if len(node.text) > 200
-                                else node.text
-                            ),
-                        }
-                    )
+            response = self.response_llm.invoke(chat_msgs)
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
+
+            logger.info(
+                f"RAG response generated successfully with {len(sources)} sources"
+            )
+            return response_text, sources
 
         except Exception as e:
-            logger.error(f"Failed to extract sources: {e}")
-
-        return response_text, sources
+            logger.error(f"Error generating RAG response: {e}")
+            raise
 
     def query_without_rag(self, query: str, messages_history: List[Dict]) -> str:
         """Query without RAG - returns complete response"""
@@ -255,18 +267,8 @@ Respond with ONLY a JSON object:
         # Add current query
         chat_msgs.append(HumanMessage(content=query))
 
-        # Create LLM
-        llm = ChatOllama(
-            model=self.ollama_model,
-            base_url=self.ollama_server,
-            temperature=0.7,
-            streaming=False,  # Disable streaming
-        )
-
         # Get complete response using invoke
-        response = llm.invoke(chat_msgs)
-
-        # Extract text from response
+        response = self.response_llm.invoke(chat_msgs)
         response_text = (
             response.content if hasattr(response, "content") else str(response)
         )
@@ -275,7 +277,6 @@ Respond with ONLY a JSON object:
 
     def has_documents(self) -> bool:
         """Check if index has any documents"""
-
         try:
             retriever = self.index.as_retriever(similarity_top_k=1)
             results = retriever.retrieve("test")

@@ -44,36 +44,6 @@ def inject_custom_css():
             min-height: 2rem;
         }
         
-        /* Chat history items */
-        .chat-history-item {
-            margin-bottom: 0.5rem;
-            padding: 0.5rem;
-            border-radius: 0.5rem;
-            transition: background-color 0.2s;
-        }
-        
-        .chat-history-item:hover {
-            background-color: rgba(128, 128, 128, 0.1);
-        }
-        
-        /* New chat button */
-        .new-chat-btn {
-            width: 100%;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            font-weight: 500;
-            transition: opacity 0.2s;
-        }
-        
-        .new-chat-btn:hover {
-            opacity: 0.8;
-        }
-        
         /* Thinking animation */
         .thinking-dots span {
             display: inline-block;
@@ -156,8 +126,7 @@ def inject_custom_css():
             transition: all 0.2s ease;
         }
         
-        /* Hide streamlit branding in small screens */
-        #MainMenu {visibility: hidden;}
+        /* Keep footer hidden but show main menu (settings) */
         footer {visibility: hidden;}
         
         /* Better text input styling */

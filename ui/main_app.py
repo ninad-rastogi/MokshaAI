@@ -1,5 +1,5 @@
 """
-Main Streamlit application with .invoke() method to avoid memory issues
+Main Streamlit application with proper caching and immediate message display
 """
 
 import logging
@@ -44,7 +44,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-
 logger = logging.getLogger("moksha_ai.main")
 
 
@@ -77,7 +76,7 @@ class MokshaAIApp:
 
         self.colors = get_theme_colors(self.theme)
 
-        # Inject custom CSS
+        # Inject custom CSS (with settings menu enabled)
         inject_custom_css()
 
         # Set logo (REVERSED: dark logo for light theme, light logo for dark theme)
@@ -93,20 +92,20 @@ class MokshaAIApp:
             st.logo(image=logo_path, size="large")
 
         except Exception as e:
-            pass  # Logo file might not exist yet
+            pass
 
-    @st.cache_resource(show_spinner=False, ttl=300)  # Cache for 5 minutes, then recheck
+    @st.cache_resource(
+        show_spinner=False
+    )  # No TTL - cache until restart or metadata changes
     def initialize_components(_self):
-        """Initialize core components (cached with auto-refresh)"""
-
+        """Initialize core components - only reload if documents change"""
         logger.info("Initializing Moksha AI components...")
 
         # 1. Document Loader
         doc_loader = ScriptureDocumentLoader(DOCS_DIR)
 
         # 2. Load documents with metadata
-        with st.spinner("📚 Loading sacred scriptures..."):
-            documents = doc_loader.load_documents_with_metadata()
+        documents = doc_loader.load_documents_with_metadata()
 
         available_scriptures = doc_loader.get_available_scriptures()
 
@@ -119,9 +118,8 @@ class MokshaAIApp:
             ollama_server=OLLAMA_SERVER,
         )
 
-        # 4. Build/load index
-        with st.spinner("🧠 Building knowledge index..."):
-            index = embeddings_manager.build_index(documents, DOCS_DIR)
+        # 4. Build/load index (automatically checks metadata for changes)
+        index = embeddings_manager.build_index(documents, DOCS_DIR)
 
         # 5. RAG Engine with intelligent routing
         rag_engine = RAGEngine(
@@ -143,7 +141,6 @@ class MokshaAIApp:
     def initialize_session_state(self):
         """Initialize session state variables"""
 
-        # Chat Manager (not cached, needed for session state init)
         chat_manager = ChatManager(
             chats_dir=CHATS_DIR,
             ollama_model=OLLAMA_MODEL,
@@ -156,14 +153,12 @@ class MokshaAIApp:
             all_chats = chat_manager.get_all_chats()
 
             if all_chats:
-                # Load most recent chat
-                last_chat = all_chats[0]  # Already sorted by updated_at
+                last_chat = all_chats[0]
                 st.session_state.current_chat_id = last_chat["id"]
                 st.session_state.messages = chat_manager.get_messages(last_chat["id"])
                 logger.info(f"Loaded last chat: {last_chat['name']}")
 
             else:
-                # Create new chat if none exist
                 st.session_state.current_chat_id = chat_manager.create_new_chat()
                 st.session_state.messages = []
 
@@ -173,15 +168,17 @@ class MokshaAIApp:
         if "awaiting_response" not in st.session_state:
             st.session_state.awaiting_response = False
 
+        if "user_message_displayed" not in st.session_state:
+            st.session_state.user_message_displayed = False
+
     def run(self):
         """Main application loop"""
-
         # Header with logo
         col1, col2 = st.columns([1, 5])
 
         with col1:
             try:
-                st.image(self.logo_path, width=100)
+                st.image(self.logo_path, width=80)
 
             except Exception as e:
                 st.markdown(
@@ -193,13 +190,13 @@ class MokshaAIApp:
             st.title("Moksha AI")
             st.caption("Your Vedic Spiritual Guide")
 
-        # Initialize components (with auto-refresh every 5 minutes)
+        # Initialize components (cached - only reloads if metadata changes)
         components = self.initialize_components()
         rag_engine = components["rag_engine"]
         doc_loader = components["doc_loader"]
         has_docs = components["has_docs"]
 
-        # Chat Manager (create fresh instance)
+        # Chat Manager
         chat_manager = ChatManager(
             chats_dir=CHATS_DIR,
             ollama_model=OLLAMA_MODEL,
@@ -207,14 +204,13 @@ class MokshaAIApp:
             max_name_length=MAX_CHAT_NAME_LENGTH,
         )
 
-        # Sidebar with scripture info
+        # Sidebar
         sidebar = Sidebar(chat_manager, doc_loader)
         selected_chat = sidebar.render(st.session_state.current_chat_id)
 
         # Handle chat selection
         if selected_chat and selected_chat != st.session_state.current_chat_id:
             st.session_state.current_chat_id = selected_chat
-            # Load messages from selected chat
             st.session_state.messages = chat_manager.get_messages(selected_chat)
             st.session_state.awaiting_response = False
             st.rerun()
@@ -245,16 +241,15 @@ class MokshaAIApp:
     def _handle_user_input(
         self, user_input: str, chat_manager: ChatManager, chat_display: ChatDisplay
     ):
-        """Handle new user input - show immediately"""
-
+        """Handle new user input - show message immediately"""
         # Add to messages
         st.session_state.messages.append({"role": "user", "content": user_input})
 
         # Save to chat file
         chat_manager.add_message(st.session_state.current_chat_id, "user", user_input)
 
-        # Display user message immediately
-        chat_display.render_message_history(st.session_state.messages)
+        # Mark that we need to show user message
+        st.session_state.user_message_displayed = False
 
         # Queue response generation
         st.session_state.awaiting_response = True
@@ -284,9 +279,11 @@ class MokshaAIApp:
             )
 
             if route == "rag" and has_docs:
-                # Use RAG for scripture-based queries
+                # Use RAG with custom implementation
                 full_response, sources = rag_engine.query_with_rag(
-                    query=last_query, session_id=st.session_state.current_chat_id
+                    query=last_query,
+                    session_id=st.session_state.current_chat_id,
+                    messages_history=st.session_state.messages[:-1],
                 )
 
                 # Display response with typing effect
@@ -325,7 +322,6 @@ class MokshaAIApp:
         except Exception as e:
             logger.exception(f"Error generating response: {e}")
 
-            # Create safe error message (no HTML)
             error_msg = f"⚠️ An error occurred: {str(e)}\n\nPlease try again or rephrase your question."
 
             st.session_state.messages.append(
@@ -336,7 +332,7 @@ class MokshaAIApp:
                 st.session_state.current_chat_id, "assistant", error_msg, mode="ERROR"
             )
 
-            # Display error in placeholder
+            # Display error
             response_placeholder.markdown(
                 chat_display._format_bot_message(error_msg), unsafe_allow_html=True
             )
@@ -344,12 +340,13 @@ class MokshaAIApp:
         finally:
             # Clear awaiting flag and rerun
             st.session_state.awaiting_response = False
-            time.sleep(0.5)  # Brief pause before rerun
+            time.sleep(0.5)
             st.rerun()
 
 
 def main():
     """Entry point"""
+
     app = MokshaAIApp()
     app.run()
 

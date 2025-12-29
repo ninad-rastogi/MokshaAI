@@ -1,5 +1,5 @@
 """
-Sidebar with chat history and scripture info
+Sidebar with chat history and scripture info - properly aligned buttons
 """
 
 from typing import Optional
@@ -29,6 +29,18 @@ class Sidebar:
             # Logo/Header
             st.markdown("### 🕉️ Moksha AI")
             st.markdown("*Your Spiritual Guide*")
+            st.divider()
+
+            # New Chat Button
+            if st.button(
+                "➕ New Conversation", use_container_width=True, type="primary"
+            ):
+                new_id = self.chat_manager.create_new_chat()
+                st.session_state.current_chat_id = new_id
+                st.session_state.messages = []
+                st.rerun()
+
+            st.divider()
 
             # Available Scriptures Section
             if self.doc_loader:
@@ -42,17 +54,10 @@ class Sidebar:
                     else:
                         st.info("No scriptures loaded. Add PDFs to data/docs/")
 
+                st.divider()
+
             # Chat History Section
             st.markdown("### 💬 Chat History")
-
-            # New Chat Button
-            if st.button(
-                "➕ New Conversation", use_container_width=True, type="primary"
-            ):
-                new_id = self.chat_manager.create_new_chat()
-                st.session_state.current_chat_id = new_id
-                st.session_state.messages = []
-                st.rerun()
 
             chats = self.chat_manager.get_all_chats()
 
@@ -61,22 +66,18 @@ class Sidebar:
 
                 return current_chat_id
 
-            # Display chats with better alignment
+            # Display chats with properly aligned buttons
             selected_chat = None
 
             for chat in chats:
                 chat_id = chat["id"]
                 chat_name = chat["name"]
                 message_count = chat.get("message_count", 0)
-
-                # Chat item with actions
                 is_current = chat_id == current_chat_id
 
-                # Create a container for the chat item
-                chat_container = st.container()
-
-                with chat_container:
-                    # Main chat button
+                # Create container for each chat
+                with st.container():
+                    # Row 1: Chat name button
                     button_label = f"{'📌 ' if is_current else '💬 '}{chat_name}"
 
                     if st.button(
@@ -87,28 +88,25 @@ class Sidebar:
                     ):
                         selected_chat = chat_id
 
-                    # Action buttons row
-                    col1, col2, col3 = st.columns([6, 1, 1])
+                    # Row 2: Action buttons (properly aligned)
+                    col1, col2 = st.columns([1, 1])
 
-                    with col2:
+                    with col1:
                         if st.button(
-                            "✏️",
+                            "✏️ Rename",
                             key=f"rename_{chat_id}",
-                            help="Rename",
                             use_container_width=True,
                         ):
                             st.session_state[f"renaming_{chat_id}"] = True
                             st.rerun()
 
-                    with col3:
+                    with col2:
                         if st.button(
-                            "🗑️",
+                            "🗑️ Delete",
                             key=f"delete_{chat_id}",
-                            help="Delete",
                             use_container_width=True,
                         ):
                             if self.chat_manager.delete_chat(chat_id):
-                                # If deleted chat was current, create new one
                                 if chat_id == current_chat_id:
                                     new_id = self.chat_manager.create_new_chat()
                                     st.session_state.current_chat_id = new_id
@@ -123,6 +121,7 @@ class Sidebar:
                         )
 
                         col_a, col_b = st.columns(2)
+
                         with col_a:
                             if st.button(
                                 "✅ Save",
@@ -142,11 +141,12 @@ class Sidebar:
                                 st.session_state[f"renaming_{chat_id}"] = False
                                 st.rerun()
 
-                    # Show message count
+                    # Message count
                     if message_count > 0:
                         st.caption(f"  {message_count} messages")
 
-                    st.divider()  # Separator between chats
+                    # Divider between chats
+                    st.markdown("---")
 
             # Info section
             with st.expander("ℹ️ About", expanded=False):
@@ -171,7 +171,7 @@ class Sidebar:
                 """
                 )
 
-            # Settings/Debug
+            # Settings
             with st.expander("⚙️ Settings", expanded=False):
                 st.markdown("#### Danger Zone")
 
