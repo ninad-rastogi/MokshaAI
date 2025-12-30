@@ -1,9 +1,8 @@
 """
-Main Streamlit application with proper caching and immediate message display
+Main Streamlit application.
 """
 
 import logging
-import time
 import warnings
 
 import streamlit as st
@@ -76,10 +75,10 @@ class MokshaAIApp:
 
         self.colors = get_theme_colors(self.theme)
 
-        # Inject custom CSS (with settings menu enabled)
+        # Inject custom CSS
         inject_custom_css()
 
-        # Set logo (REVERSED: dark logo for light theme, light logo for dark theme)
+        # Set logo
         logo_path = (
             "./images/MokshaAI_dark_cropped.png"
             if self.theme == "light"
@@ -94,22 +93,16 @@ class MokshaAIApp:
         except Exception as e:
             pass
 
-    @st.cache_resource(
-        show_spinner=False
-    )  # No TTL - cache until restart or metadata changes
+    @st.cache_resource(show_spinner=False)
     def initialize_components(_self):
-        """Initialize core components - only reload if documents change"""
+        """Initialize core components"""
+
         logger.info("Initializing Moksha AI components...")
 
-        # 1. Document Loader
         doc_loader = ScriptureDocumentLoader(DOCS_DIR)
-
-        # 2. Load documents with metadata
         documents = doc_loader.load_documents_with_metadata()
-
         available_scriptures = doc_loader.get_available_scriptures()
 
-        # 3. Embeddings Manager
         embeddings_manager = EmbeddingsManager(
             embeddings_dir=EMBEDDINGS_DIR,
             meta_file=META_FILE,
@@ -118,10 +111,8 @@ class MokshaAIApp:
             ollama_server=OLLAMA_SERVER,
         )
 
-        # 4. Build/load index (automatically checks metadata for changes)
         index = embeddings_manager.build_index(documents, DOCS_DIR)
 
-        # 5. RAG Engine with intelligent routing
         rag_engine = RAGEngine(
             index=index,
             ollama_model=OLLAMA_MODEL,
@@ -149,7 +140,6 @@ class MokshaAIApp:
         )
 
         if "current_chat_id" not in st.session_state:
-            # Load last chat or create new one
             all_chats = chat_manager.get_all_chats()
 
             if all_chats:
@@ -168,11 +158,12 @@ class MokshaAIApp:
         if "awaiting_response" not in st.session_state:
             st.session_state.awaiting_response = False
 
-        if "user_message_displayed" not in st.session_state:
-            st.session_state.user_message_displayed = False
+        if "pending_user_message" not in st.session_state:
+            st.session_state.pending_user_message = None
 
     def run(self):
         """Main application loop"""
+
         # Header with logo
         col1, col2 = st.columns([1, 5])
 
@@ -190,7 +181,7 @@ class MokshaAIApp:
             st.title("Moksha AI")
             st.caption("Your Vedic Spiritual Guide")
 
-        # Initialize components (cached - only reloads if metadata changes)
+        # Initialize components
         components = self.initialize_components()
         rag_engine = components["rag_engine"]
         doc_loader = components["doc_loader"]
@@ -223,6 +214,7 @@ class MokshaAIApp:
             chat_display.display_welcome_message()
 
         else:
+            # Render existing messages
             chat_display.render_message_history(st.session_state.messages)
 
         # Handle queued response generation
@@ -235,25 +227,21 @@ class MokshaAIApp:
             disabled=st.session_state.awaiting_response,
         )
 
-        if user_input:
-            self._handle_user_input(user_input, chat_manager, chat_display)
+        if user_input and not st.session_state.awaiting_response:
+            # Immediately add and display user message
+            st.session_state.messages.append({"role": "user", "content": user_input})
 
-    def _handle_user_input(
-        self, user_input: str, chat_manager: ChatManager, chat_display: ChatDisplay
-    ):
-        """Handle new user input - show message immediately"""
-        # Add to messages
-        st.session_state.messages.append({"role": "user", "content": user_input})
+            # Save to chat file
+            chat_manager.add_message(
+                st.session_state.current_chat_id, "user", user_input
+            )
 
-        # Save to chat file
-        chat_manager.add_message(st.session_state.current_chat_id, "user", user_input)
+            # Display user message immediately
+            chat_display.render_message_history(st.session_state.messages)
 
-        # Mark that we need to show user message
-        st.session_state.user_message_displayed = False
-
-        # Queue response generation
-        st.session_state.awaiting_response = True
-        st.rerun()
+            # Queue response generation
+            st.session_state.awaiting_response = True
+            st.rerun()
 
     def _generate_response(
         self,
@@ -262,7 +250,7 @@ class MokshaAIApp:
         chat_display: ChatDisplay,
         has_docs: bool,
     ):
-        """Generate bot response with intelligent routing using .invoke()"""
+        """Generate bot response"""
 
         last_query = st.session_state.messages[-1]["content"]
         response_placeholder = chat_display.create_message_placeholder()
@@ -278,15 +266,22 @@ class MokshaAIApp:
                 f"Query route: {route}, requires_scripture: {requires_scripture}"
             )
 
+            # Get only last 3 messages for context (to avoid referring to old questions)
+            recent_history = (
+                st.session_state.messages[-4:-1]
+                if len(st.session_state.messages) > 1
+                else []
+            )
+
             if route == "rag" and has_docs:
-                # Use RAG with custom implementation
+                # Use RAG
                 full_response, sources = rag_engine.query_with_rag(
                     query=last_query,
                     session_id=st.session_state.current_chat_id,
-                    messages_history=st.session_state.messages[:-1],
+                    messages_history=recent_history,  # Only recent context
                 )
 
-                # Display response with typing effect
+                # Display response
                 chat_display.display_complete_response(
                     full_response, response_placeholder
                 )
@@ -296,12 +291,13 @@ class MokshaAIApp:
                     chat_display.display_sources(sources)
 
             else:
-                # Use general conversation mode
+                # Use general mode
                 full_response = rag_engine.query_without_rag(
-                    query=last_query, messages_history=st.session_state.messages[:-1]
+                    query=last_query,
+                    messages_history=recent_history,  # Only recent context
                 )
 
-                # Display response with typing effect
+                # Display response
                 chat_display.display_complete_response(
                     full_response, response_placeholder
                 )
@@ -332,15 +328,13 @@ class MokshaAIApp:
                 st.session_state.current_chat_id, "assistant", error_msg, mode="ERROR"
             )
 
-            # Display error
             response_placeholder.markdown(
                 chat_display._format_bot_message(error_msg), unsafe_allow_html=True
             )
 
         finally:
-            # Clear awaiting flag and rerun
+            # Clear awaiting flag
             st.session_state.awaiting_response = False
-            time.sleep(0.5)
             st.rerun()
 
 

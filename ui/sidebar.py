@@ -1,5 +1,5 @@
 """
-Sidebar with chat history and scripture info - properly aligned buttons
+Sidebar with improved UI - 3-dot menu for actions
 """
 
 from typing import Optional
@@ -11,7 +11,7 @@ from core.document_loader import ScriptureDocumentLoader
 
 
 class Sidebar:
-    """Sidebar component for chat history"""
+    """Sidebar component for chat history with improved UI"""
 
     def __init__(
         self, chat_manager: ChatManager, doc_loader: ScriptureDocumentLoader = None
@@ -63,10 +63,9 @@ class Sidebar:
 
             if not chats:
                 st.info("No previous conversations")
-
                 return current_chat_id
 
-            # Display chats with properly aligned buttons
+            # Display chats with 3-dot menu
             selected_chat = None
 
             for chat in chats:
@@ -77,42 +76,46 @@ class Sidebar:
 
                 # Create container for each chat
                 with st.container():
-                    # Row 1: Chat name button
-                    button_label = f"{'📌 ' if is_current else '💬 '}{chat_name}"
-
-                    if st.button(
-                        button_label,
-                        key=f"chat_{chat_id}",
-                        use_container_width=True,
-                        type="primary" if is_current else "secondary",
-                    ):
-                        selected_chat = chat_id
-
-                    # Row 2: Action buttons (properly aligned)
-                    col1, col2 = st.columns([1, 1])
+                    # Chat item with button and popover
+                    col1, col2 = st.columns([5, 1])
 
                     with col1:
+                        # Chat select button
+                        button_label = f"{'📌 ' if is_current else '💬 '}{chat_name}"
                         if st.button(
-                            "✏️ Rename",
-                            key=f"rename_{chat_id}",
+                            button_label,
+                            key=f"chat_{chat_id}",
                             use_container_width=True,
+                            type="primary" if is_current else "secondary",
                         ):
-                            st.session_state[f"renaming_{chat_id}"] = True
-                            st.rerun()
+                            selected_chat = chat_id
 
                     with col2:
-                        if st.button(
-                            "🗑️ Delete",
-                            key=f"delete_{chat_id}",
-                            use_container_width=True,
-                        ):
-                            if self.chat_manager.delete_chat(chat_id):
-                                if chat_id == current_chat_id:
-                                    new_id = self.chat_manager.create_new_chat()
-                                    st.session_state.current_chat_id = new_id
-                                    st.session_state.messages = []
+                        # 3-dot menu using popover
+                        with st.popover("⋮", use_container_width=True):
+                            st.markdown("**Actions**")
 
+                            # Rename button
+                            if st.button(
+                                "✏️ Rename",
+                                key=f"rename_{chat_id}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[f"renaming_{chat_id}"] = True
                                 st.rerun()
+
+                            # Delete button
+                            if st.button(
+                                "🗑️ Delete",
+                                key=f"delete_{chat_id}",
+                                use_container_width=True,
+                            ):
+                                if self.chat_manager.delete_chat(chat_id):
+                                    if chat_id == current_chat_id:
+                                        new_id = self.chat_manager.create_new_chat()
+                                        st.session_state.current_chat_id = new_id
+                                        st.session_state.messages = []
+                                    st.rerun()
 
                     # Rename dialog
                     if st.session_state.get(f"renaming_{chat_id}", False):

@@ -1,13 +1,12 @@
 """
-UI styling and CSS for Moksha AI
+UI styling and CSS for Moksha AI - Enhanced visual design
 """
 
 import streamlit as st
 
 
 def inject_custom_css():
-    """Inject custom CSS for better UI"""
-
+    """Inject custom CSS for beautiful UI"""
     st.markdown(
         """
         <style>
@@ -16,32 +15,101 @@ def inject_custom_css():
             padding-top: 2rem;
         }
         
-        /* Sidebar styling */
+        /* Sidebar - Enhanced styling with gradient */
         [data-testid="stSidebar"] {
-            background-color: var(--background-color);
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
         }
         
-        /* Better button alignment in sidebar */
+        [data-testid="stSidebar"] > div:first-child {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        /* Sidebar text colors */
+        [data-testid="stSidebar"] .stMarkdown {
+            color: #e0e0e0;
+        }
+        
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: #f0f0f0 !important;
+        }
+        
+        /* Sidebar dividers */
+        [data-testid="stSidebar"] hr {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Sidebar buttons */
         [data-testid="stSidebar"] button {
             margin: 0.25rem 0;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
         }
         
-        /* Chat item container */
-        [data-testid="stSidebar"] .stButton {
-            margin-bottom: 0.25rem;
+        [data-testid="stSidebar"] button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
         
-        /* Align action buttons horizontally */
-        [data-testid="stSidebar"] [data-testid="column"] {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
+        /* Primary button in sidebar */
+        [data-testid="stSidebar"] button[kind="primary"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
         }
         
-        /* Make small buttons consistent */
+        [data-testid="stSidebar"] button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        
+        /* Secondary buttons in sidebar */
         [data-testid="stSidebar"] button[kind="secondary"] {
-            padding: 0.25rem 0.5rem;
-            min-height: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-testid="stSidebar"] button[kind="secondary"]:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Popover styling */
+        [data-testid="stPopover"] {
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+        }
+        
+        /* Expander styling in sidebar */
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 0.5rem;
+            margin: 0.5rem 0;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stExpander"]:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+        
+        /* Chat item styling */
+        .stButton button {
+            text-align: left;
+        }
+        
+        /* Info and caption in sidebar */
+        [data-testid="stSidebar"] .stAlert {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #e0e0e0;
+        }
+        
+        [data-testid="stSidebar"] .stCaption {
+            color: rgba(224, 224, 224, 0.6);
         }
         
         /* Thinking animation */
@@ -156,6 +224,15 @@ def inject_custom_css():
         
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(128, 128, 128, 0.5);
+        }
+        
+        /* Sidebar scrollbar (darker) */
+        [data-testid="stSidebar"] ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        [data-testid="stSidebar"] ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
         </style>
     """,

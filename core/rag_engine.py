@@ -1,6 +1,5 @@
 """
-RAG engine with AI-powered intelligent query routing
-Custom RAG implementation using .invoke() to avoid memory issues
+RAG engine with improved AI-powered intelligent query routing
 """
 
 import json
@@ -15,7 +14,7 @@ logger = logging.getLogger("moksha_ai.rag_engine")
 
 
 class RAGEngine:
-    """RAG-based question answering with AI-powered intelligent routing"""
+    """RAG-based question answering with intelligent routing"""
 
     def __init__(
         self,
@@ -30,7 +29,7 @@ class RAGEngine:
         self.ollama_server = ollama_server
         self.available_scriptures = available_scriptures
 
-        # Format system prompt with available scriptures
+        # Format system prompt
         self.system_prompt = system_prompt.format(
             available_scriptures=(
                 ", ".join(available_scriptures)
@@ -51,7 +50,7 @@ class RAGEngine:
 
     def route_query(self, query: str) -> tuple[str, bool]:
         """
-        Use LLM to intelligently route query to appropriate handler
+        Use LLM to intelligently route query
         Returns: (route: "rag" or "general", requires_scripture: bool)
         """
 
@@ -61,64 +60,63 @@ class RAGEngine:
             else "None"
         )
 
-        classification_prompt = f"""You are a query classifier for a spiritual AI assistant called Moksha AI.
+        classification_prompt = f"""You are a query classifier for Moksha AI, a spiritual AI assistant.
 
-Your job is to classify user queries into one of these categories:
+Classify the user's query into ONE of these categories:
 
-1. **SCRIPTURE** - User is asking about specific scriptures, teachings, verses, or quotes
+1. **SCRIPTURE** - User explicitly asks about specific scriptures, verses, or teachings FROM texts
    Examples:
    - "What does Bhagavad Gita say about karma?"
-   - "Tell me about the story of Rama"
+   - "Tell me the story of Rama from Ramayana"
    - "Quote a shloka about dharma"
    - "Explain Chapter 2 of the Gita"
    
-2. **GUIDANCE** - User is asking for spiritual guidance, life advice, or philosophical discussion within the scope of spirituality
+2. **GUIDANCE** - User asks for spiritual guidance, life advice, or philosophical questions
    Examples:
    - "How can I find inner peace?"
-   - "What should I do when I feel stressed?"
+   - "What should I do when stressed?"
    - "How to practice meditation?"
-   - "What is the meaning of life?"
+   - "What is the purpose of life?"
    
-3. **CASUAL** - User is just chatting casually, saying hello, or asking about non-spiritual topics
+3. **CASUAL** - Greetings, gratitude, meta-questions about the bot, or non-spiritual topics
    Examples:
    - "Hi", "Hello", "How are you?"
+   - "Who are you?", "What can you do?"
    - "Thank you", "Thanks"
    - "How to bake a cake?"
    - "What's the weather?"
-   - "Tell me a joke"
 
-Available scriptures in the database: {scriptures_list}
+Available scriptures: {scriptures_list}
 
-**IMPORTANT RULES:**
-- If query asks about specific scriptures, verses, quotes, or teachings → SCRIPTURE
-- If query asks for spiritual guidance, life advice, or philosophical questions → GUIDANCE
-- If query is casual chat, gratitude, or about non-spiritual topics (cooking, coding, weather, etc.) → CASUAL
-- If scriptures are available and query mentions them, prefer SCRIPTURE over GUIDANCE
-- If no scriptures available, SCRIPTURE queries should be treated as GUIDANCE
+**CRITICAL RULES:**
+- If query asks "who are you" or "what are you" or "introduce yourself" → CASUAL (meta-question about bot)
+- If query mentions specific scripture names (Gita, Ramayana, etc.) AND asks about their content → SCRIPTURE
+- If query asks for life advice, guidance, or "how to" for spiritual matters → GUIDANCE
+- If query is about non-spiritual topics (cooking, coding, weather) → CASUAL
+- If no scriptures available, SCRIPTURE queries become GUIDANCE
 
 User Query: "{query}"
 
-Respond with ONLY a JSON object:
+Respond with ONLY valid JSON:
 {{
   "category": "SCRIPTURE" or "GUIDANCE" or "CASUAL",
-  "reasoning": "brief explanation of why you chose this category"
+  "reasoning": "brief explanation"
 }}"""
 
         try:
             messages = [
                 SystemMessage(
-                    content="You are an expert query classifier. Always respond with valid JSON only."
+                    content="You are an expert query classifier. Respond with valid JSON only."
                 ),
                 HumanMessage(content=classification_prompt),
             ]
 
             response = self.classifier_llm.invoke(messages)
-
             response_text = (
                 response.content if hasattr(response, "content") else str(response)
             )
 
-            # Parse JSON response
+            # Parse JSON
             response_text = response_text.strip()
 
             if response_text.startswith("```json"):
@@ -129,15 +127,15 @@ Respond with ONLY a JSON object:
 
             if response_text.endswith("```"):
                 response_text = response_text[:-3]
-
             response_text = response_text.strip()
 
             classification = json.loads(response_text)
             category = classification.get("category", "GUIDANCE")
-            reasoning = classification.get("reasoning", "No reasoning provided")
+            reasoning = classification.get("reasoning", "No reasoning")
 
             logger.info(f"Query classified as: {category} - Reasoning: {reasoning}")
 
+            # Route based on category
             if category == "SCRIPTURE" and self.has_documents():
                 route = "rag"
                 requires_scripture = True
@@ -145,13 +143,7 @@ Respond with ONLY a JSON object:
             elif category == "SCRIPTURE" and not self.has_documents():
                 route = "general"
                 requires_scripture = False
-                logger.warning(
-                    "SCRIPTURE query but no documents available, routing to GENERAL"
-                )
-
-            elif category in ["GUIDANCE", "CASUAL"]:
-                route = "general"
-                requires_scripture = False
+                logger.warning("SCRIPTURE query but no documents, routing to GENERAL")
 
             else:
                 route = "general"
@@ -160,14 +152,12 @@ Respond with ONLY a JSON object:
             return route, requires_scripture
 
         except json.JSONDecodeError as e:
-            logger.error(
-                f"Failed to parse classification JSON: {e}, Response: {response_text}"
-            )
+            logger.error(f"Failed to parse JSON: {e}, Response: {response_text}")
 
             return "general", False
 
         except Exception as e:
-            logger.error(f"Error in query routing: {e}")
+            logger.error(f"Error in routing: {e}")
 
             return "general", False
 
@@ -175,23 +165,23 @@ Respond with ONLY a JSON object:
         self, query: str, session_id: str, messages_history: List[Dict] = None
     ) -> tuple[str, List[Dict]]:
         """
-        Custom RAG implementation using .invoke() to avoid memory issues
+        Custom RAG implementation using .invoke()
         Returns: (response_text, sources)
         """
 
-        # Step 1: Retrieve relevant documents
+        # Retrieve relevant documents
         retriever = self.index.as_retriever(similarity_top_k=3)
         nodes = retriever.retrieve(query)
 
-        # Step 2: Format context from retrieved nodes
+        # Format context
         context_parts = []
         sources = []
 
         for i, node in enumerate(nodes):
             context_parts.append(f"[Context {i+1}]\n{node.text}\n")
 
-            # Extract metadata for citations
             metadata = node.metadata
+
             sources.append(
                 {
                     "scripture": metadata.get("scripture", "Unknown"),
@@ -206,10 +196,9 @@ Respond with ONLY a JSON object:
 
         context_str = "\n".join(context_parts)
 
-        # Step 3: Build conversation history
+        # Build conversation (only recent history to avoid confusion)
         chat_msgs = [SystemMessage(content=self.system_prompt)]
 
-        # Add previous messages if available
         if messages_history:
             for msg in messages_history:
                 if msg["role"] == "user":
@@ -218,43 +207,44 @@ Respond with ONLY a JSON object:
                 elif msg["role"] == "assistant":
                     chat_msgs.append(SystemMessage(content=msg["content"]))
 
-        # Step 4: Create prompt with context
-        rag_prompt = f"""Based on the following context from sacred scriptures, please answer the user's question.
+        # Create prompt with context
+        rag_prompt = f"""Based ONLY on the following scripture context, answer the user's question.
 
-Context from Scriptures:
+Scripture Context:
 {context_str}
 
 User Question: {query}
 
 Instructions:
-- Answer based STRICTLY on the provided context
-- Quote relevant Sanskrit shlokas if present in the context
-- Cite the scripture name and page number
-- If the context doesn't contain the answer, say so honestly
-- Be clear, concise, and respectful"""
+- Answer STRICTLY from the provided context
+- Quote Sanskrit shlokas if present
+- Cite scripture name and page number
+- If context doesn't answer the question, say so
+- Do NOT refer to previous questions or conversations
+- Be clear and concise"""
 
         chat_msgs.append(HumanMessage(content=rag_prompt))
 
-        # Step 5: Get response using .invoke() (no streaming)
+        # Get response
         try:
             response = self.response_llm.invoke(chat_msgs)
             response_text = (
                 response.content if hasattr(response, "content") else str(response)
             )
 
-            logger.info(
-                f"RAG response generated successfully with {len(sources)} sources"
-            )
+            logger.info(f"RAG response generated with {len(sources)} sources")
+
             return response_text, sources
 
         except Exception as e:
-            logger.error(f"Error generating RAG response: {e}")
+            logger.error(f"Error in RAG response: {e}")
+
             raise
 
     def query_without_rag(self, query: str, messages_history: List[Dict]) -> str:
         """Query without RAG - returns complete response"""
 
-        # Build message history
+        # Build message history (only recent to avoid confusion)
         chat_msgs = [SystemMessage(content=self.system_prompt)]
 
         for msg in messages_history:
@@ -264,10 +254,14 @@ Instructions:
             elif msg["role"] == "assistant":
                 chat_msgs.append(SystemMessage(content=msg["content"]))
 
-        # Add current query
-        chat_msgs.append(HumanMessage(content=query))
+        # Add current query with specific instruction
+        enhanced_query = f"""{query}
 
-        # Get complete response using invoke
+IMPORTANT: Answer this NEW question directly. Do NOT refer to or mention previous questions in the conversation."""
+
+        chat_msgs.append(HumanMessage(content=enhanced_query))
+
+        # Get response
         response = self.response_llm.invoke(chat_msgs)
         response_text = (
             response.content if hasattr(response, "content") else str(response)
@@ -276,10 +270,12 @@ Instructions:
         return response_text
 
     def has_documents(self) -> bool:
-        """Check if index has any documents"""
+        """Check if index has documents"""
+
         try:
             retriever = self.index.as_retriever(similarity_top_k=1)
             results = retriever.retrieve("test")
+
             return len(results) > 0
 
         except Exception as e:
@@ -289,6 +285,6 @@ Instructions:
         """Get formatted string of available scriptures"""
 
         if not self.available_scriptures:
-            return "No scriptures currently loaded. Please add PDF files to the docs folder."
+            return "No scriptures loaded. Add PDFs to docs folder."
 
         return f"Available scriptures: {', '.join(self.available_scriptures)}"
