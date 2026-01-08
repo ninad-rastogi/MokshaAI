@@ -1,5 +1,5 @@
 """
-Main Streamlit application.
+Main Streamlit application - with optimized document loading
 """
 
 import logging
@@ -75,14 +75,14 @@ class MokshaAIApp:
 
         self.colors = get_theme_colors(self.theme)
 
-        # Inject custom CSS
-        inject_custom_css()
+        # Inject custom CSS with theme
+        inject_custom_css(self.theme)
 
         # Set logo
         logo_path = (
-            "./images/MokshaAI_dark_cropped.png"
+            "./images/MokshaAI_light_cropped.png"
             if self.theme == "light"
-            else "./images/MokshaAI_light_cropped.png"
+            else "./images/MokshaAI_dark_cropped.png"
         )
 
         self.logo_path = logo_path
@@ -95,14 +95,15 @@ class MokshaAIApp:
 
     @st.cache_resource(show_spinner=False)
     def initialize_components(_self):
-        """Initialize core components"""
+        """Initialize core components - only loads docs when metadata changes"""
 
         logger.info("Initializing Moksha AI components...")
 
+        # Initialize document loader (just scans, doesn't load)
         doc_loader = ScriptureDocumentLoader(DOCS_DIR)
-        documents = doc_loader.load_documents_with_metadata()
         available_scriptures = doc_loader.get_available_scriptures()
 
+        # Initialize embeddings manager
         embeddings_manager = EmbeddingsManager(
             embeddings_dir=EMBEDDINGS_DIR,
             meta_file=META_FILE,
@@ -111,8 +112,23 @@ class MokshaAIApp:
             ollama_server=OLLAMA_SERVER,
         )
 
+        # Check if we need to rebuild embeddings
+        needs_rebuild = embeddings_manager.needs_rebuild(DOCS_DIR)
+
+        if needs_rebuild:
+            logger.info(
+                "Metadata changed. Loading documents and rebuilding embeddings..."
+            )
+            # Only load documents if we need to rebuild
+            documents = doc_loader.load_documents_with_metadata()
+        else:
+            logger.info("No metadata changes. Skipping document loading...")
+            documents = []  # Empty list, we'll load from cache
+
+        # Build or load index (handles both cases)
         index = embeddings_manager.build_index(documents, DOCS_DIR)
 
+        # Create RAG engine
         rag_engine = RAGEngine(
             index=index,
             ollama_model=OLLAMA_MODEL,
@@ -126,7 +142,7 @@ class MokshaAIApp:
         return {
             "doc_loader": doc_loader,
             "rag_engine": rag_engine,
-            "has_docs": len(documents) > 0,
+            "has_docs": len(available_scriptures) > 0,
         }
 
     def initialize_session_state(self):
@@ -228,19 +244,18 @@ class MokshaAIApp:
         )
 
         if user_input and not st.session_state.awaiting_response:
-            # Immediately add and display user message
+            # IMMEDIATELY add user message to session state
             st.session_state.messages.append({"role": "user", "content": user_input})
 
-            # Save to chat file
+            # IMMEDIATELY save to chat file (without waiting for response)
             chat_manager.add_message(
                 st.session_state.current_chat_id, "user", user_input
             )
 
-            # Display user message immediately
-            chat_display.render_message_history(st.session_state.messages)
-
             # Queue response generation
             st.session_state.awaiting_response = True
+
+            # Rerun to display user message immediately
             st.rerun()
 
     def _generate_response(
@@ -278,7 +293,7 @@ class MokshaAIApp:
                 full_response, sources = rag_engine.query_with_rag(
                     query=last_query,
                     session_id=st.session_state.current_chat_id,
-                    messages_history=recent_history,  # Only recent context
+                    messages_history=recent_history,
                 )
 
                 # Display response
@@ -294,7 +309,7 @@ class MokshaAIApp:
                 # Use general mode
                 full_response = rag_engine.query_without_rag(
                     query=last_query,
-                    messages_history=recent_history,  # Only recent context
+                    messages_history=recent_history,
                 )
 
                 # Display response
@@ -307,7 +322,7 @@ class MokshaAIApp:
                 {"role": "assistant", "content": full_response}
             )
 
-            # Save to chat file
+            # Save assistant message (this will trigger auto-naming after 4+ messages)
             chat_manager.add_message(
                 st.session_state.current_chat_id,
                 "assistant",

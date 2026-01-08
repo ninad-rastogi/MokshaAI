@@ -1,5 +1,5 @@
 """
-Chat session management with smart naming
+Chat session management with 3-4 word naming limit
 """
 
 import json
@@ -44,6 +44,7 @@ class ChatManager:
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
             "messages": [],
+            "auto_named": False,  # Track if chat has been auto-named
         }
 
         self._save_chat(chat_id, chat_data)
@@ -133,6 +134,7 @@ class ChatManager:
 
         chat_data["name"] = new_name[: self.max_name_length]
         chat_data["updated_at"] = datetime.now().isoformat()
+        chat_data["auto_named"] = True  # Mark as manually named
         self._save_chat(chat_id, chat_data)
         logger.info(f"Renamed chat {chat_id} to: {new_name}")
 
@@ -150,6 +152,7 @@ class ChatManager:
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
                 "messages": [],
+                "auto_named": False,
             }
 
         chat_data["messages"].append(
@@ -163,29 +166,64 @@ class ChatManager:
 
         chat_data["updated_at"] = datetime.now().isoformat()
 
-        # Auto-name chat after first user message
-        if len(chat_data["messages"]) == 1 and role == "user":
-            self._auto_name_chat(chat_id, chat_data, content)
+        # Auto-name chat after 4-5 messages (2-3 exchanges) if not already named
+        message_count = len(chat_data["messages"])
+        auto_named = chat_data.get("auto_named", False)
+
+        if not auto_named and message_count >= 4 and role == "assistant":
+            self._auto_name_chat(chat_id, chat_data)
 
         self._save_chat(chat_id, chat_data)
 
-    def _auto_name_chat(self, chat_id: str, chat_data: dict, first_message: str):
-        """Generate a smart name for the chat based on first message"""
+    def _auto_name_chat(self, chat_id: str, chat_data: dict):
+        """Generate a smart name (3-4 words max) for the chat"""
 
         try:
+            # Get first 2-3 user messages for context
+            user_messages = [
+                msg["content"]
+                for msg in chat_data["messages"][:6]
+                if msg["role"] == "user"
+            ][:3]
+
+            if not user_messages:
+                return
+
+            conversation_context = "\n".join([f"Q: {msg}" for msg in user_messages])
+
             llm = ChatOllama(
                 model=self.ollama_model, base_url=self.ollama_server, temperature=0.3
             )
 
-            naming_prompt = f"""Based on this spiritual question, create a short, meaningful title (max 6 words):
+            naming_prompt = f"""You are a title generator for spiritual conversations. Create a SHORT title that captures the main topic.
 
-Question: {first_message[:200]}
+Conversation:
+{conversation_context}
 
-Generate ONLY the title, nothing else. Make it spiritual and relevant."""
+STRICT RULES:
+- MAXIMUM 3-4 WORDS (this is critical!)
+- Be SPECIFIC to the actual topic discussed
+- NO generic phrases like "Spiritual Journey" or "Divine Connection"
+- Focus on the concrete topic: Karma, Meditation, Gita, Dharma, etc.
+
+GOOD Examples (3-4 words):
+- "Understanding Karma Effects"
+- "Bhagavad Gita Teachings"
+- "Meditation for Beginners"
+- "Dharma and Duty"
+- "Life Purpose Questions"
+- "Yoga Practice Guide"
+
+BAD Examples (too generic or too long):
+- "Connecting with Divine Within" (generic)
+- "Spiritual Journey of Self Discovery" (too long)
+- "Questions About Life" (too vague)
+
+Generate ONLY the title (3-4 words max), nothing else."""
 
             messages = [
                 SystemMessage(
-                    content="You are a helpful assistant that creates concise, meaningful titles."
+                    content="You create ultra-concise titles. Maximum 3-4 words."
                 ),
                 HumanMessage(content=naming_prompt),
             ]
@@ -195,11 +233,21 @@ Generate ONLY the title, nothing else. Make it spiritual and relevant."""
             # Extract title
             title = response.content.strip().strip('"').strip("'")
 
-            # Truncate if too long
+            # Clean up common prefixes/suffixes
+            title = title.replace("Title:", "").replace("title:", "").strip()
+
+            # Force 3-4 word limit by taking first 4 words
+            words = title.split()
+
+            if len(words) > 4:
+                title = " ".join(words[:4])
+
+            # Truncate if still too long
             if len(title) > self.max_name_length:
                 title = title[: self.max_name_length - 3] + "..."
 
             chat_data["name"] = title
+            chat_data["auto_named"] = True
             logger.info(f"Auto-named chat {chat_id}: {title}")
 
         except Exception as e:

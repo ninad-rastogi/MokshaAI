@@ -171,7 +171,7 @@ class ChatDisplay:
         if not sources:
             return
 
-        st.markdown("---")
+        st.divider()
         st.markdown("### 📜 Scripture References")
 
         for idx, source in enumerate(sources, 1):
@@ -207,17 +207,37 @@ class ChatDisplay:
             </div>
         </div>
         """
+
         placeholder.markdown(thinking_html, unsafe_allow_html=True)
 
     def display_welcome_message(self):
         """Display welcome message for new chat"""
 
-        welcome_html = f"""
+        welcome_html_old = f"""
         <div style="text-align: center; padding: 2rem; color: #666;">
             <h2 style="margin-bottom: 1rem;">{self.bot_emoji} Welcome to Moksha AI</h2>
             <p style="font-size: 1.1rem; margin-bottom: 2rem;">
                 Your spiritual guide rooted in Vedic wisdom
             </p>
+            <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <p><strong>You can ask about:</strong></p>
+                <ul style="list-style-type: none; padding-left: 0;">
+                    <li>🙏 Life's purpose and dharma</li>
+                    <li>⚖️ Righteousness and moral dilemmas</li>
+                    <li>🔄 Karma and its effects</li>
+                    <li>🧘 Meditation and spiritual practices</li>
+                    <li>📚 Scripture teachings and interpretations</li>
+                    <li>💭 General spiritual guidance</li>
+                </ul>
+                <p style="margin-top: 1rem; font-size: 0.9rem; font-style: italic;">
+                    Note: I intelligently determine whether to search scriptures or provide general guidance based on your question.
+                </p>
+            </div>
+        </div>
+        """
+
+        welcome_html = """
+        <div style="text-align: center; padding: 2rem; color: #666;">
             <div style="text-align: left; max-width: 600px; margin: 0 auto;">
                 <p><strong>You can ask about:</strong></p>
                 <ul style="list-style-type: none; padding-left: 0;">

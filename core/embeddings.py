@@ -1,5 +1,5 @@
 """
-Embeddings and vector store management
+Embeddings and vector store management - optimized loading
 """
 
 import json
@@ -39,7 +39,7 @@ class EmbeddingsManager:
         self.ollama_model = ollama_model
         self.ollama_server = ollama_server
 
-        # Initialize Settings
+        # Initialize Settings ONCE
         Settings.embed_model = HuggingFaceEmbedding(model_name=embed_model_name)
         Settings.llm = Ollama(
             model=ollama_model, base_url=ollama_server, request_timeout=480.0
@@ -55,6 +55,7 @@ class EmbeddingsManager:
 
         for item in docs_dir.rglob("*.pdf"):
             stat = item.stat()
+            # Use both mtime and size for accurate change detection
             meta[str(item)] = {"mtime": stat.st_mtime, "size": stat.st_size}
 
         return meta
@@ -63,6 +64,7 @@ class EmbeddingsManager:
         """Load previously stored metadata"""
 
         if not self.meta_file.exists():
+            logger.info("No stored metadata found")
             return {}
 
         try:
@@ -71,7 +73,6 @@ class EmbeddingsManager:
 
         except Exception as e:
             logger.warning(f"Failed to load metadata: {e}")
-
             return {}
 
     def _save_metadata(self, metadata: dict):
@@ -80,23 +81,44 @@ class EmbeddingsManager:
         try:
             with open(self.meta_file, "w") as f:
                 json.dump(metadata, f, indent=2)
+            logger.debug("Saved metadata to file")
 
         except Exception as e:
             logger.error(f"Failed to save metadata: {e}")
 
     def needs_rebuild(self, docs_dir: Path) -> bool:
         """Check if embeddings need to be rebuilt"""
+
         current_meta = self._scan_docs_metadata(docs_dir)
         stored_meta = self._load_stored_metadata()
 
-        return current_meta != stored_meta
+        # If metadata differs, we need rebuild
+        if current_meta != stored_meta:
+            logger.info("Metadata changed - rebuild needed")
+            return True
+
+        # If embeddings directory doesn't exist, rebuild
+        if not self.embeddings_dir.exists():
+            logger.info("Embeddings directory missing - rebuild needed")
+            return True
+
+        logger.info("No changes detected - using cached embeddings")
+        return False
 
     def build_index(
         self, documents: List[Document], docs_dir: Path
     ) -> VectorStoreIndex:
         """Build or load vector index"""
 
-        if self.needs_rebuild(docs_dir):
+        # Ensure embeddings directory exists
+        self.embeddings_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get current metadata
+        current_meta = self._scan_docs_metadata(docs_dir)
+        stored_meta = self._load_stored_metadata()
+
+        # Check if rebuild is needed
+        if current_meta != stored_meta:
             logger.info("Documents changed. Rebuilding embeddings...")
 
             # Clear old embeddings
@@ -106,7 +128,6 @@ class EmbeddingsManager:
             self.embeddings_dir.mkdir(parents=True, exist_ok=True)
 
             # Save new metadata
-            current_meta = self._scan_docs_metadata(docs_dir)
             self._save_metadata(current_meta)
 
             # Create new index
@@ -121,16 +142,18 @@ class EmbeddingsManager:
                     embed_model=Settings.embed_model,
                     storage_context=storage_context,
                 )
-
-                logger.info("Embeddings built successfully")
+                logger.info(
+                    f"Embeddings built successfully from {len(documents)} documents"
+                )
 
             else:
                 index = VectorStoreIndex.from_vector_store(
                     vector_store, storage_context=storage_context
                 )
-
                 logger.warning("No documents found, created empty index")
+
         else:
+            # Load from cache
             logger.info("Using cached embeddings")
             db = chromadb.PersistentClient(path=str(self.embeddings_dir))
             collection = db.get_or_create_collection("moksha_ai")

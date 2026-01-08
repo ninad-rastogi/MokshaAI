@@ -1,5 +1,5 @@
 """
-Sidebar with improved UI - 3-dot menu for actions
+Sidebar with hover-based 3-dot menu
 """
 
 from typing import Optional
@@ -11,7 +11,7 @@ from core.document_loader import ScriptureDocumentLoader
 
 
 class Sidebar:
-    """Sidebar component for chat history with improved UI"""
+    """Sidebar component for chat history with hover menu"""
 
     def __init__(
         self, chat_manager: ChatManager, doc_loader: ScriptureDocumentLoader = None
@@ -65,62 +65,84 @@ class Sidebar:
                 st.info("No previous conversations")
                 return current_chat_id
 
-            # Display chats with 3-dot menu
+            # Display chats with hover menu
             selected_chat = None
 
             for chat in chats:
                 chat_id = chat["id"]
                 chat_name = chat["name"]
-                message_count = chat.get("message_count", 0)
                 is_current = chat_id == current_chat_id
 
-                # Create container for each chat
-                with st.container():
-                    # Chat item with button and popover
-                    col1, col2 = st.columns([5, 1])
+                # Create chat item with hover menu using HTML
+                chat_item_html = f"""
+                <div class="chat-item-container">
+                    <div class="chat-button-wrapper">
+                        <button class="chat-main-button {'current-chat' if is_current else ''}" 
+                                data-chat-id="{chat_id}" 
+                                title="{chat_name}">
+                            {'📌' if is_current else '💬'} {chat_name}
+                        </button>
+                        <div class="three-dot-menu">
+                            <div class="three-dots">⋮</div>
+                            <div class="hover-menu">
+                                <button class="menu-action rename-action" data-chat-id="{chat_id}" data-action="rename">✏️ Rename</button>
+                                <button class="menu-action delete-action" data-chat-id="{chat_id}" data-action="delete">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                """
 
-                    with col1:
-                        # Chat select button
-                        button_label = f"{'📌 ' if is_current else '💬 '}{chat_name}"
-                        if st.button(
-                            button_label,
-                            key=f"chat_{chat_id}",
-                            use_container_width=True,
-                            type="primary" if is_current else "secondary",
-                        ):
-                            selected_chat = chat_id
+                # Render HTML
+                st.markdown(chat_item_html, unsafe_allow_html=True)
 
-                    with col2:
-                        # 3-dot menu using popover
-                        with st.popover("⋮", use_container_width=True):
-                            st.markdown("**Actions**")
+                # Hidden Streamlit buttons for actual functionality (no label_visibility)
+                col1, col2, col3, col4 = st.columns([6, 1, 1, 1])
 
-                            # Rename button
-                            if st.button(
-                                "✏️ Rename",
-                                key=f"rename_{chat_id}",
-                                use_container_width=True,
-                            ):
-                                st.session_state[f"renaming_{chat_id}"] = True
-                                st.rerun()
+                # Use markdown to hide button text instead
+                with col1:
+                    if st.button(
+                        "​",  # Zero-width space character
+                        key=f"sel_{chat_id}",
+                        use_container_width=True,
+                    ):
+                        selected_chat = chat_id
 
-                            # Delete button
-                            if st.button(
-                                "🗑️ Delete",
-                                key=f"delete_{chat_id}",
-                                use_container_width=True,
-                            ):
-                                if self.chat_manager.delete_chat(chat_id):
-                                    if chat_id == current_chat_id:
-                                        new_id = self.chat_manager.create_new_chat()
-                                        st.session_state.current_chat_id = new_id
-                                        st.session_state.messages = []
-                                    st.rerun()
+                with col2:
+                    if st.button(
+                        "​",
+                        key=f"menu_{chat_id}",
+                        use_container_width=True,
+                    ):
+                        pass  # Menu opens on hover via CSS
 
-                    # Rename dialog
-                    if st.session_state.get(f"renaming_{chat_id}", False):
+                with col3:
+                    if st.button(
+                        "​",
+                        key=f"ren_{chat_id}",
+                        use_container_width=True,
+                        help="Rename",
+                    ):
+                        st.session_state[f"renaming_{chat_id}"] = True
+                        st.rerun()
+
+                with col4:
+                    if st.button(
+                        "​",
+                        key=f"del_{chat_id}",
+                        use_container_width=True,
+                        help="Delete",
+                    ):
+                        st.session_state[f"confirm_delete_{chat_id}"] = True
+                        st.rerun()
+
+                # Rename dialog
+                if st.session_state.get(f"renaming_{chat_id}", False):
+                    with st.container():
                         new_name = st.text_input(
-                            "New name:", value=chat_name, key=f"new_name_{chat_id}"
+                            "New name:",
+                            value=chat_name,
+                            key=f"new_name_{chat_id}",
                         )
 
                         col_a, col_b = st.columns(2)
@@ -138,18 +160,40 @@ class Sidebar:
                         with col_b:
                             if st.button(
                                 "❌ Cancel",
-                                key=f"cancel_{chat_id}",
+                                key=f"cancel_rename_{chat_id}",
                                 use_container_width=True,
                             ):
                                 st.session_state[f"renaming_{chat_id}"] = False
                                 st.rerun()
 
-                    # Message count
-                    if message_count > 0:
-                        st.caption(f"  {message_count} messages")
+                # Delete confirmation
+                if st.session_state.get(f"confirm_delete_{chat_id}", False):
+                    with st.container():
+                        st.warning("⚠️ Delete this chat?")
+                        col_y, col_n = st.columns(2)
 
-                    # Divider between chats
-                    st.markdown("---")
+                        with col_y:
+                            if st.button(
+                                "Yes",
+                                key=f"yes_delete_{chat_id}",
+                                use_container_width=True,
+                            ):
+                                if self.chat_manager.delete_chat(chat_id):
+                                    if chat_id == current_chat_id:
+                                        new_id = self.chat_manager.create_new_chat()
+                                        st.session_state.current_chat_id = new_id
+                                        st.session_state.messages = []
+                                st.session_state[f"confirm_delete_{chat_id}"] = False
+                                st.rerun()
+
+                        with col_n:
+                            if st.button(
+                                "No",
+                                key=f"no_delete_{chat_id}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[f"confirm_delete_{chat_id}"] = False
+                                st.rerun()
 
             # Info section
             with st.expander("ℹ️ About", expanded=False):
@@ -181,7 +225,11 @@ class Sidebar:
                 if st.button(
                     "🗑️ Clear All Chats", type="secondary", use_container_width=True
                 ):
-                    st.warning("This will delete ALL chat history!")
+                    st.session_state["confirm_clear_all"] = True
+                    st.rerun()
+
+                if st.session_state.get("confirm_clear_all", False):
+                    st.warning("⚠️ This will delete ALL chat history!")
 
                     col_confirm, col_cancel = st.columns(2)
 
@@ -196,12 +244,14 @@ class Sidebar:
                             new_id = self.chat_manager.create_new_chat()
                             st.session_state.current_chat_id = new_id
                             st.session_state.messages = []
+                            st.session_state["confirm_clear_all"] = False
                             st.rerun()
 
                     with col_cancel:
                         if st.button(
                             "Cancel", key="cancel_delete_all", use_container_width=True
                         ):
+                            st.session_state["confirm_clear_all"] = False
                             st.rerun()
 
             return selected_chat
