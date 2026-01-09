@@ -139,3 +139,30 @@ class ScriptureDocumentLoader:
             summary[scripture_name] = pdf_count
 
         return summary
+
+    def get_scripture_files(self):
+        """
+        Returns a dictionary of scriptures and their associated files.
+
+        Returns:
+            dict: {scripture_name: [file_list]} or empty dict if no files found
+        """
+        scripture_files = {}
+
+        # Assuming your docs are organized in data/docs/ directory
+        import os
+
+        docs_path = "data/docs"
+
+        if not os.path.exists(docs_path):
+            return scripture_files
+
+        # Group files by scripture (subdirectory)
+        for item in os.listdir(docs_path):
+            item_path = os.path.join(docs_path, item)
+
+            if os.path.isdir(item_path):
+                files = [f for f in os.listdir(item_path) if f.endswith(".pdf")]
+                scripture_files[item] = files
+
+        return scripture_files

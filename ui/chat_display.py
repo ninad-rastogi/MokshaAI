@@ -43,13 +43,12 @@ class ChatDisplay:
         return safe_content
 
     def _format_user_message(self, content: str) -> str:
-        """Format user message bubble with safe HTML"""
+        """Format user message bubble with safe HTML - aligned to right"""
 
         safe_content = self._escape_and_format(content)
 
         return f"""
-        <div class="chat-message" style="display: flex; align-items: flex-start; margin-bottom: 1rem;">
-            <span style="font-size: 24px; margin-right: 0.5rem;">{self.user_emoji}</span>
+        <div class="chat-message" style="display: flex; align-items: flex-start; margin-bottom: 1rem; justify-content: flex-end;">
             <div style="
                 color: {self.colors['user_font']};
                 background-color: {self.colors['user_bg']};
@@ -57,19 +56,21 @@ class ChatDisplay:
                 padding: 0.75rem 1rem;
                 max-width: 80%;
                 word-wrap: break-word;
+                order: 2;
             ">
                 {safe_content}
             </div>
+            <span style="font-size: 24px; margin-left: 0.5rem; order: 3;">{self.user_emoji}</span>
         </div>
         """
 
     def _format_bot_message(self, content: str) -> str:
-        """Format bot message bubble with safe HTML"""
+        """Format bot message bubble with safe HTML - aligned to left"""
 
         safe_content = self._escape_and_format(content)
 
         return f"""
-        <div class="chat-message" style="display: flex; align-items: flex-start; margin-bottom: 1rem;">
+        <div class="chat-message" style="display: flex; align-items: flex-start; margin-bottom: 1rem; justify-content: flex-start;">
             <span style="font-size: 24px; margin-right: 0.5rem;">{self.bot_emoji}</span>
             <div style="
                 color: {self.colors['bot_font']};
@@ -213,29 +214,6 @@ class ChatDisplay:
     def display_welcome_message(self):
         """Display welcome message for new chat"""
 
-        welcome_html_old = f"""
-        <div style="text-align: center; padding: 2rem; color: #666;">
-            <h2 style="margin-bottom: 1rem;">{self.bot_emoji} Welcome to Moksha AI</h2>
-            <p style="font-size: 1.1rem; margin-bottom: 2rem;">
-                Your spiritual guide rooted in Vedic wisdom
-            </p>
-            <div style="text-align: left; max-width: 600px; margin: 0 auto;">
-                <p><strong>You can ask about:</strong></p>
-                <ul style="list-style-type: none; padding-left: 0;">
-                    <li>🙏 Life's purpose and dharma</li>
-                    <li>⚖️ Righteousness and moral dilemmas</li>
-                    <li>🔄 Karma and its effects</li>
-                    <li>🧘 Meditation and spiritual practices</li>
-                    <li>📚 Scripture teachings and interpretations</li>
-                    <li>💭 General spiritual guidance</li>
-                </ul>
-                <p style="margin-top: 1rem; font-size: 0.9rem; font-style: italic;">
-                    Note: I intelligently determine whether to search scriptures or provide general guidance based on your question.
-                </p>
-            </div>
-        </div>
-        """
-
         welcome_html = """
         <div style="text-align: center; padding: 2rem; color: #666;">
             <div style="text-align: left; max-width: 600px; margin: 0 auto;">
@@ -248,9 +226,6 @@ class ChatDisplay:
                     <li>📚 Scripture teachings and interpretations</li>
                     <li>💭 General spiritual guidance</li>
                 </ul>
-                <p style="margin-top: 1rem; font-size: 0.9rem; font-style: italic;">
-                    Note: I intelligently determine whether to search scriptures or provide general guidance based on your question.
-                </p>
             </div>
         </div>
         """

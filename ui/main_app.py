@@ -31,7 +31,7 @@ from core.rag_engine import RAGEngine
 
 # Import UI modules
 from ui.chat_display import ChatDisplay
-from ui.sidebar_1 import Sidebar
+from ui.sidebar import Sidebar
 from ui.styles import get_theme_colors, inject_custom_css
 
 # Suppress warnings
@@ -290,7 +290,7 @@ class MokshaAIApp:
 
             if route == "rag" and has_docs:
                 # Use RAG
-                full_response, sources = rag_engine.query_with_rag(
+                full_response, _ = rag_engine.query_with_rag(
                     query=last_query,
                     session_id=st.session_state.current_chat_id,
                     messages_history=recent_history,
@@ -300,10 +300,6 @@ class MokshaAIApp:
                 chat_display.display_complete_response(
                     full_response, response_placeholder
                 )
-
-                # Display sources
-                if sources:
-                    chat_display.display_sources(sources)
 
             else:
                 # Use general mode

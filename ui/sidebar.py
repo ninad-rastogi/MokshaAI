@@ -1,5 +1,5 @@
 """
-Sidebar with simple working click menu
+Sidebar with click-based 3-dot menu (fixed) - WORKING VERSION
 """
 
 from typing import Optional
@@ -11,7 +11,7 @@ from core.document_loader import ScriptureDocumentLoader
 
 
 class Sidebar:
-    """Sidebar component for chat history with click menu"""
+    """Sidebar component for chat history with click-based menu"""
 
     def __init__(
         self, chat_manager: ChatManager, doc_loader: ScriptureDocumentLoader = None
@@ -38,23 +38,15 @@ class Sidebar:
                 new_id = self.chat_manager.create_new_chat()
                 st.session_state.current_chat_id = new_id
                 st.session_state.messages = []
+
+                # Close any open menus
+                for key in list(st.session_state.keys()):
+                    if key.startswith("menu_open_") or key.startswith("renaming_"):
+                        del st.session_state[key]
+
                 st.rerun()
 
             st.divider()
-
-            # Available Scriptures Section
-            if self.doc_loader:
-                with st.expander("📚 Available Scriptures", expanded=False):
-                    scripture_summary = self.doc_loader.get_scripture_summary()
-
-                    if scripture_summary:
-                        for scripture, count in scripture_summary.items():
-                            st.markdown(f"**{scripture}**: {count} file(s)")
-
-                    else:
-                        st.info("No scriptures loaded. Add PDFs to data/docs/")
-
-                st.divider()
 
             # Chat History Section
             st.markdown("### 💬 Chat History")
@@ -63,6 +55,7 @@ class Sidebar:
 
             if not chats:
                 st.info("No previous conversations")
+
                 return current_chat_id
 
             # Display chats with action buttons
@@ -73,138 +66,172 @@ class Sidebar:
                 chat_name = chat["name"]
                 is_current = chat_id == current_chat_id
 
-                # Check if we're in rename or delete mode for this chat
+                # Check session state for this specific chat
                 in_rename_mode = st.session_state.get(f"renaming_{chat_id}", False)
-                in_delete_mode = st.session_state.get(
-                    f"confirm_delete_{chat_id}", False
-                )
+                menu_open = st.session_state.get(f"menu_open_{chat_id}", False)
 
-                # If in rename mode, show text input
+                # === RENAME MODE ===
                 if in_rename_mode:
                     with st.container():
-                        new_name = st.text_input(
+
+                        def handle_rename(chat_id, original_name):
+                            new_name = st.session_state.get(
+                                f"new_name_{chat_id}", original_name
+                            ).strip()
+                            if new_name and new_name != original_name:
+                                self.chat_manager.rename_chat(chat_id, new_name)
+                            st.session_state[f"renaming_{chat_id}"] = False
+
+                        st.text_input(
                             "New name:",
                             value=chat_name,
                             key=f"new_name_{chat_id}",
+                            on_change=handle_rename,
+                            args=(chat_id, chat_name),
                         )
 
-                        col_save, col_cancel = st.columns(2)
+                    continue  # Skip normal rendering
 
-                        with col_save:
-                            if st.button(
-                                "✅ Save",
-                                key=f"save_{chat_id}",
-                                use_container_width=True,
-                            ):
-                                self.chat_manager.rename_chat(chat_id, new_name)
-                                st.session_state[f"renaming_{chat_id}"] = False
-                                st.rerun()
-
-                        with col_cancel:
-                            if st.button(
-                                "❌ Cancel",
-                                key=f"cancel_rename_{chat_id}",
-                                use_container_width=True,
-                            ):
-                                st.session_state[f"renaming_{chat_id}"] = False
-                                st.rerun()
-                    continue
-
-                # If in delete mode, show confirmation
-                if in_delete_mode:
-                    with st.container():
-                        st.warning("⚠️ Delete this chat?")
-                        col_yes, col_no = st.columns(2)
-
-                        with col_yes:
-                            if st.button(
-                                "Yes",
-                                key=f"yes_delete_{chat_id}",
-                                use_container_width=True,
-                            ):
-                                if self.chat_manager.delete_chat(chat_id):
-                                    if chat_id == current_chat_id:
-                                        new_id = self.chat_manager.create_new_chat()
-                                        st.session_state.current_chat_id = new_id
-                                        st.session_state.messages = []
-                                st.session_state[f"confirm_delete_{chat_id}"] = False
-                                st.rerun()
-
-                        with col_no:
-                            if st.button(
-                                "No",
-                                key=f"no_delete_{chat_id}",
-                                use_container_width=True,
-                            ):
-                                st.session_state[f"confirm_delete_{chat_id}"] = False
-                                st.rerun()
-                    continue
-
-                # Normal display: chat button with action buttons
-                col_chat, col_edit, col_delete = st.columns([4, 1, 1])
+                # === NORMAL RENDERING (chat button + menu) ===
+                col_chat, col_menu = st.columns([5, 1])
 
                 with col_chat:
-                    # Main chat selection button
                     if st.button(
-                        f"{'📌 ' if is_current else '💬 '}{chat_name}",
+                        f"{chat_name}",
                         key=f"chat_{chat_id}",
                         use_container_width=True,
                         type="primary" if is_current else "secondary",
                         help=chat_name,
+                        disabled=menu_open,  # Disable when menu is open for this chat
                     ):
+                        # Close all menus before switching chats
+                        for key in list(st.session_state.keys()):
+                            if key.startswith("menu_open_"):
+                                st.session_state[key] = False
+
                         selected_chat = chat_id
 
-                with col_edit:
-                    # Edit button
-                    if st.button(
-                        "✏️",
-                        key=f"edit_{chat_id}",
-                        use_container_width=True,
-                        help="Rename",
-                    ):
-                        st.session_state[f"renaming_{chat_id}"] = True
-                        st.rerun()
+                with col_menu:
+                    # 3-dot menu button or close button
+                    if menu_open:
+                        # Show close button when menu is open
+                        if st.button(
+                            "✖️",
+                            key=f"close_{chat_id}",
+                            use_container_width=True,
+                            help="Close menu",
+                        ):
+                            st.session_state[f"menu_open_{chat_id}"] = False
+                            st.rerun()
 
-                with col_delete:
-                    # Delete button
-                    if st.button(
-                        "🗑️",
-                        key=f"delete_{chat_id}",
-                        use_container_width=True,
-                        help="Delete",
-                    ):
-                        st.session_state[f"confirm_delete_{chat_id}"] = True
-                        st.rerun()
+                    else:
+                        # Show 3-dot button when menu is closed
+                        if st.button(
+                            "⋮",
+                            key=f"menu_{chat_id}",
+                            use_container_width=True,
+                            help="Actions",
+                        ):
+                            # Close all other menus first
+                            for key in list(st.session_state.keys()):
+                                if (
+                                    key.startswith("menu_open_")
+                                    and key != f"menu_open_{chat_id}"
+                                ):
+                                    st.session_state[key] = False
+
+                            # Open this menu
+                            st.session_state[f"menu_open_{chat_id}"] = True
+                            st.rerun()
+
+                # === SHOW MENU ACTIONS (only if menu is open for THIS chat) ===
+                if menu_open:
+                    col_rename, col_delete = st.columns(2)
+
+                    with col_rename:
+                        if st.button(
+                            "✏️ Rename",
+                            key=f"action_rename_{chat_id}",
+                            use_container_width=True,
+                            help="Rename this chat",
+                        ):
+                            st.session_state[f"renaming_{chat_id}"] = True
+                            st.session_state[f"menu_open_{chat_id}"] = False
+                            st.rerun()
+
+                    with col_delete:
+                        if st.button(
+                            "🗑️ Delete",
+                            key=f"action_delete_{chat_id}",
+                            use_container_width=True,
+                            help="Delete this chat",
+                        ):
+                            if self.chat_manager.delete_chat(chat_id):
+                                # If deleting current chat, create new one
+                                if chat_id == current_chat_id:
+                                    new_id = self.chat_manager.create_new_chat()
+                                    st.session_state.current_chat_id = new_id
+                                    st.session_state.messages = []
+
+                            st.session_state[f"menu_open_{chat_id}"] = False
+                            st.rerun()
+
+            st.divider()
+
+            # Available Scriptures Section
+            if self.doc_loader:
+                with st.expander("📚 Available Scriptures", expanded=False):
+                    scripture_files = self.doc_loader.get_scripture_files()
+
+                    if scripture_files:
+                        for scripture, files in scripture_files.items():
+                            with st.container():
+                                st.markdown(f"**📁 {scripture}**")
+
+                                if files:
+                                    for file in files:
+                                        st.markdown(
+                                            f"&nbsp;&nbsp;&nbsp;&nbsp;📄 {file}"
+                                        )
+
+                                else:
+                                    st.markdown("&nbsp;&nbsp;&nbsp;&nbsp;*No files*")
+
+                    else:
+                        st.info("No scriptures loaded. Add PDFs to data/docs/")
 
             # Info section
-            with st.expander("ℹ️ About", expanded=False):
-                st.markdown(
-                    """
-                **Moksha AI** is your spiritual companion, 
-                grounded in Vedic wisdom and sacred scriptures.
-                
-                **Features:**
-                - 📖 Scripture-based answers
-                - 🔍 Page-level citations
-                - 🧠 Intelligent query routing
-                - 💬 Continuous conversations
-                
-                **Ask about:**
-                - Life's purpose and dharma
-                - Karma and spiritual practices
-                - Scripture teachings and meanings
-                - Meditation and self-realization
-                
-                All answers are based on authentic texts.
-                """
-                )
+            # with st.expander("ℹ️ About", expanded=False):
+            #     st.markdown(
+            #         """
+            #     **Moksha AI** is your spiritual companion,
+            #     grounded in Vedic wisdom and sacred scriptures.
+
+            #     **Features:**
+            #     - 📖 Scripture-based answers
+            #     - 🔍 Page-level citations
+            #     - 🧠 Intelligent query routing
+            #     - 💬 Continuous conversations
+
+            #     **Ask about:**
+            #     - Life's purpose and dharma
+            #     - Karma and spiritual practices
+            #     - Scripture teachings and meanings
+            #     - Meditation and self-realization
+
+            #     All answers are based on authentic texts.
+            #     """
+            #     )
 
             # Settings
             with st.expander("⚙️ Settings", expanded=False):
                 st.markdown("#### Danger Zone")
 
                 if st.button(
-                    "🗑️ Clear All Chats", type="secondary", use_container_width=True
+                    "🗑️ Clear All Chats",
+                    type="secondary",
+                    use_container_width=True,
+                    key="clear_all_btn",
                 ):
                     st.session_state["confirm_clear_all"] = True
                     st.rerun()
