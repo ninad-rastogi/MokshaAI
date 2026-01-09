@@ -31,7 +31,7 @@ from core.rag_engine import RAGEngine
 
 # Import UI modules
 from ui.chat_display import ChatDisplay
-from ui.sidebar import Sidebar
+from ui.sidebar_1 import Sidebar
 from ui.styles import get_theme_colors, inject_custom_css
 
 # Suppress warnings
