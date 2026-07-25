@@ -1,0 +1,101 @@
+[project]
+name = "moksha-ai"
+version = "2.0.0"
+description = "Vedic Spiritual Guide Chatbot"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    # Django + DRF
+    "django>=6.0,<7.0",
+    "uvicorn[standard]>=0.35",
+    "gunicorn>=23.0",
+    "djangorestframework>=3.15",
+    "djangorestframework-simplejwt>=5.3",
+    "django-cors-headers>=4.3",
+    "fastapi>=0.116",
+    # Database
+    "psycopg2-binary>=2.9",
+    "pgvector>=0.3",
+    "celery[redis]>=5.4",
+    "redis>=5.0",
+    # RAG + Embeddings
+    "llama-index>=0.12",
+    "llama-index-llms-ollama>=0.6",
+    "llama-index-embeddings-huggingface>=0.5",
+    "sentence-transformers>=3.0",
+    "torch>=2.13",
+    "ollama>=0.4",
+    "langchain-core>=0.3",
+    "langchain-ollama>=0.3",
+    "numpy>=1.26",
+    "PyMuPDF>=1.25",
+    # Transitional frontend kept until Nuxt reaches verified parity
+    "streamlit>=1.30",
+    "streamlit-theme>=0.58",
+    # Utils
+    "requests>=2.34",
+    "python-dotenv>=1.0",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.2",
+    "flake8>=7.0",
+    "mypy>=1.10",
+    "django-stubs[compatible-mypy]>=5.2",
+    "djangorestframework-stubs[compatible-mypy]>=3.16",
+    "types-redis>=4.6",
+    "types-requests>=2.32",
+    "pre-commit>=3.6",
+    "pytest>=8.0",
+    "pytest-django>=4.8",
+    "pytest-asyncio>=0.23",
+    "coverage>=7.4",
+    "httpx>=0.27",
+    "playwright>=1.60",
+    "pytest-playwright>=0.8",
+    "whichllm>=0.5.15",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py314"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.mypy]
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+exclude = ["(^|[\\\\/])migrations([\\\\/]|$)", "(^|[\\\\/])tests([\\\\/]|$)"]
+check_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = false
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
+
+[tool.django-stubs]
+django_settings_module = "moksha.settings"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "moksha.settings_test"
+testpaths = ["users/tests", "chat/tests", "scriptures/tests", "tests/"]
+markers = [
+    "e2e: end-to-end browser tests (require running servers)",
+]

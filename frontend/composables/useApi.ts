@@ -1,0 +1,162 @@
+import { z } from "zod";
+import type {
+  ChatSummary,
+  GenerationRun,
+  Message,
+  Page,
+  Scripture,
+  UserProfile,
+} from "~/types/api";
+
+const pageSchema = <T extends z.ZodTypeAny>(item: T) =>
+  z.object({
+    next: z.string().nullable(),
+    previous: z.string().nullable(),
+    results: z.array(item),
+  });
+
+const chatSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  message_count: z.number(),
+});
+
+const citationSchema = z.object({
+  scripture: z.string(),
+  page: z.union([z.number(), z.string()]),
+  file_name: z.string(),
+  score: z.number(),
+  excerpt: z.string(),
+});
+
+const messageSchema = z.object({
+  id: z.number(),
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+  mode: z.string(),
+  sources: z.array(citationSchema),
+  created_at: z.string(),
+});
+
+const runSchema = z.object({
+  id: z.string(),
+  chat: z.string(),
+  state: z.enum(["queued", "running", "completed", "failed", "cancelled"]),
+  model_profile: z.string(),
+  last_event_id: z.string(),
+  final_text: z.string(),
+  final_sources: z.array(citationSchema),
+  error_code: z.string(),
+  queued_at: z.string(),
+  started_at: z.string().nullable(),
+  finished_at: z.string().nullable(),
+});
+
+const userSchema = z.object({
+  id: z.number(),
+  email: z.string(),
+  spiritual_name: z.string(),
+  created_at: z.string(),
+});
+
+const scriptureSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  folder_path: z.string(),
+  is_indexed: z.boolean(),
+  total_volumes: z.number(),
+  total_pages: z.number(),
+  last_indexed_at: z.string().nullable(),
+});
+
+export function useApi() {
+  const config = useRuntimeConfig();
+  const base = config.public.apiBase;
+  const csrfToken = useState<string>("csrf-token", () => "");
+
+  async function ensureCsrf() {
+    if (csrfToken.value) return csrfToken.value;
+    const response = await fetch(`${base}/auth/csrf/`, {
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("csrf_failed");
+    const data = z
+      .object({ csrfToken: z.string() })
+      .parse(await response.json());
+    csrfToken.value = data.csrfToken;
+    return csrfToken.value;
+  }
+
+  async function request<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    options: RequestInit = {},
+  ): Promise<T> {
+    const method = (options.method || "GET").toUpperCase();
+    const token = method === "GET" ? "" : await ensureCsrf();
+    const response = await fetch(`${base}${path}`, {
+      ...options,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-CSRFToken": token } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`request_failed:${response.status}`);
+    }
+    return schema.parse(await response.json());
+  }
+
+  return {
+    me: () => request<UserProfile>("/auth/me/", userSchema),
+    register: (email: string, password: string) =>
+      request<UserProfile>("/auth/register/", userSchema, {
+        method: "POST",
+        body: JSON.stringify({ email, password, password_confirm: password }),
+      }),
+    sessionLogin: async (email: string, password: string) => {
+      const user = await request<UserProfile>("/auth/session/login/", userSchema, {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      csrfToken.value = "";
+      await ensureCsrf();
+      return user;
+    },
+    sessionLogout: () =>
+      fetch(`${base}/auth/session/logout/`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRFToken": csrfToken.value },
+      }),
+    chats: () => request<Page<ChatSummary>>("/chats/", pageSchema(chatSchema)),
+    createChat: () =>
+      request<ChatSummary>("/chats/", chatSchema, { method: "POST" }),
+    messages: (chatId: string) =>
+      request<Page<Message>>(
+        `/chats/${chatId}/messages/`,
+        pageSchema(messageSchema),
+      ),
+    createRun: (
+      chatId: string,
+      message: string,
+      modelProfile: string,
+      idempotencyKey: string,
+    ) =>
+      request<GenerationRun>(`/chats/${chatId}/runs/`, runSchema, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ message, model_profile: modelProfile }),
+      }),
+    cancelRun: (runId: string) =>
+      request<GenerationRun>(`/chats/runs/${runId}/cancel/`, runSchema, {
+        method: "POST",
+      }),
+    scriptures: () =>
+      request<Page<Scripture>>("/scriptures/", pageSchema(scriptureSchema)),
+  };
+}

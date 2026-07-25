@@ -1,0 +1,24 @@
+https://localhost:8443, https://127.0.0.1:8443 {
+	encode zstd gzip
+	tls internal
+
+	handle /api/v1/* {
+		reverse_proxy django:8000
+	}
+
+	handle /api/auth/* {
+		reverse_proxy django:8000
+	}
+
+	handle /admin/* {
+		reverse_proxy django:8000
+	}
+
+	handle /static/* {
+		reverse_proxy django:8000
+	}
+
+	handle {
+		reverse_proxy nuxt:3000
+	}
+}

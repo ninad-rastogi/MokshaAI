@@ -1,250 +1,219 @@
-# 🕉️ Moksha AI - Vedic Spiritual Guide
+# 🕉️ Moksha AI — Vedic Spiritual Guide
 
-A sophisticated AI chatbot that serves as your spiritual companion, deeply rooted in Hindu Vedic wisdom and sacred scriptures. Moksha AI provides meaningful spiritual conversations, quotes authentic shlokas, and answers questions based strictly on sacred texts.
+A sophisticated AI-powered chatbot that serves as your spiritual companion, deeply rooted in
+Hindu Vedic wisdom and sacred scriptures. Moksha AI provides meaningful spiritual conversations,
+quotes authentic shlokas with Sanskrit text and Hindi translations, and answers questions based
+strictly on sacred texts stored in its knowledge base.
 
 ## ✨ Features
 
-- **📚 Scripture-Based RAG**: Answers grounded in authentic Vedic texts
-- **🔍 Page-Level Citations**: Precise references with scripture name and page numbers
-- **💬 Smart Chat Management**: ChatGPT-like sidebar with intelligent chat naming
-- **🌍 Multilingual Support**: Handles Sanskrit, Hindi, and English
-- **📖 Scripture Awareness**: Automatically detects and indexes available texts
-- **🎯 Context-Aware Responses**: Maintains conversation flow with chat memory
-- **✏️ Chat Organization**: Rename, delete, and organize your spiritual conversations
+- **📚 Scripture-Based RAG**: Answers grounded in authentic Vedic texts using
+  Retrieval-Augmented Generation
+- **🔍 Page-Level Citations**: Precise references with scripture name, page number, and text
+  previews
+- **👤 User Authentication**: JWT-based registration and login system
+- **💬 Smart Chat Management**: Sidebar with chat history, rename, delete, and auto-naming
+- **🌍 Multilingual Embeddings**: Uses `BAAI/bge-m3` model optimized for mixed
+  Sanskrit/Hindi/English content
+- **📖 Scripture Auto-Discovery**: Automatically detects and indexes PDF scriptures from
+  organized folders
+- **🎯 Intelligent Query Routing**: LLM classifies queries into Scripture, Guidance, or Casual
+  categories
+- **📊 Django Admin Panel**: Manage users, scriptures, chat logs, and volumes from a web
+  interface
+- **🐳 Docker-Ready**: Compose setup for Django + PostgreSQL/PgVector + Streamlit
 
-## 🏗️ Project Structure
+## 🏗️ Architecture
 
 ```
-MokshaAI/
-├── moksha_ai.py              # Entry point
-├── requirements.txt          # Dependencies
-├── README.md                 # This file
-│
-├── core/                     # Core business logic
-│   ├── __init__.py
-│   ├── config.py            # Configuration settings
-│   ├── document_loader.py   # PDF loading with metadata
-│   ├── embeddings.py        # Vector store management
-│   ├── rag_engine.py        # RAG implementation
-│   └── chat_manager.py      # Chat session management
-│
-├── ui/                       # User interface
-│   ├── __init__.py
-│   ├── main_app.py          # Main Streamlit app
-│   ├── sidebar.py           # Sidebar with chat history
-│   ├── chat_display.py      # Chat rendering
-│   └── styles.py            # CSS and styling
-│
-├── data/                     # Data storage
-│   ├── docs/                # Scripture PDFs (organized by folder)
-│   │   ├── Mahabharata/
-│   │   ├── Ramayana/
-│   │   ├── Bhagavad_Gita/
-│   │   └── ...
-│   ├── embeddings/          # Vector store (auto-generated)
-│   └── chats/               # Chat history JSON files (auto-generated)
-│
-└── images/                   # Logo and assets
-    ├── MokshaAI_light_cropped.png
-    └── MokshaAI_dark_cropped.png
+┌──────────────────┐      HTTP/REST       ┌──────────────────┐
+│   Streamlit UI    │ ◄──────────────────► │  Django + DRF     │
+│   (Frontend)      │    JWT Bearer Tokens │  (Backend + API)  │
+└──────────────────┘                       └────────┬─────────┘
+                                                    │
+                         ┌─────────────────────────┼──────────────────┐
+                         ▼                         ▼                  ▼
+                  ┌──────────────┐          ┌──────────────┐   ┌────────────┐
+                  │  PostgreSQL   │          │   PgVector   │   │   Ollama   │
+                  │  (users,      │          │  (embeddings │   │  (LLM:     │
+                  │   chats,      │          │   stored as   │   │  llama3)   │
+                  │   messages,   │          │   vectors in  │   │            │
+                  │   metadata)   │          │   PostgreSQL) │   │            │
+                  └──────────────┘          └──────────────┘   └────────────┘
 ```
 
-## 🚀 Installation
+**Key Design Decisions:**
+- **Django** handles authentication, ORM, admin panel, and REST API (via DRF)
+- **PgVector** (PostgreSQL extension) replaces ChromaDB — single database for all data
+- **BAAI/bge-m3** embedding model handles mixed Sanskrit/Hindi/English content better than
+  the old distiluse model
+- **Semantic chunking** splits PDF pages into shloka, translation, and narration chunks
+- **Streamlit** is a pure HTTP client — it calls Django REST API for all operations
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-1. **Python 3.10+**
-2. **Ollama** installed and running locally
+1. **Python 3.14.6** managed by uv (virtual environment at `D:\Ninad\Python\.env`)
+2. **PostgreSQL 16+** with PgVector extension
+3. **Ollama** installed and running locally
    ```bash
-   # Install Ollama from https://ollama.ai
-   # Pull the required model
-   ollama pull llama3.2:3b
+   ollama list
+   # The default local model is imported as:
+   # moksha-qwen3:4b-instruct-q3km
    ```
 
 ### Setup Steps
 
-1. **Clone the repository**
-
+1. **Configure environment:**
    ```bash
-   git clone <your-repo-url>
-   cd MokshaAI
+   cp .env.example .env
+   # Edit .env with your PostgreSQL credentials
    ```
 
-2. **Create virtual environment**
-
+2. **Create the database:**
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   createdb moksha
+   psql moksha -c "CREATE EXTENSION IF NOT EXISTS vector;"
    ```
 
-3. **Install dependencies**
-
+3. **Install dependencies with uv:**
    ```bash
-   pip install -r requirements.txt
+   # PowerShell
+   $env:UV_PROJECT_ENVIRONMENT = "D:\Ninad\Python\.env"
+   uv sync --locked --extra dev --python 3.14.6
    ```
 
-4. **Add scripture PDFs**
-
-   - Create folders in `data/docs/` for each scripture (e.g., `Mahabharata`, `Ramayana`)
-   - Add PDF files to respective folders
-   - Example structure:
-     ```
-     data/docs/
-     ├── Bhagavad_Gita/
-     │   └── bhagavad_gita_complete.pdf
-     ├── Mahabharata/
-     │   ├── mahabharata_part1.pdf
-     │   └── mahabharata_part2.pdf
-     └── Ramayana/
-         └── ramayana_complete.pdf
-     ```
-
-5. **Run the application**
+4. **Run migrations:**
    ```bash
-   streamlit run moksha_ai.py
+   python manage.py migrate
    ```
 
-## 🎯 Usage
+5. **Add scripture PDFs:**
+   ```
+   data/docs/
+   └── Mahabharata/
+       ├── Mahabharata Volume 1.pdf
+       ├── Mahabharata Volume 2.pdf
+       └── ... (Volumes 3-6)
+   ```
 
-### Starting a New Conversation
+6. **Index scriptures:**
+   ```bash
+   python manage.py discover_scriptures
+   ```
 
-1. Click "➕ New Conversation" in the sidebar
-2. Type your spiritual question in the chat input
-3. Receive answers with scripture references
+7. **Start Django backend:**
+   ```bash
+   python manage.py runserver
+   ```
 
-### Managing Chats
+8. **Start Streamlit frontend (new terminal):**
+   ```bash
+   streamlit run streamlit_ui/main_app.py
+   ```
 
-- **Switch Chats**: Click on any chat in the sidebar
-- **Rename**: Click the ✏️ icon next to a chat
-- **Delete**: Click the 🗑️ icon to remove a chat
-- **Auto-Naming**: Chats are automatically named based on the first question
+9. **Open browser:** Navigate to `http://localhost:8501`
+
+## 📁 Project Structure & Documentation
+
+Each major folder has a detailed README explaining its contents:
+
+| Folder | README | Description |
+|--------|--------|-------------|
+| `moksha/` | [moksha/README.md](moksha/README.md) | Django project settings, URL routing, WSGI/ASGI config |
+| `users/` | [users/README.md](users/README.md) | Custom User model, JWT auth, registration/login API |
+| `chat/` | [chat/README.md](chat/README.md) | Chat/Message models, API views, RAG engine, management commands |
+| `scriptures/` | [scriptures/README.md](scriptures/README.md) | Scripture/Volume models, auto-discovery, admin |
+| `chat/rag/` | [chat/rag/README.md](chat/rag/README.md) | RAG engine, PgVector store, PDF loader, semantic chunker |
+| `streamlit_ui/` | [streamlit_ui/README.md](streamlit_ui/README.md) | Streamlit frontend, API client, UI components |
+| `tests/` | [tests/README.md](tests/README.md) | Test structure, fixtures, integration tests |
+| `docs/` | [docs/README.md](docs/README.md) | Architecture, API reference, deployment guides |
+
+## 🎯 Usage Examples
+
+### API Endpoints
+
+| Endpoint | Method | Description | Auth |
+|----------|--------|-------------|------|
+| `/api/auth/register/` | POST | Create new account | No |
+| `/api/auth/login/` | POST | Get JWT tokens | No |
+| `/api/auth/refresh/` | POST | Refresh JWT token | No |
+| `/api/auth/me/` | GET/PUT | Get/update profile | Yes |
+| `/api/auth/health/` | GET | Health check | No |
+| `/api/chat/` | GET | List user's chats | Yes |
+| `/api/chat/` | POST | Create new chat | Yes |
+| `/api/chat/<id>/` | GET | Get chat with messages | Yes |
+| `/api/chat/<id>/` | DELETE | Delete chat | Yes |
+| `/api/chat/<id>/query/` | POST | Submit query, get AI response | Yes |
+| `/api/chat/<id>/rename/` | PATCH | Rename chat | Yes |
+| `/api/scriptures/` | GET | List scriptures | Yes |
+| `/api/scriptures/<id>/` | GET | Scripture details | Yes |
+| `/api/scriptures/<id>/reindex/` | POST | Trigger re-indexing | Yes |
 
 ### Example Questions
 
-- "What is the meaning of dharma according to the Bhagavad Gita?"
-- "Explain the concept of karma"
-- "What does the Ramayana teach about devotion?"
-- "How can I practice meditation according to the Vedas?"
+- "What does the Mahabharata say about dharma?"
+- "How can I find inner peace according to Vedic wisdom?"
+- "Quote a shloka about karma from the scriptures"
+- "What is the purpose of meditation?"
 
-## ⚙️ Configuration
+## ⚙️ Key Configuration
 
-Edit `core/config.py` to customize:
+| Setting | Default | Location |
+|---------|---------|----------|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | `.env` |
+| `OLLAMA_MODEL` | `moksha-qwen3:4b-instruct-q3km` | `.env` |
+| `EMBEDDING_MODEL` | `BAAI/bge-m3` | `.env` |
+| `EMBEDDING_DEVICE` | `cpu` | `.env` |
+| `POSTGRES_DB` | `moksha` | `.env` |
+| `DJANGO_SECRET_KEY` | (generated) | `.env` |
+| `DJANGO_API_URL` | `http://localhost:8000` | `.env` |
 
-```python
-# Ollama settings
-OLLAMA_SERVER = "http://localhost:11434/"
-OLLAMA_MODEL = "llama3.2:3b"  # Change to your preferred model
-
-# Embedding model
-SENTENCE_TRANSFORMERS_MODEL = "sentence-transformers/distiluse-base-multilingual-cased-v2"
-
-# Chat settings
-MAX_CHAT_NAME_LENGTH = 50
-CHUNK_SIZE = 512
-RESPONSE_CHUNK_SIZE = 2048
-```
-
-## 🔧 Technical Details
-
-### RAG Implementation
-
-- **Document Loading**: PyMuPDF extracts text page-by-page
-- **Metadata Enrichment**: Each page tagged with scripture name, file name, and page number
-- **Embeddings**: Multilingual sentence transformers for better semantic search
-- **Vector Store**: ChromaDB for efficient similarity search
-- **Context**: Top-3 relevant chunks retrieved for each query
-
-### Chat Management
-
-- **Storage**: JSON files per chat in `data/chats/`
-- **Smart Naming**: LLM generates meaningful titles from first message
-- **History**: Full conversation history maintained per chat
-- **Memory**: RAG engine uses chat memory for context
-
-### UI Components
-
-- **Sidebar**: Native Streamlit sidebar with chat list
-- **Streaming**: Token-by-token response streaming
-- **Citations**: Expandable source references with page numbers
-- **Themes**: Auto-adapts to light/dark mode
-
-## 🐛 Troubleshooting
-
-### No documents loaded
-
-- Ensure PDFs are in `data/docs/<ScriptureName>/` folders
-- Check PDF files are not corrupted
-- Verify folder structure is correct
-
-### Ollama connection error
-
-- Verify Ollama is running: `ollama serve`
-- Check the model is pulled: `ollama list`
-- Confirm `OLLAMA_SERVER` URL in config
-
-### Slow response times
-
-- First-time embedding generation takes time
-- Reduce `similarity_top_k` in `rag_engine.py`
-- Use a smaller embedding model
-
-### Chat history not loading
-
-- Check `data/chats/` directory exists
-- Verify JSON files are valid
-- Check file permissions
-
-## 📝 Development
-
-### Adding New Features
-
-1. **Core logic**: Add to respective file in `core/`
-2. **UI components**: Extend classes in `ui/`
-3. **Configuration**: Update `core/config.py`
-
-### Code Style
-
-- Follow PEP 8
-- Use type hints where appropriate
-- Add docstrings to functions/classes
-- Log important operations
-
-### Testing
+## 🔧 Code Quality
 
 ```bash
-# Run with debug logging
-python moksha_ai.py --log-level DEBUG
-
-# Test document loading
-python -c "from core.document_loader import ScriptureDocumentLoader; loader = ScriptureDocumentLoader('data/docs'); print(loader.get_scripture_summary())"
+make format        # Format code with black
+make lint          # Run flake8 and black --check
+make test          # Run pytest with coverage
+make help          # Show all available commands
 ```
 
-## 🤝 Contributing
+## 🧪 Testing
 
-Contributions welcome! Please:
+```bash
+pytest                              # All tests
+pytest --cov=. --cov-report=html    # With coverage report
+pytest -x                           # Stop on first failure
+pytest users/tests/                 # Users app tests only
+pytest chat/tests/                  # Chat app tests only
+```
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+## 🐳 Docker Deployment
+
+```bash
+docker-compose up --build    # Start all services
+docker-compose up db         # Start only PostgreSQL
+docker-compose up django     # Start only Django
+docker-compose up streamlit  # Start only Streamlit
+```
+
+## 📝 Development Workflow
+
+1. **Model changes:** Edit `models.py` → `python manage.py makemigrations` → `python manage.py migrate`
+2. **New management command:** Add to `management/commands/` → `python manage.py <command>`
+3. **New API endpoint:** Add to `views.py` + `urls.py` → test via DRF browsable API at `http://localhost:8000/api/`
+4. **Re-index scriptures:** Add PDFs to `data/docs/<ScriptureName>/` → `python manage.py discover_scriptures`
 
 ## 📄 License
 
-This project is open source. Please respect the sacred nature of the scriptures and use this tool with reverence.
+MIT License. Please respect the sacred nature of the scriptures and use this tool with reverence.
 
 ## 🙏 Acknowledgments
 
-- Built with Streamlit, LlamaIndex, and LangChain
+- Built with Django, Django REST Framework, Streamlit, LlamaIndex, and LangChain
 - Powered by Ollama for local LLM inference
 - Inspired by the timeless wisdom of Vedic texts
-
-## 📧 Support
-
-For issues or questions:
-
-- Open an issue on GitHub
-- Check existing documentation
-- Review troubleshooting guide above
 
 ---
 

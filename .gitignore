@@ -1,0 +1,51 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Django
+*.log
+staticfiles/
+db.sqlite3
+
+# Frontend
+node_modules/
+frontend/node_modules/
+frontend/.nuxt/
+frontend/.output/
+frontend/dist/
+
+# Data
+data/embeddings/
+data/chats/
+data/docs_metadata.json
+
+# Images
+images/MokshaAI_combined_*.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Old files (legacy)
+core/__pycache__/
+ui/__pycache__/
+ui/sidebar_1.py
+
+# Testing
+htmlcov/
+.coverage
+.pytest_cache/

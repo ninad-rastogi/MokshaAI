@@ -1,0 +1,61 @@
+:root {
+  --moksha-bg: #fbfaf6;
+  --moksha-ink: #211b16;
+  --moksha-muted: #655c52;
+  --moksha-line: #d9d0c2;
+  --moksha-surface: #fffdf8;
+  --moksha-accent: #9a5b23;
+  --moksha-leaf: #426b51;
+  --moksha-focus: #0f6f7d;
+}
+
+.dark {
+  --moksha-bg: #151413;
+  --moksha-ink: #f5eee3;
+  --moksha-muted: #c5b9a8;
+  --moksha-line: #3c352e;
+  --moksha-surface: #1e1b18;
+  --moksha-accent: #d29a62;
+  --moksha-leaf: #9ab89f;
+  --moksha-focus: #7dc9d4;
+}
+
+html {
+  color: var(--moksha-ink);
+  background: var(--moksha-bg);
+}
+
+body {
+  margin: 0;
+  font-family: Charter, Cambria, "Nirmala UI", "Kohinoor Devanagari", serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--moksha-focus);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--moksha-focus);
+}
+
+a:visited {
+  color: var(--moksha-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
