@@ -1,0 +1,154 @@
+"""Tests for provider probes and model selection precedence."""
+
+import json
+from unittest.mock import Mock, patch
+
+import pytest
+from django.utils import timezone
+
+from llm.models import ModelConnection, ModelProfile, UserModelPreference
+from llm.providers import probe_connection, update_connection_probe
+from llm.services import resolve_model_selection
+from users.models import User
+
+
+@pytest.mark.django_db
+def test_resolve_model_selection_uses_override_then_user_then_admin_default() -> None:
+    user = User.objects.create_user(email="models@example.test", password="pass")
+    admin_connection = ModelConnection.objects.create(
+        name="Built-in Ollama",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    admin_default = ModelProfile.objects.create(
+        name="Admin Local",
+        connection=admin_connection,
+        model_id="moksha-local",
+        is_enabled=True,
+        is_admin_default=True,
+    )
+    user_primary = ModelProfile.objects.create(
+        name="User Primary",
+        connection=admin_connection,
+        model_id="user-primary",
+        is_enabled=True,
+    )
+    override = ModelProfile.objects.create(
+        name="Chat Override",
+        connection=admin_connection,
+        model_id="chat-override",
+        is_enabled=True,
+    )
+    UserModelPreference.objects.create(
+        user=user,
+        primary_profile=user_primary,
+        ordered_fallback_profile_ids=[str(admin_default.pk)],
+    )
+
+    selection = resolve_model_selection(
+        user=user,
+        chat_override_profile_id=str(override.pk),
+    )
+    assert selection.primary == override
+    assert selection.fallback == user_primary
+
+
+@pytest.mark.django_db
+def test_resolve_model_selection_falls_back_to_admin_default() -> None:
+    user = User.objects.create_user(email="default@example.test", password="pass")
+    connection = ModelConnection.objects.create(
+        name="Built-in Ollama",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Admin Default",
+        connection=connection,
+        model_id="default-model",
+        is_enabled=True,
+        is_admin_default=True,
+    )
+    selection = resolve_model_selection(user=user)
+    assert selection.primary == profile
+    assert selection.fallback is None
+
+
+def test_probe_connection_rejects_unsafe_endpoint() -> None:
+    connection = ModelConnection(
+        name="Localhost",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://localhost:11434",
+        dns_pins=["127.0.0.1"],
+    )
+    result = probe_connection(connection)
+    assert result.status == ModelConnection.Status.ENDPOINT_INVALID
+    assert "localhost" not in result.detail.lower()
+
+
+def test_probe_connection_maps_openai_models_success(settings) -> None:
+    connection = ModelConnection(
+        name="OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+    )
+
+    response = Mock()
+    response.status = 200
+    response.read.return_value = json.dumps(
+        {"data": [{"id": "alpha"}, {"id": "beta"}]}
+    ).encode("utf-8")
+    fake_http = Mock()
+    fake_http.getresponse.return_value = response
+
+    with patch("llm.providers.NoRedirectHTTPSConnection", return_value=fake_http):
+        result = probe_connection(connection)
+
+    assert result.status == ModelConnection.Status.CONNECTED
+    assert result.models == ("alpha", "beta")
+    fake_http.request.assert_called_once()
+    _, path = fake_http.request.call_args.args[:2]
+    assert path == "/v1/models"
+
+
+def test_probe_connection_sanitizes_http_failure() -> None:
+    connection = ModelConnection(
+        name="OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+    )
+    response = Mock()
+    response.status = 401
+    response.read.return_value = b'{"error":"secret leaked"}'
+    fake_http = Mock()
+    fake_http.getresponse.return_value = response
+
+    with patch("llm.providers.NoRedirectHTTPSConnection", return_value=fake_http):
+        result = probe_connection(connection)
+
+    assert result.status == ModelConnection.Status.AUTH_INVALID
+    assert "secret" not in result.detail
+
+
+@pytest.mark.django_db
+def test_update_connection_probe_persists_status_without_secret_detail() -> None:
+    connection = ModelConnection.objects.create(
+        name="OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        remote_data_consent_at=timezone.now(),
+    )
+    with patch(
+        "llm.providers.probe_connection",
+        return_value=Mock(
+            status=ModelConnection.Status.RATE_LIMITED,
+            detail="Provider returned HTTP 429.",
+            models=(),
+        ),
+    ):
+        update_connection_probe(connection)
+    connection.refresh_from_db()
+    assert connection.status == ModelConnection.Status.RATE_LIMITED
+    assert connection.sanitized_detail == "Provider returned HTTP 429."

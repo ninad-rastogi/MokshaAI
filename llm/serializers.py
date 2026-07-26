@@ -25,6 +25,14 @@ class ModelConnectionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ModelConnectionProbeSerializer(serializers.Serializer):
+    """Sanitized connection probe response."""
+
+    status = serializers.CharField()
+    detail = serializers.CharField()
+    models = serializers.ListField(child=serializers.CharField())
+
+
 class ModelProfileSerializer(serializers.ModelSerializer):
     """Selectable model profile."""
 

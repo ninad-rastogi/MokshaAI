@@ -14,6 +14,8 @@ Entry points:
 
 - `models.py`: persistent model platform objects.
 - `security.py`: BYOK encryption and endpoint SSRF guardrails.
+- `providers.py`: safe provider probes for OpenAI-compatible and Ollama-compatible endpoints.
+- `services.py`: model selection precedence for chat override, user preference, fallback, and admin default.
 - `views.py`: read-only status/profile APIs plus user preference update.
 - `admin.py`: staff management surfaces.
 
@@ -30,7 +32,9 @@ Security notes:
   link-local, multicast, reserved, and unspecified addresses for user-owned
   connections.
 - Remote data consent is required before saving user-owned remote connections.
+- Provider probes do not follow redirects, do not use proxy environment variables,
+  cap response bodies, and persist only sanitized status details.
 
-Tests: `llm/tests/test_security.py`.
+Tests: `llm/tests/test_security.py` and `llm/tests/test_services.py`.
 
 Related docs: root README, `chat/README.md`, and `deploy/README.md`.

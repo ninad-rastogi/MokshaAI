@@ -3,13 +3,15 @@
 from typing import cast
 
 from django.db.models import Q
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from llm.models import ModelConnection, ModelProfile, UserModelPreference
+from llm.providers import update_connection_probe
 from llm.serializers import (
+    ModelConnectionProbeSerializer,
     ModelConnectionSerializer,
     ModelProfileSerializer,
     UserModelPreferenceSerializer,
@@ -26,6 +28,20 @@ class ModelConnectionViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = cast(User, self.request.user)
         return ModelConnection.objects.filter(Q(user=user) | Q(user=None))
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
+    def probe(self, request: Request, pk: str | None = None) -> Response:
+        connection = self.get_object()
+        result = update_connection_probe(connection)
+        serializer = ModelConnectionProbeSerializer(
+            {"status": result.status, "detail": result.detail, "models": result.models}
+        )
+        http_status = (
+            status.HTTP_200_OK
+            if result.status == ModelConnection.Status.CONNECTED
+            else status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+        return Response(serializer.data, status=http_status)
 
 
 class ModelProfileViewSet(viewsets.ReadOnlyModelViewSet):
