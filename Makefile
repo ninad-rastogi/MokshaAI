@@ -1,6 +1,7 @@
-.PHONY: help install lint format test run django streamlit migrate benchmark-model
+.PHONY: help install lint format test run django streamlit migrate benchmark-model frontend-format frontend-lint frontend-test frontend-typecheck
 
 export UV_PROJECT_ENVIRONMENT := D:/Ninad/Python/.env
+UV = uv run --active --no-cache
 PYTHON = D:/Ninad/Python/.env/Scripts/python.exe
 STREAMLIT = D:/Ninad/Python/.env/Scripts/streamlit.exe
 
@@ -12,29 +13,41 @@ install: ## Install dependencies
 	uv sync --locked --extra dev --python 3.14.6
 
 lint: ## Run linters
-	$(PYTHON) -m black --check .
-	$(PYTHON) -m flake8 .
+	$(UV) python -m black --check .
+	$(UV) python manage.py check
 
 format: ## Format code with black
-	$(PYTHON) -m black .
+	$(UV) python -m black .
 
 test: ## Run tests
-	$(PYTHON) -m pytest --cov=. --cov-report=term-missing
+	$(UV) python -m pytest --cov=. --cov-report=term-missing
+
+frontend-format: ## Check frontend formatting
+	$(UV) python scripts/run_frontend_gate.py format
+
+frontend-lint: ## Run frontend lint
+	$(UV) python scripts/run_frontend_gate.py lint
+
+frontend-test: ## Run frontend tests
+	$(UV) python scripts/run_frontend_gate.py test
+
+frontend-typecheck: ## Run frontend typecheck
+	$(UV) python scripts/run_frontend_gate.py typecheck
 
 benchmark-model: ## Benchmark local Ollama models against Moksha contracts
 	$(PYTHON) scripts/benchmark_ollama.py
 
 migrate: ## Run Django migrations
-	$(PYTHON) manage.py migrate
+	$(UV) python manage.py migrate
 
 django: ## Start Django development server
-	$(PYTHON) manage.py runserver
+	$(UV) python manage.py runserver
 
 streamlit: ## Start Streamlit frontend
 	$(STREAMLIT) run streamlit_ui/main_app.py
 
 discover: ## Run scripture auto-discovery
-	$(PYTHON) manage.py discover_scriptures
+	$(UV) python manage.py discover_scriptures
 
 migrate-chats: ## Migrate existing JSON chats to database
-	$(PYTHON) manage.py migrate_json_chats
+	$(UV) python manage.py migrate_json_chats

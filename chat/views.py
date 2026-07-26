@@ -71,7 +71,8 @@ class ChatViewSet(viewsets.ViewSet):
 
     def list(self, request: Request) -> Response:
         """List all chats for the current user."""
-        chats = Chat.objects.filter(user=cast(User, request.user))
+        archived = request.query_params.get("archived") == "true"
+        chats = Chat.objects.filter(user=cast(User, request.user), is_archived=archived)
         paginator = ChatCursorPagination()
         page = paginator.paginate_queryset(chats, request)
         serializer = ChatSerializer(page, many=True)
@@ -102,6 +103,22 @@ class ChatViewSet(viewsets.ViewSet):
             )
         chat.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"])
+    def archive(self, request: Request, pk: UUID = None) -> Response:
+        """Archive a chat session."""
+        chat = get_object_or_404(Chat, pk=pk, user=request.user)
+        chat.is_archived = True
+        chat.save(update_fields=["is_archived", "updated_at"])
+        return Response(ChatSerializer(chat).data)
+
+    @action(detail=True, methods=["post"])
+    def unarchive(self, request: Request, pk: UUID = None) -> Response:
+        """Restore an archived chat session."""
+        chat = get_object_or_404(Chat, pk=pk, user=request.user)
+        chat.is_archived = False
+        chat.save(update_fields=["is_archived", "updated_at"])
+        return Response(ChatSerializer(chat).data)
 
     @action(detail=True, methods=["get"])
     def messages(self, request: Request, pk: UUID = None) -> Response:

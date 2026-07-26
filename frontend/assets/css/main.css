@@ -1,31 +1,43 @@
 :root {
-  --moksha-bg: #f8f5ef;
-  --moksha-ink: #201915;
-  --moksha-muted: #74685b;
-  --moksha-line: #ded4c5;
-  --moksha-surface: #fffdf8;
-  --moksha-surface-raised: #ffffff;
-  --moksha-accent: #9a5b23;
-  --moksha-accent-strong: #6f3f17;
-  --moksha-leaf: #3e7458;
-  --moksha-focus: #0f6f7d;
-  --moksha-danger: #9f2f2f;
-  --moksha-shadow: 0 18px 48px rgb(72 52 29 / 10%);
+  --moksha-bg: #f7f1e7;
+  --moksha-ink: #211a15;
+  --moksha-muted: #766859;
+  --moksha-line: #ddcdb8;
+  --moksha-surface: #fffaf1;
+  --moksha-surface-raised: #fffdf8;
+  --moksha-glass: rgb(255 250 241 / 74%);
+  --moksha-glass-line: rgb(122 86 45 / 22%);
+  --moksha-accent: #a76528;
+  --moksha-accent-strong: #794416;
+  --moksha-ember: #c47b36;
+  --moksha-leaf: #3f7158;
+  --moksha-focus: #19727d;
+  --moksha-danger: #a63b37;
+  --moksha-user-bubble: #f0c58e;
+  --moksha-user-ink: #22160c;
+  --moksha-shadow: 0 24px 70px rgb(72 52 29 / 16%);
+  --moksha-shadow-soft: 0 14px 34px rgb(72 52 29 / 10%);
 }
 
 .dark {
-  --moksha-bg: #111412;
-  --moksha-ink: #f4eee6;
-  --moksha-muted: #bdb2a4;
-  --moksha-line: #38332d;
-  --moksha-surface: #181714;
-  --moksha-surface-raised: #211f1a;
-  --moksha-accent: #d39a63;
-  --moksha-accent-strong: #f0c18b;
-  --moksha-leaf: #8fbea1;
-  --moksha-focus: #7dc9d4;
+  --moksha-bg: #0e1310;
+  --moksha-ink: #f6efe5;
+  --moksha-muted: #c2b5a2;
+  --moksha-line: #3d352c;
+  --moksha-surface: #161915;
+  --moksha-surface-raised: #211d18;
+  --moksha-glass: rgb(28 27 22 / 72%);
+  --moksha-glass-line: rgb(226 176 109 / 20%);
+  --moksha-accent: #d99b5f;
+  --moksha-accent-strong: #f1c38c;
+  --moksha-ember: #b86f3b;
+  --moksha-leaf: #91c5a4;
+  --moksha-focus: #76c8d2;
   --moksha-danger: #f08a8a;
-  --moksha-shadow: 0 18px 48px rgb(0 0 0 / 28%);
+  --moksha-user-bubble: #efc38b;
+  --moksha-user-ink: #1d130a;
+  --moksha-shadow: 0 24px 70px rgb(0 0 0 / 34%);
+  --moksha-shadow-soft: 0 14px 34px rgb(0 0 0 / 24%);
 }
 
 html {

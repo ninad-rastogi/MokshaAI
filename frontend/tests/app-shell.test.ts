@@ -17,11 +17,22 @@ const runStreamComposable = readFileSync(
 );
 
 describe("app shell", () => {
-  it("keeps theme and model controls inside settings", () => {
+  it("keeps theme and model controls inside a settings dialog", () => {
     expect(appPage).toContain('aria-label="Theme"');
     expect(appPage).toContain('id="model-profile"');
-    expect(appPage).toContain("<h2>Settings</h2>");
+    expect(appPage).toContain('role="dialog"');
+    expect(appPage).toContain("settingsOpen");
     expect(appPage).not.toContain('aria-label="Model profile"');
+  });
+
+  it("exposes production chat history actions", () => {
+    expect(appPage).toContain("Search conversations");
+    expect(appPage).toContain("Rename");
+    expect(appPage).toContain("Archive");
+    expect(appPage).toContain("Delete");
+    expect(apiComposable).toContain("renameChat");
+    expect(apiComposable).toContain("deleteChat");
+    expect(apiComposable).toContain("archiveChat");
   });
 
   it("uses top-level v1 run endpoints for durable run follow-up", () => {
@@ -40,8 +51,8 @@ describe("app shell", () => {
   });
 
   it("frames Moksha AI as scripture-guided support for difficult moments", () => {
-    expect(indexPage).toContain("When life feels heavy, ask for guidance.");
-    expect(indexPage).toContain("Krishna guiding Arjuna");
-    expect(appPage).toContain("Bring what weighs on you.");
+    expect(indexPage).toContain("A quieter place for hard moments.");
+    expect(indexPage).toContain("expand the library as your study deepens");
+    expect(appPage).toContain("Bring the question you cannot carry alone.");
   });
 });

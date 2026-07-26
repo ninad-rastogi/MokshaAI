@@ -1,6 +1,7 @@
 export type ChatSummary = {
   id: string;
   name: string;
+  is_archived: boolean;
   created_at: string;
   updated_at: string;
   message_count: number;

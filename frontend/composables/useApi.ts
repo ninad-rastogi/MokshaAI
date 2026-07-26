@@ -19,6 +19,7 @@ const pageSchema = <T extends z.ZodTypeAny>(item: T) =>
 const chatSchema = z.object({
   id: z.string(),
   name: z.string(),
+  is_archived: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
   message_count: z.number(),
@@ -174,9 +175,40 @@ export function useApi() {
         credentials: "include",
         headers: { "X-CSRFToken": await ensureCsrf() },
       }),
-    chats: () => request<Page<ChatSummary>>("/chats/", pageSchema(chatSchema)),
+    chats: (archived = false) =>
+      request<Page<ChatSummary>>(
+        `/chats/?archived=${archived ? "true" : "false"}`,
+        pageSchema(chatSchema),
+      ),
     createChat: () =>
       request<ChatSummary>("/chats/", chatSchema, { method: "POST" }),
+    renameChat: (chatId: string, name: string) =>
+      request<ChatSummary>(`/chats/${chatId}/rename/`, chatSchema, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    deleteChat: async (chatId: string) => {
+      const token = await ensureCsrf();
+      const response = await fetch(`${base}/chats/${chatId}/`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "X-CSRFToken": token },
+      });
+      if (!response.ok) {
+        throw new ApiRequestError(
+          response.status,
+          await responsePayload(response),
+        );
+      }
+    },
+    archiveChat: (chatId: string) =>
+      request<ChatSummary>(`/chats/${chatId}/archive/`, chatSchema, {
+        method: "POST",
+      }),
+    unarchiveChat: (chatId: string) =>
+      request<ChatSummary>(`/chats/${chatId}/unarchive/`, chatSchema, {
+        method: "POST",
+      }),
     messages: (chatId: string) =>
       request<Page<Message>>(
         `/chats/${chatId}/messages/`,

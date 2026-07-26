@@ -57,12 +57,12 @@ async function submit() {
     <section class="welcome__panel" aria-labelledby="welcome-title">
       <MokshaBrand />
       <div>
-        <p class="eyebrow">Ancient scripture for difficult moments</p>
-        <h1 id="welcome-title">When life feels heavy, ask for guidance.</h1>
+        <p class="eyebrow">Scripture-grounded counsel</p>
+        <h1 id="welcome-title">A quieter place for hard moments.</h1>
         <p>
-          Moksha AI listens with patience and answers through Indian spiritual
-          wisdom, grounding counsel in cited verses like Krishna guiding Arjuna
-          through confusion, fear, and duty.
+          Moksha AI listens first, then searches Indian wisdom texts for careful
+          guidance with citations. Begin with the scriptures you have now, and
+          expand the library as your study deepens.
         </p>
       </div>
       <form class="auth" @submit.prevent="submit">

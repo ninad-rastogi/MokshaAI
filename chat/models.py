@@ -41,6 +41,7 @@ class Chat(models.Model):
         related_name="chats",
     )
     name = models.CharField(max_length=50, default="New Spiritual Conversation")
+    is_archived = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

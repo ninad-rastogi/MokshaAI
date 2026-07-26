@@ -24,6 +24,7 @@ class ChatSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
+            "is_archived",
             "created_at",
             "updated_at",
             "message_count",
@@ -38,7 +39,7 @@ class ChatDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Chat
-        fields = ("id", "name", "created_at", "updated_at", "messages")
+        fields = ("id", "name", "is_archived", "created_at", "updated_at", "messages")
         read_only_fields = ("id", "created_at", "updated_at")
 
 
