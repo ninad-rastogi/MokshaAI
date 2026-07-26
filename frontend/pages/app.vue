@@ -13,6 +13,7 @@ const api = useApi();
 const stream = useRunStream();
 const colorMode = useColorMode();
 
+const workspace = ref<HTMLElement | null>(null);
 const user = ref("");
 const chats = ref<ChatSummary[]>([]);
 const messages = ref<Message[]>([]);
@@ -31,6 +32,7 @@ const search = ref("");
 const showArchived = ref(false);
 const openMenuId = ref("");
 const settingsOpen = ref(false);
+const historyOpen = ref(false);
 const renameChatId = ref("");
 const renameName = ref("");
 const deleteChatId = ref("");
@@ -86,6 +88,19 @@ const statusTone = computed(() => {
   if (state === "cancelled") return "muted";
   return "ready";
 });
+
+function trackPointer(event: PointerEvent) {
+  const bounds = workspace.value?.getBoundingClientRect();
+  if (!bounds) return;
+  workspace.value?.style.setProperty(
+    "--pointer-x",
+    `${event.clientX - bounds.left}px`,
+  );
+  workspace.value?.style.setProperty(
+    "--pointer-y",
+    `${event.clientY - bounds.top}px`,
+  );
+}
 
 onMounted(async () => {
   try {
@@ -145,6 +160,7 @@ async function loadScriptures() {
 async function selectChat(chatId: string) {
   activeChatId.value = chatId;
   openMenuId.value = "";
+  historyOpen.value = false;
   streamingText.value = "";
   streamingSources.value = [];
   await loadMessages();
@@ -152,6 +168,7 @@ async function selectChat(chatId: string) {
 
 async function newChat() {
   showArchived.value = false;
+  historyOpen.value = false;
   const chat = await api.createChat();
   chats.value = [chat, ...chats.value];
   await selectChat(chat.id);
@@ -200,6 +217,7 @@ function askDelete(chatId: string) {
 
 function openSettings() {
   openMenuId.value = "";
+  historyOpen.value = false;
   settingsOpen.value = true;
 }
 
@@ -254,6 +272,12 @@ async function send() {
         ? runError.message
         : "Could not start generation.";
   }
+}
+
+async function handleComposerKeydown(event: KeyboardEvent) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  await send();
 }
 
 function connectRun(runId = activeRunId.value) {
@@ -312,19 +336,40 @@ async function signOut() {
 </script>
 
 <template>
-  <main class="workspace">
-    <aside class="history" aria-label="Chat history">
+  <main ref="workspace" class="workspace" @pointermove="trackPointer">
+    <button
+      v-if="historyOpen"
+      class="mobile-scrim"
+      type="button"
+      aria-label="Close chat history"
+      @click="historyOpen = false"
+    />
+    <aside
+      :class="['history', { 'history--open': historyOpen }]"
+      aria-label="Chat history"
+    >
       <div class="history__top">
         <MokshaBrand />
-        <button
-          class="icon-button"
-          type="button"
-          aria-label="New chat"
-          title="New chat"
-          @click="newChat"
-        >
-          <UIcon name="i-lucide-plus" aria-hidden="true" />
-        </button>
+        <div class="history__actions">
+          <button
+            class="icon-button mobile-only"
+            type="button"
+            aria-label="Close chat history"
+            title="Close chat history"
+            @click="historyOpen = false"
+          >
+            <UIcon name="i-lucide-x" aria-hidden="true" />
+          </button>
+          <button
+            class="icon-button"
+            type="button"
+            aria-label="New chat"
+            title="New chat"
+            @click="newChat"
+          >
+            <UIcon name="i-lucide-plus" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <label class="search">
@@ -409,13 +454,34 @@ async function signOut() {
           {{ showArchived ? "No archived chats." : "No matching chats." }}
         </p>
       </nav>
+
+      <footer class="history-footer">
+        <button class="account-button" type="button" @click="openSettings">
+          <span>
+            <strong>{{ user || "Moksha AI" }}</strong>
+            <small>{{ activeModelLabel }}</small>
+          </span>
+          <UIcon name="i-lucide-settings" aria-hidden="true" />
+        </button>
+      </footer>
     </aside>
 
     <section class="chat" aria-label="Chat workspace">
       <header class="chat__header">
-        <div class="chat__identity">
-          <p>{{ activeChat?.name || "New conversation" }}</p>
-          <span>{{ activeModelLabel }}</span>
+        <div class="chat__title-row">
+          <button
+            class="icon-button mobile-only"
+            type="button"
+            aria-label="Open chat history"
+            title="Open chat history"
+            @click="historyOpen = true"
+          >
+            <UIcon name="i-lucide-panel-left-open" aria-hidden="true" />
+          </button>
+          <div class="chat__identity">
+            <p>{{ activeChat?.name || "New conversation" }}</p>
+            <span>Grounded guidance workspace</span>
+          </div>
         </div>
         <div class="run-actions">
           <span :class="['status-pill', `status-pill--${statusTone}`]">
@@ -439,24 +505,16 @@ async function signOut() {
             <UIcon name="i-lucide-square" aria-hidden="true" />
             Stop
           </button>
-          <button
-            class="icon-button"
-            type="button"
-            aria-label="Settings"
-            title="Settings"
-            @click="openSettings"
-          >
-            <UIcon name="i-lucide-settings" aria-hidden="true" />
-          </button>
         </div>
       </header>
 
       <div class="messages" aria-live="polite">
         <div v-if="!messages.length && !streamingText" class="empty-state">
+          <span class="empty-state__eyebrow">Scripture-grounded counsel</span>
           <p>Bring the question you cannot carry alone.</p>
           <span>
-            Moksha AI listens first, then searches your scripture library for
-            grounded guidance with citations.
+            Share the situation. Moksha AI listens, searches your scripture
+            library, and answers with citations when evidence is found.
           </span>
         </div>
 
@@ -476,20 +534,19 @@ async function signOut() {
       </div>
 
       <form class="composer" @submit.prevent="send">
-        <label for="prompt">Ask Moksha AI</label>
-        <textarea
-          id="prompt"
-          v-model="prompt"
-          rows="3"
-          :disabled="busy"
-          placeholder="Share what is weighing on your mind..."
-        />
-        <div class="composer__bar">
-          <p v-if="error" role="alert">{{ error }}</p>
-          <span v-else
-            >Scripture-grounded answers. Citations shown when found.</span
-          >
-          <div>
+        <div class="composer-shell">
+          <label for="prompt">Ask Moksha AI</label>
+          <textarea
+            id="prompt"
+            v-model="prompt"
+            rows="2"
+            :disabled="busy"
+            placeholder="Share what is weighing on your mind..."
+            @keydown="handleComposerKeydown"
+          />
+          <div class="composer__bar">
+            <p v-if="error" role="alert">{{ error }}</p>
+            <span v-else>Enter sends. Shift + Enter adds a new line.</span>
             <button
               class="ghost-button"
               type="button"
@@ -651,101 +708,199 @@ async function signOut() {
 
 <style scoped>
 .workspace {
+  --sidebar-width: clamp(16.5rem, 18vw, 20rem);
+  --header-height: 4rem;
+  --composer-height: 8.75rem;
+  --chrome: rgb(255 250 241 / 72%);
+  --chrome-strong: rgb(255 250 241 / 88%);
+  --hairline: rgb(119 82 44 / 16%);
+  --soft-ring: rgb(220 164 84 / 18%);
+  --glow-x: var(--pointer-x, 62vw);
+  --glow-y: var(--pointer-y, 30vh);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--moksha-ember) 10%, transparent),
-      transparent 35%
+    radial-gradient(
+      circle at var(--glow-x) var(--glow-y),
+      rgb(218 157 82 / 18%),
+      transparent 17rem
     ),
-    linear-gradient(
-      220deg,
-      color-mix(in srgb, var(--moksha-leaf) 16%, transparent),
-      transparent 42%
-    ),
-    var(--moksha-bg);
+    radial-gradient(circle at 84% 8%, rgb(69 116 88 / 16%), transparent 21rem),
+    linear-gradient(135deg, #fbf4e7 0%, #f4eadb 44%, #edf1e7 100%);
+  color: var(--moksha-ink);
   display: grid;
-  grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
-  min-height: 100svh;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100svh;
+  overflow: hidden;
+  position: relative;
+}
+
+.dark .workspace {
+  --chrome: rgb(24 22 18 / 72%);
+  --chrome-strong: rgb(30 27 22 / 88%);
+  --hairline: rgb(229 181 112 / 16%);
+  --soft-ring: rgb(229 181 112 / 12%);
+  background:
+    radial-gradient(
+      circle at var(--glow-x) var(--glow-y),
+      rgb(216 151 82 / 18%),
+      transparent 17rem
+    ),
+    radial-gradient(
+      circle at 82% 10%,
+      rgb(86 144 108 / 16%),
+      transparent 22rem
+    ),
+    linear-gradient(135deg, #11120f 0%, #171410 46%, #111812 100%);
+}
+
+.workspace::before,
+.workspace::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.workspace::before {
+  background:
+    linear-gradient(90deg, var(--soft-ring) 1px, transparent 1px),
+    linear-gradient(var(--soft-ring) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+  inset: 0;
+  mask-image: radial-gradient(circle at 76% 18%, black, transparent 48%);
+  opacity: 0.28;
+}
+
+.workspace::after {
+  aspect-ratio: 1;
+  background: conic-gradient(
+    from 25deg,
+    transparent,
+    rgb(185 125 57 / 18%),
+    transparent 34%,
+    rgb(65 107 83 / 14%),
+    transparent 70%
+  );
+  border: 1px solid rgb(181 128 62 / 10%);
+  border-radius: 50%;
+  filter: blur(0.2px);
+  opacity: 0.72;
+  right: min(8vw, 7rem);
+  top: 7.5rem;
+  transform: rotate(18deg);
+  width: min(28rem, 35vw);
 }
 
 .history,
-.chat__header,
-.composer,
-.settings-modal,
-.small-modal {
-  backdrop-filter: blur(22px);
-  background: var(--moksha-glass);
-  border-color: var(--moksha-glass-line);
+.chat,
+.mobile-scrim,
+.modal-backdrop {
+  position: relative;
+  z-index: 1;
 }
 
 .history {
-  border-right: 1px solid var(--moksha-glass-line);
+  backdrop-filter: blur(26px) saturate(1.25);
+  background: color-mix(in srgb, var(--chrome) 92%, transparent);
+  border-right: 1px solid var(--hairline);
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  height: 100svh;
   min-width: 0;
-  padding: 1rem;
+  overflow: hidden;
+  padding: 1rem 0.9rem;
 }
 
 .history__top,
+.history__actions,
 .chat__header,
+.chat__title-row,
 .run-actions,
 .composer__bar,
-.composer__bar > div,
 .panel__title,
 .settings-modal header,
 .small-modal div {
   align-items: center;
   display: flex;
-  gap: 0.75rem;
+  gap: 0.6rem;
+}
+
+.history__top,
+.chat__header,
+.composer__bar,
+.panel__title,
+.settings-modal header,
+.small-modal div {
   justify-content: space-between;
+}
+
+.mobile-only {
+  display: none;
 }
 
 button,
 input,
 select,
 textarea {
-  background: var(--moksha-surface-raised);
-  border: 1px solid var(--moksha-line);
-  border-radius: 0.65rem;
+  background: var(--chrome-strong);
+  border: 1px solid var(--hairline);
+  border-radius: 0.8rem;
   color: var(--moksha-ink);
+  font: inherit;
 }
 
 button,
 select {
   align-items: center;
   display: inline-flex;
-  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  gap: 0.42rem;
   justify-content: center;
-  min-height: 2.5rem;
-  padding: 0 0.85rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
 }
 
 button {
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--moksha-accent) 42%, var(--hairline));
+  box-shadow: 0 0.65rem 1.8rem rgb(94 64 30 / 10%);
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.42;
+  opacity: 0.44;
 }
 
 .icon-button {
   border-radius: 999px;
-  height: 2.5rem;
-  min-width: 2.5rem;
+  height: 2.35rem;
+  min-width: 2.35rem;
   padding: 0;
-  width: 2.5rem;
+  width: 2.35rem;
 }
 
 .icon-button :deep(svg),
 button :deep(svg) {
   flex: 0 0 auto;
-  height: 1.05rem;
-  width: 1.05rem;
+  height: 1rem;
+  width: 1rem;
 }
 
 .ghost-button {
-  background: color-mix(in srgb, var(--moksha-surface-raised) 42%, transparent);
+  background: color-mix(in srgb, var(--chrome-strong) 62%, transparent);
 }
 
 .ghost-button--danger,
@@ -760,7 +915,8 @@ button :deep(svg) {
 }
 
 .primary-button {
-  background: var(--moksha-accent-strong);
+  background: linear-gradient(135deg, var(--moksha-accent-strong), #b87538);
+  box-shadow: 0 0.9rem 1.9rem rgb(140 82 34 / 22%);
 }
 
 .danger-button {
@@ -769,7 +925,7 @@ button :deep(svg) {
 
 .search {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.4rem;
   margin-top: 1rem;
 }
 
@@ -780,26 +936,30 @@ small,
 .chat__identity span,
 .composer__bar span,
 .panel__title span,
-.empty-state span {
+.empty-state > span,
+.account-button small,
+.history-empty {
   color: var(--moksha-muted);
 }
 
 .search span,
 .field > span {
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-transform: uppercase;
 }
 
 .search input {
-  min-height: 2.55rem;
+  font-size: 0.92rem;
+  min-height: 2.45rem;
   padding: 0 0.8rem;
 }
 
 .history-tabs,
 .segmented {
-  background: color-mix(in srgb, var(--moksha-bg) 72%, transparent);
-  border: 1px solid var(--moksha-line);
-  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--moksha-bg) 58%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 0.9rem;
   display: grid;
   gap: 0.25rem;
   grid-template-columns: repeat(2, 1fr);
@@ -816,35 +976,41 @@ small,
 .segmented button {
   background: transparent;
   border-color: transparent;
-  min-height: 2.15rem;
+  min-height: 2rem;
 }
 
 .history-tabs button[aria-selected="true"],
 .segmented button[aria-pressed="true"] {
-  background: var(--moksha-surface-raised);
-  border-color: var(--moksha-line);
-  box-shadow: var(--moksha-shadow-soft);
+  background: var(--chrome-strong);
+  border-color: var(--hairline);
+  box-shadow: 0 0.45rem 1.1rem rgb(90 59 28 / 8%);
 }
 
 .chat-list {
   align-content: start;
   display: grid;
   gap: 0.55rem;
-  margin-top: 0.85rem;
+  margin-top: 0.75rem;
+  min-height: 0;
   overflow: auto;
+  padding-right: 0.15rem;
 }
 
 .chat-card {
   border: 1px solid transparent;
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   position: relative;
 }
 
 .chat-card[aria-current="page"] {
-  background: color-mix(in srgb, var(--moksha-accent) 14%, var(--moksha-glass));
-  border-color: var(--moksha-accent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--moksha-accent) 13%, transparent),
+    color-mix(in srgb, var(--moksha-leaf) 8%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--moksha-accent) 55%, transparent);
 }
 
 .chat-card__main {
@@ -854,20 +1020,22 @@ small,
   display: grid;
   height: auto;
   justify-items: start;
-  line-height: 1.3;
-  min-height: 4.3rem;
+  line-height: 1.25;
+  min-height: 3.65rem;
   min-width: 0;
-  padding: 0.8rem;
+  padding: 0.72rem;
   text-align: left;
 }
 
 .chat-card__main span,
 .chat__identity p,
-.settings-modal header p {
-  font-weight: 800;
+.settings-modal header p,
+.account-button strong {
+  font-weight: 760;
 }
 
-.chat-card__main span {
+.chat-card__main span,
+.account-button strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -878,23 +1046,24 @@ small,
   align-self: center;
   background: transparent;
   border-color: transparent;
-  height: 2.2rem;
-  min-width: 2.2rem;
+  height: 2rem;
+  min-width: 2rem;
   padding: 0;
-  width: 2.2rem;
+  width: 2rem;
 }
 
 .chat-menu {
-  background: var(--moksha-surface-raised);
-  border: 1px solid var(--moksha-line);
-  border-radius: 0.75rem;
-  box-shadow: var(--moksha-shadow);
+  backdrop-filter: blur(22px) saturate(1.2);
+  background: var(--chrome-strong);
+  border: 1px solid var(--hairline);
+  border-radius: 0.8rem;
+  box-shadow: 0 1rem 2.6rem rgb(48 32 16 / 18%);
   display: grid;
   min-width: 9rem;
   padding: 0.35rem;
   position: absolute;
-  right: 0.5rem;
-  top: 3.2rem;
+  right: 0.45rem;
+  top: 2.9rem;
   z-index: 5;
 }
 
@@ -906,29 +1075,57 @@ small,
 }
 
 .history-empty {
-  color: var(--moksha-muted);
-  margin: 1rem 0;
+  font-size: 0.92rem;
+  margin: 0.8rem 0;
+}
+
+.history-footer {
+  border-top: 1px solid var(--hairline);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.account-button {
+  background: color-mix(in srgb, var(--chrome-strong) 76%, transparent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  height: auto;
+  min-height: 3.2rem;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  width: 100%;
+}
+
+.account-button span {
+  display: grid;
+  min-width: 0;
 }
 
 .chat {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: var(--header-height) minmax(0, 1fr) auto;
+  height: 100svh;
   min-width: 0;
+  overflow: hidden;
 }
 
 .chat__header {
-  border-bottom: 1px solid var(--moksha-glass-line);
-  min-height: 4.75rem;
-  padding: 0.85rem 1.5rem;
+  backdrop-filter: blur(26px) saturate(1.25);
+  background: color-mix(in srgb, var(--chrome) 88%, transparent);
+  border-bottom: 1px solid var(--hairline);
+  min-height: var(--header-height);
+  padding: 0 1.35rem;
+  z-index: 2;
 }
 
+.chat__title-row,
 .chat__identity {
   min-width: 0;
 }
 
 .chat__identity p,
 h2 {
-  font-size: 1rem;
+  font-size: 0.98rem;
   margin: 0;
 }
 
@@ -940,12 +1137,22 @@ h2 {
   white-space: nowrap;
 }
 
+.chat__identity span {
+  font-size: 0.82rem;
+}
+
+.run-actions {
+  justify-content: flex-end;
+}
+
 .status-pill {
-  border: 1px solid var(--moksha-line);
+  background: color-mix(in srgb, var(--chrome-strong) 70%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: 999px;
   color: var(--moksha-muted);
-  font-size: 0.84rem;
-  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 0.28rem 0.65rem;
   text-transform: capitalize;
   white-space: nowrap;
 }
@@ -968,68 +1175,125 @@ h2 {
 .messages {
   align-content: start;
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
+  grid-template-columns: minmax(0, min(58rem, 100%));
+  justify-content: center;
+  min-height: 0;
   overflow: auto;
-  padding: 1.5rem max(1.5rem, 8vw);
+  padding: 1.25rem clamp(1rem, 4vw, 3.5rem) 1rem;
+  scroll-behavior: smooth;
 }
 
 .empty-state {
   align-self: center;
+  grid-column: 1;
   justify-self: center;
   max-width: 36rem;
+  padding-bottom: 4vh;
   text-align: center;
 }
 
-.empty-state p {
-  font-family: Charter, Cambria, "Nirmala UI", serif;
-  font-size: clamp(1.8rem, 4.2vw, 3.15rem);
+.empty-state__eyebrow {
+  color: var(--moksha-accent);
+  display: inline-block;
+  font-size: 0.76rem;
   font-weight: 800;
-  line-height: 1.05;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+.empty-state p {
+  font-size: clamp(1.85rem, 2.9vw, 3rem);
+  font-weight: 780;
+  line-height: 1.08;
   margin: 0 0 0.8rem;
 }
 
+.empty-state > span:last-child {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.55;
+  margin: 0 auto;
+  max-width: 31rem;
+}
+
 .message {
-  border: 1px solid var(--moksha-glass-line);
-  border-radius: 1rem;
-  box-shadow: var(--moksha-shadow-soft);
-  line-height: 1.65;
-  max-width: min(46rem, 92%);
-  padding: 1rem;
+  backdrop-filter: blur(20px) saturate(1.15);
+  border: 1px solid var(--hairline);
+  border-radius: 1.05rem;
+  box-shadow: 0 0.9rem 2.7rem rgb(54 34 14 / 10%);
+  font-size: 0.98rem;
+  line-height: 1.62;
+  grid-column: 1;
+  max-width: min(42rem, 82%);
+  padding: 0.82rem 0.95rem;
 }
 
 .message--user {
-  background: var(--moksha-user-bubble);
-  color: var(--moksha-user-ink);
+  background: linear-gradient(135deg, #eebf81, #d99b5c);
+  color: #201308;
   justify-self: end;
 }
 
 .message--assistant {
-  background: var(--moksha-glass);
+  background: color-mix(in srgb, var(--chrome-strong) 84%, transparent);
   justify-self: start;
 }
 
 .composer {
-  border-top: 1px solid var(--moksha-glass-line);
+  backdrop-filter: blur(26px) saturate(1.25);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--chrome) 96%, transparent),
+    color-mix(in srgb, var(--chrome) 72%, transparent)
+  );
+  border-top: 1px solid var(--hairline);
+  padding: 0.75rem clamp(1rem, 5vw, 4.5rem) 0.95rem;
+  z-index: 2;
+}
+
+.composer-shell {
+  background: color-mix(in srgb, var(--chrome-strong) 80%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 1.1rem;
+  box-shadow: 0 1rem 3rem rgb(64 38 15 / 12%);
   display: grid;
-  gap: 0.65rem;
-  padding: 1rem max(1.5rem, 8vw);
+  gap: 0.28rem;
+  margin: 0 auto;
+  max-width: 58rem;
+  padding: 0.62rem;
 }
 
 .composer label {
+  color: var(--moksha-muted);
+  font-size: 0.76rem;
   font-weight: 800;
+  text-transform: uppercase;
 }
 
 textarea,
 .small-modal input,
 .field select {
-  line-height: 1.5;
-  padding: 0.85rem;
+  line-height: 1.45;
   width: 100%;
 }
 
 textarea {
-  min-height: 5rem;
-  resize: vertical;
+  background: transparent;
+  border-color: transparent;
+  font-size: 1rem;
+  max-height: 8rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0;
+  resize: none;
+}
+
+textarea:focus {
+  outline: none;
+}
+
+.composer__bar {
+  gap: 0.55rem;
 }
 
 .composer__bar p {
@@ -1037,9 +1301,16 @@ textarea {
   margin: 0;
 }
 
+.composer__bar span,
+.composer__bar p {
+  font-size: 0.82rem;
+  min-width: 0;
+}
+
 .modal-backdrop {
   align-items: center;
-  background: rgb(0 0 0 / 48%);
+  backdrop-filter: blur(8px);
+  background: rgb(18 13 8 / 46%);
   display: grid;
   inset: 0;
   justify-items: center;
@@ -1050,31 +1321,39 @@ textarea {
 
 .settings-modal,
 .small-modal {
-  border: 1px solid var(--moksha-glass-line);
-  border-radius: 1rem;
-  box-shadow: var(--moksha-shadow);
+  backdrop-filter: blur(30px) saturate(1.3);
+  background: var(--chrome-strong);
+  border: 1px solid var(--hairline);
+  border-radius: 1.2rem;
+  box-shadow: 0 1.8rem 5rem rgb(25 15 7 / 28%);
   display: grid;
   gap: 1rem;
-  max-height: min(48rem, 92svh);
+  max-height: min(44rem, 92svh);
   overflow: auto;
-  padding: 1.25rem;
-  width: min(32rem, 100%);
+  padding: 1.1rem;
+  width: min(29rem, 100%);
 }
 
 .field,
 .scripture-panel {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.5rem;
+}
+
+.field select,
+.small-modal input {
+  min-height: 2.6rem;
+  padding: 0 0.8rem;
 }
 
 .scripture-panel {
-  border-top: 1px solid var(--moksha-line);
+  border-top: 1px solid var(--hairline);
   padding-top: 1rem;
 }
 
 .scripture-list {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.5rem;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1083,12 +1362,13 @@ textarea {
 .scripture-list li {
   align-items: center;
   display: flex;
+  font-size: 0.92rem;
   justify-content: space-between;
 }
 
 .scripture-list strong {
   color: var(--moksha-leaf);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .signout {
@@ -1100,33 +1380,138 @@ textarea {
   margin: 0;
 }
 
-@media (max-width: 880px) {
+.mobile-scrim {
+  display: none;
+}
+
+@media (max-width: 900px) {
   .workspace {
     grid-template-columns: 1fr;
   }
 
+  .mobile-only {
+    display: inline-flex;
+  }
+
+  .mobile-scrim {
+    background: rgb(18 13 8 / 42%);
+    border: 0;
+    border-radius: 0;
+    display: block;
+    inset: 0;
+    min-height: 0;
+    padding: 0;
+    position: fixed;
+    z-index: 20;
+  }
+
   .history {
-    border-bottom: 1px solid var(--moksha-line);
-    border-right: 0;
-    max-height: 18rem;
+    border-right: 1px solid var(--hairline);
+    box-shadow: 1rem 0 3rem rgb(25 15 7 / 22%);
+    left: 0;
+    max-width: min(21rem, 88vw);
+    position: fixed;
+    top: 0;
+    transform: translateX(-105%);
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    width: min(21rem, 88vw);
+    z-index: 30;
   }
 
-  .run-actions,
-  .composer__bar {
-    align-items: stretch;
-    flex-wrap: wrap;
+  .history--open {
+    transform: translateX(0);
   }
 
-  .run-actions > button,
-  .composer__bar button {
-    flex: 1;
-  }
-
-  .messages,
-  .composer,
   .chat__header {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    gap: 0.8rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0 0.8rem;
+  }
+
+  .run-actions .ghost-button {
+    display: none;
+  }
+
+  .messages {
+    padding: 0.95rem 0.8rem;
+  }
+
+  .empty-state {
+    max-width: 22rem;
+  }
+
+  .empty-state p {
+    font-size: clamp(1.75rem, 8vw, 2.15rem);
+  }
+
+  .message {
+    max-width: 90%;
+  }
+
+  .composer {
+    padding: 0.65rem 0.7rem max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .composer__bar {
+    align-items: center;
+  }
+
+  .composer__bar span,
+  .composer__bar p {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .workspace {
+    --header-height: 3.65rem;
+  }
+
+  .status-pill {
+    display: none;
+  }
+
+  .chat__identity p {
+    font-size: 0.92rem;
+  }
+
+  .chat__identity span {
+    font-size: 0.76rem;
+  }
+
+  .composer-shell {
+    border-radius: 1rem;
+    padding: 0.6rem;
+  }
+
+  textarea {
+    font-size: 0.96rem;
+    min-height: 2.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace,
+  button,
+  .history {
+    transition: none !important;
+  }
+
+  button:hover:not(:disabled),
+  button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .history,
+  .chat__header,
+  .composer,
+  .settings-modal,
+  .small-modal,
+  .message {
+    backdrop-filter: none;
+    background: var(--moksha-surface);
   }
 }
 </style>
