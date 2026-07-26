@@ -210,3 +210,48 @@ def test_generation_run_openai_profile_persists_usage(create_user):
     assert attempt.model == "remote-model"
     assert attempt.usage == {"total_tokens": 9}
     assert remote.call_count == 1
+
+
+@pytest.mark.django_db
+def test_generation_run_ollama_compatible_profile_persists_usage(create_user):
+    user = create_user(email="remote-ollama-run@example.test")
+    chat = Chat.objects.create(user=user)
+    connection = ModelConnection.objects.create(
+        user=user,
+        name="Remote Ollama",
+        dialect=ModelConnection.Dialect.OLLAMA_COMPATIBLE,
+        endpoint_url="https://ollama.example.com",
+        dns_pins=["93.184.216.34"],
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Remote Ollama Profile",
+        connection=connection,
+        model_id="remote-ollama",
+        is_enabled=True,
+    )
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="remote-ollama",
+        prompt="Offer brief guidance.",
+        model_profile=str(profile.pk),
+        stream_key=f"generation:{chat.id}:remote-ollama",
+    )
+
+    with (
+        patch("chat.tasks.publish_run_event", return_value="1-0"),
+        patch(
+            "chat.tasks.ollama_chat_completion",
+            return_value=("Ollama answer.", {"eval_count": 7}),
+        ) as remote,
+    ):
+        generate_chat_response(str(run.pk))
+
+    run.refresh_from_db()
+    attempt = run.attempts.get()
+    assert run.state == GenerationRun.State.COMPLETED
+    assert attempt.provider == "ollama_compatible"
+    assert attempt.model == "remote-ollama"
+    assert attempt.usage == {"eval_count": 7}
+    assert remote.call_count == 1

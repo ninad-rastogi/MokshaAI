@@ -14,7 +14,7 @@ from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
 from chat.rag.engine import RAGEngine
 from llm.models import ModelConnection, ModelProfile
-from llm.providers import openai_chat_completion
+from llm.providers import ollama_chat_completion, openai_chat_completion
 from llm.services import ModelSelection, resolve_model_selection
 from scriptures.models import Scripture
 
@@ -118,13 +118,22 @@ def _generate_response(
     available_scriptures: list[str],
 ) -> tuple[str, list[dict[str, Any]], str]:
     if spec.provider == ModelConnection.Dialect.OPENAI_COMPATIBLE:
-        return _generate_openai_compatible_response(
+        return _generate_remote_provider_response(
+            completion_func=openai_chat_completion,
             run=run,
             spec=spec,
             recent_messages=recent_messages,
             available_scriptures=available_scriptures,
         )
-    if spec.provider not in {"ollama", "ollama_compatible"} or not spec.ollama_server:
+    if spec.provider == "ollama_compatible":
+        return _generate_remote_provider_response(
+            completion_func=ollama_chat_completion,
+            run=run,
+            spec=spec,
+            recent_messages=recent_messages,
+            available_scriptures=available_scriptures,
+        )
+    if spec.provider != "ollama" or not spec.ollama_server:
         raise RuntimeError("unsupported_provider_for_generation")
     engine = RAGEngine(
         vector_store=PgVectorStore(),
@@ -165,8 +174,9 @@ def _chat_history_messages(
     return messages
 
 
-def _generate_openai_compatible_response(
+def _generate_remote_provider_response(
     *,
+    completion_func,
     run: GenerationRun,
     spec: GenerationAttemptSpec,
     recent_messages: list[dict[str, Any]],
@@ -187,7 +197,7 @@ def _generate_openai_compatible_response(
             "Answer from general spiritual guidance only. If scripture evidence is "
             "needed, say that indexed evidence is unavailable."
         )
-        response_text, usage = openai_chat_completion(
+        response_text, usage = completion_func(
             connection=spec.connection,
             model=spec.model,
             messages=_chat_history_messages(
@@ -257,7 +267,7 @@ def _generate_openai_compatible_response(
         mode = "GENERAL"
         sources = []
 
-    response_text, usage = openai_chat_completion(
+    response_text, usage = completion_func(
         connection=spec.connection,
         model=spec.model,
         messages=_chat_history_messages(

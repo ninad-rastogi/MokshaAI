@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from llm.models import ModelConnection, ModelProfile, UserModelPreference
 from llm.providers import (
+    ollama_chat_completion,
     openai_chat_completion,
     probe_connection,
     update_connection_probe,
@@ -198,6 +199,45 @@ def test_openai_chat_completion_rejects_crlf_api_key(settings) -> None:
                 temperature=0.2,
                 max_output_tokens=128,
             )
+
+
+@pytest.mark.django_db
+def test_ollama_chat_completion_posts_safe_payload() -> None:
+    connection = ModelConnection.objects.create(
+        name="Ollama Compatible",
+        dialect=ModelConnection.Dialect.OLLAMA_COMPATIBLE,
+        endpoint_url="https://ollama.example.com",
+        dns_pins=["93.184.216.34"],
+        remote_data_consent_at=timezone.now(),
+    )
+    response = Mock()
+    response.status = 200
+    response.read.return_value = json.dumps(
+        {
+            "message": {"content": "Ollama answer."},
+            "prompt_eval_count": 4,
+            "eval_count": 8,
+        }
+    ).encode("utf-8")
+    fake_http = Mock()
+    fake_http.getresponse.return_value = response
+
+    with patch("llm.providers.NoRedirectHTTPSConnection", return_value=fake_http):
+        text, usage = ollama_chat_completion(
+            connection=connection,
+            model="remote-ollama",
+            messages=[{"role": "user", "content": "Hello"}],
+            temperature=0.2,
+            max_output_tokens=128,
+        )
+
+    assert text == "Ollama answer."
+    assert usage == {"prompt_eval_count": 4, "eval_count": 8}
+    method, path = fake_http.request.call_args.args[:2]
+    assert method == "POST"
+    assert path == "/api/chat"
+    body = fake_http.request.call_args.kwargs["body"]
+    assert json.loads(body.decode("utf-8"))["options"]["num_predict"] == 128
 
 
 @pytest.mark.django_db

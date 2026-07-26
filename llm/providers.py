@@ -260,3 +260,56 @@ def openai_chat_completion(
         raise RuntimeError("provider_response_invalid")
     usage = payload.get("usage", {})
     return message["content"], usage if isinstance(usage, dict) else {}
+
+
+def ollama_chat_completion(
+    *,
+    connection: ModelConnection,
+    model: str,
+    messages: list[dict[str, str]],
+    temperature: float,
+    max_output_tokens: int,
+) -> tuple[str, dict[str, Any]]:
+    """Run one Ollama-compatible non-streaming chat completion safely."""
+
+    validation = validate_public_https_endpoint(
+        connection.endpoint_url,
+        allow_private=connection.is_admin_connection,
+        resolved_ips=connection.dns_pins or None,
+    )
+    api_key = connection.get_api_key()
+    url = urljoin(f"{validation.normalized_url}/", "api/chat")
+    status, payload = _json_request(
+        "POST",
+        url,
+        api_key=api_key,
+        timeout=COMPLETION_TIMEOUT_SECONDS,
+        max_body_bytes=MAX_COMPLETION_BODY_BYTES,
+        payload={
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_output_tokens,
+            },
+        },
+    )
+    if status < 200 or status >= 300:
+        raise RuntimeError(f"provider_http_{status}")
+    message = payload.get("message", {})
+    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+        raise RuntimeError("provider_response_invalid")
+    usage = {
+        key: payload[key]
+        for key in [
+            "prompt_eval_count",
+            "eval_count",
+            "total_duration",
+            "load_duration",
+            "prompt_eval_duration",
+            "eval_duration",
+        ]
+        if key in payload
+    }
+    return message["content"], usage
