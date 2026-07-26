@@ -1,12 +1,29 @@
 """Tests for durable generation run API behavior."""
 
 from unittest.mock import patch
+from uuid import UUID
 
+from django.urls import resolve
 import pytest
 
 from chat.models import Chat, GenerationAttempt, GenerationRun, Message
 from llm.models import ModelConnection, ModelProfile
 from chat.tasks import generate_chat_response
+
+
+def test_top_level_run_urls_resolve_to_v1_contract():
+    run_id = UUID("00000000-0000-0000-0000-000000000001")
+
+    detail = resolve(f"/api/v1/runs/{run_id}/")
+    events = resolve(f"/api/v1/runs/{run_id}/events/")
+    cancel = resolve(f"/api/v1/runs/{run_id}/cancel/")
+
+    assert detail.url_name == "generation-run-detail"
+    assert detail.kwargs["pk"] == run_id
+    assert events.url_name == "generation-run-events"
+    assert events.kwargs["pk"] == run_id
+    assert cancel.url_name == "generation-run-cancel"
+    assert cancel.kwargs["pk"] == run_id
 
 
 @pytest.mark.django_db
@@ -68,6 +85,31 @@ def test_delete_chat_with_active_run_returns_conflict(authenticated_client):
 
     assert response.status_code == 409
     assert response.json()["error"] == "active_run"
+
+
+@pytest.mark.django_db
+def test_top_level_run_endpoints_match_v1_contract(authenticated_client):
+    client, user = authenticated_client
+    chat = Chat.objects.create(user=user)
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="top-level",
+        prompt="Please answer",
+        stream_key=f"generation:{chat.id}:top-level",
+    )
+
+    detail = client.get(f"/api/v1/runs/{run.id}/")
+    events = client.get(f"/api/v1/runs/{run.id}/events/")
+    with patch("chat.views.publish_run_event", return_value="1-0"):
+        cancelled = client.post(f"/api/v1/runs/{run.id}/cancel/")
+
+    assert detail.status_code == 200
+    assert detail.json()["id"] == str(run.id)
+    assert events.status_code == 200
+    assert events["Content-Type"].startswith("text/event-stream")
+    assert cancelled.status_code == 200
+    assert cancelled.json()["state"] == GenerationRun.State.CANCELLED
 
 
 @pytest.mark.django_db

@@ -171,8 +171,10 @@ export function useApi() {
         headers: { "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({ message, model_profile: modelProfile }),
       }),
+    run: (runId: string) =>
+      request<GenerationRun>(`/runs/${runId}/`, runSchema),
     cancelRun: (runId: string) =>
-      request<GenerationRun>(`/chats/runs/${runId}/cancel/`, runSchema, {
+      request<GenerationRun>(`/runs/${runId}/cancel/`, runSchema, {
         method: "POST",
       }),
     modelProfiles: () =>

@@ -19,7 +19,7 @@ export function useRunStream() {
       ? `?last_event_id=${encodeURIComponent(lastEventId)}`
       : "";
     source = new EventSource(
-      `${config.public.apiBase}/chats/runs/${runId}/events/${query}`,
+      `${config.public.apiBase}/runs/${runId}/events/${query}`,
       {
         withCredentials: true,
       },
