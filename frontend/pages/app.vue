@@ -319,10 +319,11 @@ async function signOut() {
         <button
           class="icon-button"
           type="button"
+          aria-label="New chat"
           title="New chat"
           @click="newChat"
         >
-          +
+          <UIcon name="i-lucide-plus" aria-hidden="true" />
         </button>
       </div>
 
@@ -370,17 +371,27 @@ async function signOut() {
           <button
             class="chat-card__menu"
             type="button"
+            aria-label="Chat actions"
             title="Chat actions"
             :aria-expanded="openMenuId === chat.id"
             @click="openMenuId = openMenuId === chat.id ? '' : chat.id"
           >
-            ...
+            <UIcon name="i-lucide-ellipsis" aria-hidden="true" />
           </button>
           <div v-if="openMenuId === chat.id" class="chat-menu" role="menu">
             <button type="button" role="menuitem" @click="startRename(chat)">
+              <UIcon name="i-lucide-pencil" aria-hidden="true" />
               Rename
             </button>
             <button type="button" role="menuitem" @click="archiveChat(chat)">
+              <UIcon
+                :name="
+                  chat.is_archived
+                    ? 'i-lucide-archive-restore'
+                    : 'i-lucide-archive'
+                "
+                aria-hidden="true"
+              />
               {{ chat.is_archived ? "Restore" : "Archive" }}
             </button>
             <button
@@ -389,6 +400,7 @@ async function signOut() {
               role="menuitem"
               @click="askDelete(chat.id)"
             >
+              <UIcon name="i-lucide-trash-2" aria-hidden="true" />
               Delete
             </button>
           </div>
@@ -415,6 +427,7 @@ async function signOut() {
             :disabled="!activeRunId"
             @click="connectRun()"
           >
+            <UIcon name="i-lucide-wifi" aria-hidden="true" />
             Reconnect
           </button>
           <button
@@ -423,15 +436,17 @@ async function signOut() {
             :disabled="!busy"
             @click="stopRun"
           >
+            <UIcon name="i-lucide-square" aria-hidden="true" />
             Stop
           </button>
           <button
             class="icon-button"
             type="button"
+            aria-label="Settings"
             title="Settings"
             @click="openSettings"
           >
-            Settings
+            <UIcon name="i-lucide-settings" aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -481,6 +496,7 @@ async function signOut() {
               :disabled="busy || !messages.length"
               @click="retryLast"
             >
+              <UIcon name="i-lucide-rotate-ccw" aria-hidden="true" />
               Retry
             </button>
             <button
@@ -488,6 +504,7 @@ async function signOut() {
               type="submit"
               :disabled="busy || !prompt.trim()"
             >
+              <UIcon name="i-lucide-send" aria-hidden="true" />
               Send
             </button>
           </div>
@@ -511,9 +528,11 @@ async function signOut() {
             <button
               class="icon-button"
               type="button"
+              aria-label="Close settings"
+              title="Close settings"
               @click="settingsOpen = false"
             >
-              Close
+              <UIcon name="i-lucide-x" aria-hidden="true" />
             </button>
           </header>
 
@@ -564,6 +583,7 @@ async function signOut() {
           </section>
 
           <button class="ghost-button signout" type="button" @click="signOut">
+            <UIcon name="i-lucide-log-out" aria-hidden="true" />
             Sign out
           </button>
         </section>
@@ -589,9 +609,13 @@ async function signOut() {
               type="button"
               @click="renameChatId = ''"
             >
+              <UIcon name="i-lucide-x" aria-hidden="true" />
               Cancel
             </button>
-            <button class="primary-button" type="submit">Save</button>
+            <button class="primary-button" type="submit">
+              <UIcon name="i-lucide-check" aria-hidden="true" />
+              Save
+            </button>
           </div>
         </form>
       </div>
@@ -611,9 +635,11 @@ async function signOut() {
               type="button"
               @click="deleteChatId = ''"
             >
+              <UIcon name="i-lucide-x" aria-hidden="true" />
               Cancel
             </button>
             <button class="danger-button" type="button" @click="confirmDelete">
+              <UIcon name="i-lucide-trash-2" aria-hidden="true" />
               Delete
             </button>
           </div>
@@ -686,6 +712,10 @@ textarea {
 
 button,
 select {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
   min-height: 2.5rem;
   padding: 0 0.85rem;
 }
@@ -701,7 +731,17 @@ button:disabled {
 
 .icon-button {
   border-radius: 999px;
+  height: 2.5rem;
   min-width: 2.5rem;
+  padding: 0;
+  width: 2.5rem;
+}
+
+.icon-button :deep(svg),
+button :deep(svg) {
+  flex: 0 0 auto;
+  height: 1.05rem;
+  width: 1.05rem;
 }
 
 .ghost-button {
@@ -838,8 +878,10 @@ small,
   align-self: center;
   background: transparent;
   border-color: transparent;
+  height: 2.2rem;
   min-width: 2.2rem;
   padding: 0;
+  width: 2.2rem;
 }
 
 .chat-menu {
