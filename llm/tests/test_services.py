@@ -7,7 +7,11 @@ import pytest
 from django.utils import timezone
 
 from llm.models import ModelConnection, ModelProfile, UserModelPreference
-from llm.providers import probe_connection, update_connection_probe
+from llm.providers import (
+    openai_chat_completion,
+    probe_connection,
+    update_connection_probe,
+)
 from llm.services import resolve_model_selection
 from users.models import User
 
@@ -129,6 +133,71 @@ def test_probe_connection_sanitizes_http_failure() -> None:
 
     assert result.status == ModelConnection.Status.AUTH_INVALID
     assert "secret" not in result.detail
+
+
+@pytest.mark.django_db
+def test_openai_chat_completion_posts_safe_payload(settings) -> None:
+    settings.BYOK_MASTER_KEY = ""
+    connection = ModelConnection.objects.create(
+        name="OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        remote_data_consent_at=timezone.now(),
+    )
+    response = Mock()
+    response.status = 200
+    response.read.return_value = json.dumps(
+        {
+            "choices": [{"message": {"content": "Remote answer."}}],
+            "usage": {"total_tokens": 12},
+        }
+    ).encode("utf-8")
+    fake_http = Mock()
+    fake_http.getresponse.return_value = response
+
+    with patch("llm.providers.NoRedirectHTTPSConnection", return_value=fake_http):
+        text, usage = openai_chat_completion(
+            connection=connection,
+            model="remote-model",
+            messages=[{"role": "user", "content": "Hello"}],
+            temperature=0.2,
+            max_output_tokens=128,
+        )
+
+    assert text == "Remote answer."
+    assert usage == {"total_tokens": 12}
+    method, path = fake_http.request.call_args.args[:2]
+    assert method == "POST"
+    assert path == "/v1/chat/completions"
+    headers = fake_http.request.call_args.kwargs["headers"]
+    assert "Authorization" not in headers
+    assert headers["Content-Type"] == "application/json"
+
+
+@pytest.mark.django_db
+def test_openai_chat_completion_rejects_crlf_api_key(settings) -> None:
+    settings.BYOK_MASTER_KEY = ""
+    user = User.objects.create_user(email="crlf@example.test", password="pass")
+    connection = ModelConnection.objects.create(
+        user=user,
+        name="OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        remote_data_consent_at=timezone.now(),
+        encrypted_api_key="not-used",
+        api_key_nonce="not-used",
+    )
+    with patch.object(connection, "get_api_key", return_value="sk-test\r\nbad: x"):
+        with pytest.raises(Exception):
+            openai_chat_completion(
+                connection=connection,
+                model="remote-model",
+                messages=[{"role": "user", "content": "Hello"}],
+                temperature=0.2,
+                max_output_tokens=128,
+            )
 
 
 @pytest.mark.django_db

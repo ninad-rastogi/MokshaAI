@@ -17,7 +17,9 @@ from llm.models import ModelConnection
 from llm.security import validate_public_https_endpoint
 
 MAX_PROBE_BODY_BYTES = 256_000
+MAX_COMPLETION_BODY_BYTES = 1_000_000
 PROBE_TIMEOUT_SECONDS = 8
+COMPLETION_TIMEOUT_SECONDS = 90
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,12 @@ class ProbeResult:
 
 class NoRedirectHTTPSConnection(HTTPSConnection):
     """HTTPSConnection wrapper that disables proxy-env inheritance by design."""
+
+
+def _safe_bearer_header(api_key: str) -> str:
+    if "\r" in api_key or "\n" in api_key:
+        raise ValidationError("credential_header_invalid")
+    return f"Bearer {api_key}"
 
 
 def _sanitize_detail(value: str) -> str:
@@ -50,39 +58,54 @@ def _classify_http_status(status: int) -> str:
     return ModelConnection.Status.UNREACHABLE
 
 
-def _json_get(url: str, api_key: str = "") -> tuple[int, dict[str, Any]]:
+def _json_request(
+    method: str,
+    url: str,
+    *,
+    api_key: str = "",
+    payload: dict[str, Any] | None = None,
+    timeout: int = PROBE_TIMEOUT_SECONDS,
+    max_body_bytes: int = MAX_PROBE_BODY_BYTES,
+) -> tuple[int, dict[str, Any]]:
     parsed = urlparse(url)
     if parsed.scheme != "https" or parsed.hostname is None:
-        raise ValidationError("probe_endpoint_invalid")
+        raise ValidationError("provider_endpoint_invalid")
     if parsed.port and parsed.port not in {443, 8443}:
-        raise ValidationError("probe_port_forbidden")
+        raise ValidationError("provider_port_forbidden")
 
     path = parsed.path or "/"
     if parsed.query:
         path = f"{path}?{parsed.query}"
 
+    body = None if payload is None else json.dumps(payload).encode("utf-8")
     context = ssl.create_default_context()
     connection = NoRedirectHTTPSConnection(
         parsed.hostname,
         parsed.port or 443,
-        timeout=PROBE_TIMEOUT_SECONDS,
+        timeout=timeout,
         context=context,
     )
     headers = {"Accept": "application/json", "User-Agent": "MokshaAI/2"}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
     if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+        headers["Authorization"] = _safe_bearer_header(api_key)
     try:
-        connection.request("GET", path, headers=headers)
+        connection.request(method, path, body=body, headers=headers)
         response = connection.getresponse()
-        raw = response.read(MAX_PROBE_BODY_BYTES + 1)
+        raw = response.read(max_body_bytes + 1)
     finally:
         connection.close()
-    if len(raw) > MAX_PROBE_BODY_BYTES:
-        raise ValidationError("probe_body_too_large")
+    if len(raw) > max_body_bytes:
+        raise ValidationError("provider_body_too_large")
     payload = json.loads(raw.decode("utf-8") or "{}") if raw else {}
     if not isinstance(payload, dict):
-        raise ValidationError("probe_response_invalid")
+        raise ValidationError("provider_response_invalid")
     return response.status, payload
+
+
+def _json_get(url: str, api_key: str = "") -> tuple[int, dict[str, Any]]:
+    return _json_request("GET", url, api_key=api_key)
 
 
 def _extract_openai_models(payload: dict[str, Any]) -> tuple[str, ...]:
@@ -150,7 +173,13 @@ def probe_connection(connection: ModelConnection) -> ProbeResult:
 
     try:
         status, payload = _json_get(url, api_key)
-    except OSError, socket.timeout, ssl.SSLError, json.JSONDecodeError, ValidationError:
+    except (
+        OSError,
+        socket.timeout,
+        ssl.SSLError,
+        json.JSONDecodeError,
+        ValidationError,
+    ):
         return ProbeResult(
             status=ModelConnection.Status.UNREACHABLE,
             detail="Provider probe failed without exposing remote error details.",
@@ -185,3 +214,49 @@ def update_connection_probe(connection: ModelConnection) -> ProbeResult:
         update_fields=["status", "sanitized_detail", "last_checked_at", "updated_at"]
     )
     return result
+
+
+def openai_chat_completion(
+    *,
+    connection: ModelConnection,
+    model: str,
+    messages: list[dict[str, str]],
+    temperature: float,
+    max_output_tokens: int,
+) -> tuple[str, dict[str, Any]]:
+    """Run one OpenAI-compatible non-streaming chat completion safely."""
+
+    validation = validate_public_https_endpoint(
+        connection.endpoint_url,
+        allow_private=connection.is_admin_connection,
+        resolved_ips=connection.dns_pins or None,
+    )
+    api_key = connection.get_api_key()
+    url = urljoin(f"{validation.normalized_url}/", "chat/completions")
+    status, payload = _json_request(
+        "POST",
+        url,
+        api_key=api_key,
+        timeout=COMPLETION_TIMEOUT_SECONDS,
+        max_body_bytes=MAX_COMPLETION_BODY_BYTES,
+        payload={
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_output_tokens,
+            "stream": False,
+        },
+    )
+    if status < 200 or status >= 300:
+        raise RuntimeError(f"provider_http_{status}")
+    choices = payload.get("choices", [])
+    if not isinstance(choices, list) or not choices:
+        raise RuntimeError("provider_response_empty")
+    first = choices[0]
+    if not isinstance(first, dict):
+        raise RuntimeError("provider_response_invalid")
+    message = first.get("message", {})
+    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+        raise RuntimeError("provider_response_invalid")
+    usage = payload.get("usage", {})
+    return message["content"], usage if isinstance(usage, dict) else {}

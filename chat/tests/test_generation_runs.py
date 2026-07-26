@@ -165,3 +165,48 @@ def test_generation_run_falls_back_before_delta(create_user):
     assert "delta" in emitted_events
     assert emitted_events.index("delta") > emitted_events.index("state")
     assert Message.objects.filter(chat=chat, role="assistant").count() == 1
+
+
+@pytest.mark.django_db
+def test_generation_run_openai_profile_persists_usage(create_user):
+    user = create_user(email="remote-run@example.test")
+    chat = Chat.objects.create(user=user)
+    connection = ModelConnection.objects.create(
+        user=user,
+        name="Remote",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Remote Profile",
+        connection=connection,
+        model_id="remote-model",
+        is_enabled=True,
+    )
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="remote",
+        prompt="Offer brief guidance.",
+        model_profile=str(profile.pk),
+        stream_key=f"generation:{chat.id}:remote",
+    )
+
+    with (
+        patch("chat.tasks.publish_run_event", return_value="1-0"),
+        patch(
+            "chat.tasks.openai_chat_completion",
+            return_value=("Remote answer.", {"total_tokens": 9}),
+        ) as remote,
+    ):
+        generate_chat_response(str(run.pk))
+
+    run.refresh_from_db()
+    attempt = run.attempts.get()
+    assert run.state == GenerationRun.State.COMPLETED
+    assert attempt.provider == ModelConnection.Dialect.OPENAI_COMPATIBLE
+    assert attempt.model == "remote-model"
+    assert attempt.usage == {"total_tokens": 9}
+    assert remote.call_count == 1

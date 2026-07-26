@@ -14,6 +14,7 @@ from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
 from chat.rag.engine import RAGEngine
 from llm.models import ModelConnection, ModelProfile
+from llm.providers import openai_chat_completion
 from llm.services import ModelSelection, resolve_model_selection
 from scriptures.models import Scripture
 
@@ -27,6 +28,9 @@ class GenerationAttemptSpec:
     provider: str
     model: str
     ollama_server: str
+    connection: ModelConnection | None
+    temperature: float
+    max_output_tokens: int
     snapshot: dict[str, Any]
 
 
@@ -61,6 +65,9 @@ def _spec_from_profile(profile: ModelProfile) -> GenerationAttemptSpec:
         provider=provider,
         model=profile.model_id,
         ollama_server=server,
+        connection=connection,
+        temperature=profile.temperature,
+        max_output_tokens=profile.max_output_tokens,
         snapshot=snapshot,
     )
 
@@ -71,6 +78,9 @@ def _legacy_spec(run: GenerationRun) -> GenerationAttemptSpec:
         provider="ollama",
         model=model,
         ollama_server=settings.OLLAMA_BASE_URL,
+        connection=None,
+        temperature=0.7,
+        max_output_tokens=1024,
         snapshot={
             "provider": "ollama",
             "base_url": settings.OLLAMA_BASE_URL,
@@ -107,6 +117,13 @@ def _generate_response(
     recent_messages: list[dict[str, Any]],
     available_scriptures: list[str],
 ) -> tuple[str, list[dict[str, Any]], str]:
+    if spec.provider == ModelConnection.Dialect.OPENAI_COMPATIBLE:
+        return _generate_openai_compatible_response(
+            run=run,
+            spec=spec,
+            recent_messages=recent_messages,
+            available_scriptures=available_scriptures,
+        )
     if spec.provider not in {"ollama", "ollama_compatible"} or not spec.ollama_server:
         raise RuntimeError("unsupported_provider_for_generation")
     engine = RAGEngine(
@@ -129,6 +146,129 @@ def _generate_response(
         response_text = engine.query_without_rag(run.prompt, recent_messages)
         sources = []
         mode = "GENERAL"
+    return response_text, sources, mode
+
+
+def _chat_history_messages(
+    *,
+    system_prompt: str,
+    recent_messages: list[dict[str, Any]],
+    prompt: str,
+) -> list[dict[str, str]]:
+    messages = [{"role": "system", "content": system_prompt}]
+    for message in recent_messages[-6:]:
+        role = message.get("role")
+        content = str(message.get("content", ""))
+        if role in {"user", "assistant"} and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": prompt})
+    return messages
+
+
+def _generate_openai_compatible_response(
+    *,
+    run: GenerationRun,
+    spec: GenerationAttemptSpec,
+    recent_messages: list[dict[str, Any]],
+    available_scriptures: list[str],
+) -> tuple[str, list[dict[str, Any]], str]:
+    if spec.connection is None:
+        raise RuntimeError("provider_connection_missing")
+    system_prompt = settings.VEDIC_SYSTEM_PROMPT.format(
+        available_scriptures=(
+            ", ".join(available_scriptures)
+            if available_scriptures
+            else "None available"
+        )
+    )
+    if not available_scriptures:
+        prompt = (
+            f"{run.prompt}\n\n"
+            "Answer from general spiritual guidance only. If scripture evidence is "
+            "needed, say that indexed evidence is unavailable."
+        )
+        response_text, usage = openai_chat_completion(
+            connection=spec.connection,
+            model=spec.model,
+            messages=_chat_history_messages(
+                system_prompt=system_prompt,
+                recent_messages=recent_messages,
+                prompt=prompt,
+            ),
+            temperature=spec.temperature,
+            max_output_tokens=spec.max_output_tokens,
+        )
+        spec.snapshot["reported_usage"] = usage
+        return response_text, [], "GENERAL"
+
+    engine = RAGEngine(
+        vector_store=PgVectorStore(),
+        ollama_model=settings.OLLAMA_MODEL,
+        ollama_server=settings.OLLAMA_BASE_URL,
+        system_prompt=settings.VEDIC_SYSTEM_PROMPT,
+        available_scriptures=available_scriptures,
+    )
+    route, requires_scripture = engine.route_query(run.prompt)
+    if route == "safety":
+        prompt = run.prompt
+        mode = "SAFETY"
+        sources: list[dict[str, Any]] = []
+    elif route == "rag" and requires_scripture:
+        chunks = engine.vector_store.search(
+            run.prompt, top_k=3, allowed_scriptures=available_scriptures
+        )
+        chunks = [
+            chunk for chunk in chunks if chunk["score"] >= settings.RAG_MIN_SIMILARITY
+        ]
+        if not chunks:
+            return (
+                "I could not find a sufficiently relevant passage in the indexed "
+                "scriptures to answer that reliably. Please try a more specific "
+                "question or ask for general spiritual guidance.",
+                [],
+                "RAG",
+            )
+        context_parts = []
+        sources = []
+        for index, chunk in enumerate(chunks):
+            context_parts.append(f"[Context {index + 1}]\n{chunk['text']}\n")
+            sources.append(
+                {
+                    "scripture": chunk.get("scripture", "Unknown"),
+                    "page": chunk.get("page", "N/A"),
+                    "file_name": chunk.get("file_name", "Unknown"),
+                    "score": chunk.get("score", 0.0),
+                    "excerpt": (
+                        chunk["text"][:200] + "..."
+                        if len(chunk["text"]) > 200
+                        else chunk["text"]
+                    ),
+                }
+            )
+        prompt = (
+            "Based ONLY on the following scripture context, answer the user's "
+            f"question.\n\nScripture Context:\n{'\n'.join(context_parts)}\n\n"
+            f"User Question: {run.prompt}\n\n"
+            "Cite every factual scripture claim inline as [Scripture, file, p. N]."
+        )
+        mode = "RAG"
+    else:
+        prompt = run.prompt
+        mode = "GENERAL"
+        sources = []
+
+    response_text, usage = openai_chat_completion(
+        connection=spec.connection,
+        model=spec.model,
+        messages=_chat_history_messages(
+            system_prompt=system_prompt,
+            recent_messages=recent_messages,
+            prompt=prompt,
+        ),
+        temperature=spec.temperature,
+        max_output_tokens=spec.max_output_tokens,
+    )
+    spec.snapshot["reported_usage"] = usage
     return response_text, sources, mode
 
 
@@ -226,8 +366,9 @@ def generate_chat_response(self, run_id: str) -> None:
             )
 
             attempt.outcome = GenerationAttempt.Outcome.SUCCEEDED
+            attempt.usage = spec.snapshot.get("reported_usage", {})
             attempt.finished_at = timezone.now()
-            attempt.save(update_fields=["outcome", "finished_at"])
+            attempt.save(update_fields=["outcome", "usage", "finished_at"])
             GenerationRun.objects.filter(pk=run.pk).update(
                 state=GenerationRun.State.COMPLETED,
                 assistant_message=assistant_message,
