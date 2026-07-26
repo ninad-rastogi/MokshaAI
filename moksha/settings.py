@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "users",
     "chat",
     "scriptures",
+    "llm",
 ]
 
 MIDDLEWARE = [
@@ -211,6 +212,8 @@ CELERY_TASK_ROUTES = {
 }
 CELERY_TASK_DEFAULT_QUEUE = "default"
 GENERATION_MAX_ACTIVE_PER_USER = int(os.getenv("GENERATION_MAX_ACTIVE_PER_USER", "2"))
+BYOK_MASTER_KEY = os.getenv("MOKSHA_BYOK_MASTER_KEY", "")
+BYOK_MASTER_KEY_FILE = os.getenv("MOKSHA_BYOK_MASTER_KEY_FILE", "")
 
 VEDIC_SYSTEM_PROMPT = (
     "You are Moksha-AI, a compassionate spiritual guide deeply rooted in "
