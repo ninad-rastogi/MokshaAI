@@ -3,6 +3,7 @@ import type {
   ChatSummary,
   GenerationRun,
   Message,
+  ModelProfile,
   Page,
   Scripture,
   UserProfile,
@@ -52,6 +53,20 @@ const runSchema = z.object({
   queued_at: z.string(),
   started_at: z.string().nullable(),
   finished_at: z.string().nullable(),
+});
+
+const modelProfileSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  model_id: z.string(),
+  connection: z.string().nullable(),
+  connection_status: z.string(),
+  connection_dialect: z.string(),
+  is_enabled: z.boolean(),
+  is_admin_default: z.boolean(),
+  context_window: z.number(),
+  max_output_tokens: z.number(),
+  temperature: z.string(),
 });
 
 const userSchema = z.object({
@@ -119,10 +134,14 @@ export function useApi() {
         body: JSON.stringify({ email, password, password_confirm: password }),
       }),
     sessionLogin: async (email: string, password: string) => {
-      const user = await request<UserProfile>("/auth/session/login/", userSchema, {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
+      const user = await request<UserProfile>(
+        "/auth/session/login/",
+        userSchema,
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        },
+      );
       csrfToken.value = "";
       await ensureCsrf();
       return user;
@@ -156,6 +175,11 @@ export function useApi() {
       request<GenerationRun>(`/chats/runs/${runId}/cancel/`, runSchema, {
         method: "POST",
       }),
+    modelProfiles: () =>
+      request<Page<ModelProfile>>(
+        "/models/profiles/",
+        pageSchema(modelProfileSchema),
+      ),
     scriptures: () =>
       request<Page<Scripture>>("/scriptures/", pageSchema(scriptureSchema)),
   };

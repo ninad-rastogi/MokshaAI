@@ -37,6 +37,20 @@ export type GenerationRun = {
   finished_at: string | null;
 };
 
+export type ModelProfile = {
+  id: string;
+  name: string;
+  model_id: string;
+  connection: string | null;
+  connection_status: string;
+  connection_dialect: string;
+  is_enabled: boolean;
+  is_admin_default: boolean;
+  context_window: number;
+  max_output_tokens: number;
+  temperature: string;
+};
+
 export type Page<T> = {
   next: string | null;
   previous: string | null;
