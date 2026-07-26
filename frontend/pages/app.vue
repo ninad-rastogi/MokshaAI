@@ -71,11 +71,25 @@ onMounted(async () => {
   try {
     const profile = await api.me();
     user.value = profile.spiritual_name || profile.email;
-    await Promise.all([loadChats(), loadScriptures(), loadProfiles()]);
+  } catch {
+    await navigateTo("/");
+    return;
+  }
+
+  const results = await Promise.allSettled([
+    loadChats(),
+    loadScriptures(),
+    loadProfiles(),
+  ]);
+  if (results.some((result) => result.status === "rejected")) {
+    error.value = "Some workspace data could not load. Refresh or retry.";
+  }
+
+  try {
     if (!activeChatId.value) await newChat();
     else await loadMessages();
   } catch {
-    await navigateTo("/");
+    error.value = "Could not load this conversation. Refresh or retry.";
   }
 });
 
@@ -267,10 +281,10 @@ async function signOut() {
 
       <div class="messages" aria-live="polite">
         <div v-if="!messages.length && !streamingText" class="empty-state">
-          <p>Moksha AI</p>
+          <p>Bring what weighs on you.</p>
           <span
-            >Ask from indexed scripture. Answers stay grounded when evidence
-            exists.</span
+            >Moksha AI will listen, search the scriptures, and answer with
+            relevant wisdom and citations.</span
           >
         </div>
 
@@ -296,7 +310,7 @@ async function signOut() {
           v-model="prompt"
           rows="3"
           :disabled="busy"
-          placeholder="Write your question..."
+          placeholder="Share what you are facing..."
         />
         <div class="composer__bar">
           <p v-if="error" role="alert">{{ error }}</p>

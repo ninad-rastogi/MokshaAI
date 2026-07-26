@@ -86,6 +86,25 @@ const scriptureSchema = z.object({
   last_indexed_at: z.string().nullable(),
 });
 
+export class ApiRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly payload: unknown,
+  ) {
+    super(`request_failed:${status}`);
+  }
+}
+
+async function responsePayload(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
 export function useApi() {
   const config = useRuntimeConfig();
   const base = config.public.apiBase;
@@ -121,7 +140,10 @@ export function useApi() {
       },
     });
     if (!response.ok) {
-      throw new Error(`request_failed:${response.status}`);
+      throw new ApiRequestError(
+        response.status,
+        await responsePayload(response),
+      );
     }
     return schema.parse(await response.json());
   }
@@ -146,11 +168,11 @@ export function useApi() {
       await ensureCsrf();
       return user;
     },
-    sessionLogout: () =>
+    sessionLogout: async () =>
       fetch(`${base}/auth/session/logout/`, {
         method: "POST",
         credentials: "include",
-        headers: { "X-CSRFToken": csrfToken.value },
+        headers: { "X-CSRFToken": await ensureCsrf() },
       }),
     chats: () => request<Page<ChatSummary>>("/chats/", pageSchema(chatSchema)),
     createChat: () =>

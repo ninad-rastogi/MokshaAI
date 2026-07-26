@@ -27,6 +27,15 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("email", "password", "password_confirm", "spiritual_name")
+        extra_kwargs = {"email": {"validators": []}}
+
+    def validate_email(self, email: str) -> str:
+        normalized_email = User.objects.normalize_email(email)
+        if User.objects.filter(email__iexact=normalized_email).exists():
+            raise serializers.ValidationError(
+                "Account already exists. Sign in instead."
+            )
+        return normalized_email
 
     def validate(self, attrs: dict) -> dict:
         if attrs["password"] != attrs.pop("password_confirm"):
