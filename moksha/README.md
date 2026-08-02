@@ -1,47 +1,72 @@
-# moksha/ — Django Project Package
+# Django Project Configuration
 
-This is the **main Django project package**. It contains the core configuration, URL routing,
-and WSGI/ASGI entry points for the Django application.
+## Purpose
 
-## Files
+`moksha/` configures the Django 6 product backend. It owns settings, root URL
+routing, Celery bootstrap, and ASGI/WSGI entry points. Product APIs remain in
+their owning Django apps.
 
-### `settings.py`
-The **central configuration file** for the entire Django backend. Everything the Django app
-needs is configured here:
+## Architecture And Data Flow
 
-- **Environment variables**: Loads from `.env` via `python-dotenv`
-- **Installed apps**: Django admin, DRF, CORS, and local apps (`users`, `chat`, `scriptures`)
-- **Database**: PostgreSQL configured via `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, etc.
-- **REST Framework**: JWT authentication via `djangorestframework-simplejwt`, pagination
-  (20 items/page), throttling (1000 requests/hour per user)
-- **SimpleJWT settings**: Access token lifetime (1 hour), refresh token lifetime (7 days),
-  token rotation enabled
-- **CORS**: Allows requests from `http://localhost:8501` (Streamlit frontend)
-- **Ollama/RAG settings**: `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `EMBEDDING_MODEL` (BAAI/bge-m3),
-  `VEDIC_SYSTEM_PROMPT` (the full system prompt for the AI)
-- **Logging**: Structured logging for `moksha`, `chat`, `users`, `scriptures` loggers
-- **Base directories**: `BASE_DIR`, `DATA_DIR`, `DOCS_DIR`, `EMBEDDINGS_DIR` — auto-created on
-  startup
+Caddy sends `/api/v1/*`, `/admin/*`, and `/static/*` traffic to Django. Uvicorn
+loads `moksha.asgi:application`. Django uses PostgreSQL/PgVector for durable
+state, Redis for Celery and run events, the private embedding service for
+BGE-M3, and configured model providers for generation.
 
-### `urls.py`
-The **root URL router** that maps URL prefixes to each Django app:
+## Files And Entrypoints
 
-| URL Pattern | App | Description |
-|-------------|-----|-------------|
-| `/admin/` | Django admin | Web-based admin panel |
-| `/api/auth/` | `users` | Authentication endpoints |
-| `/api/chat/` | `chat` | Chat CRUD and query endpoints |
-| `/api/scriptures/` | `scriptures` | Scripture management endpoints |
+- `settings.py`: environment-backed runtime settings and security policy.
+- `settings_test.py`: isolated test overrides.
+- `urls.py`: root API, admin, and health routes.
+- `asgi.py`: production ASGI entry point.
+- `wsgi.py`: compatibility entry point for management tooling.
+- `celery.py`: Celery application and queue routing.
 
-Each app defines its own `urls.py` with detailed endpoint mappings.
+## Interfaces
 
-### `wsgi.py`
-**Web Server Gateway Interface** entry point. Used by production servers (gunicorn, uWSGI)
-to serve the Django application. Exposes the `application` callable.
+Root routes delegate to `users`, `chat`, `scriptures`, and `llm`. Django admin
+is available under `/admin/`. Browser authentication uses Django session
+cookies and CSRF; JWT remains available for non-browser clients.
 
-### `asgi.py`
-**Asynchronous Server Gateway Interface** entry point. Used by async servers (daphne, uvicorn)
-for WebSocket support if needed in the future. Exposes the `application` callable.
+## Configuration
 
-### `__init__.py`
-Empty file that makes the `moksha/` directory a Python package.
+Required production values include PostgreSQL and Redis URLs,
+`DJANGO_SECRET_KEY`, allowed hosts, CSRF trusted origins, Ollama settings, and
+the BYOK master-key file. See `.env.example` and `deploy/README.md`.
+
+## Commands
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache python manage.py check
+uv run --no-cache python manage.py migrate
+uv run --no-cache uvicorn moksha.asgi:application --host 0.0.0.0 --port 8000
+```
+
+## Tests
+
+Run `python manage.py check`, migration drift checks, mypy, and pytest through
+`uv` in the required environment. Integration tests require PostgreSQL with
+PgVector and Redis.
+
+## Dependencies
+
+Django, DRF, SimpleJWT, Celery, Redis, PostgreSQL/PgVector, and Uvicorn.
+
+## Security
+
+Production settings fail closed for missing secrets, restrict hosts and trusted
+origins, preserve secure session/CSRF cookies, and never expose the embedding
+service directly.
+
+## Failure Modes And Troubleshooting
+
+- Database startup failures: verify PostgreSQL and the `vector` extension.
+- Queue failures: verify Redis and Celery generation/index workers.
+- CSRF failures: verify Caddy origin, trusted origins, and cookie attributes.
+- Missing BYOK key: mount the configured key file; remote keys stay unusable.
+
+## Related Docs
+
+See `../README.md`, `../deploy/README.md`, `../operations/README.md`, and each
+Django app README.

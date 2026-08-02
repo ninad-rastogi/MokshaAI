@@ -1,7 +1,7 @@
 [project]
 name = "moksha-ai"
 version = "2.0.0"
-description = "Vedic Spiritual Guide Chatbot"
+description = "Scripture-grounded spiritual guidance chatbot"
 requires-python = ">=3.14,<3.15"
 dependencies = [
     # Django + DRF
@@ -11,6 +11,8 @@ dependencies = [
     "djangorestframework>=3.15",
     "djangorestframework-simplejwt>=5.3",
     "django-cors-headers>=4.3",
+    "inflection>=0.5.1",
+    "uritemplate>=4.2",
     "fastapi>=0.116",
     # Database
     "psycopg2-binary>=2.9",
@@ -39,6 +41,13 @@ dependencies = [
     "cryptography>=49.0",
 ]
 
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+moksha = "moksha.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "black>=24.2",
@@ -56,12 +65,26 @@ dev = [
     "httpx>=0.27",
     "playwright>=1.60",
     "pytest-playwright>=0.8",
-    "whichllm>=0.5.15",
 ]
+model-setup = ["whichllm==0.5.15"]
 
 [tool.black]
 line-length = 88
 target-version = ["py314"]
+
+[tool.ruff]
+extend-exclude = ["**/migrations/**", "graphify-out/**"]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint.per-file-ignores]
+"**/admin.py" = ["RUF012"]
+"**/conftest.py" = ["F401", "F403", "RUF100"]
+"**/models.py" = ["RUF012"]
+"**/serializers.py" = ["RUF012"]
+"**/tests/**" = ["B017", "RUF012"]
+"**/views.py" = ["RUF012"]
+"moksha/settings*.py" = ["F401", "F403", "RUF100"]
 
 [tool.isort]
 profile = "black"
@@ -89,6 +112,9 @@ django_settings_module = "moksha.settings"
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]
 
+[tool.setuptools.packages.find]
+include = ["moksha*"]
+
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
@@ -99,4 +125,9 @@ DJANGO_SETTINGS_MODULE = "moksha.settings_test"
 testpaths = ["users/tests", "chat/tests", "scriptures/tests", "tests/"]
 markers = [
     "e2e: end-to-end browser tests (require running servers)",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
 ]

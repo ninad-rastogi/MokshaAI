@@ -5,8 +5,20 @@ from rest_framework import serializers
 from chat.models import Chat, GenerationAttempt, GenerationRun, Message
 
 
+class CitationSerializer(serializers.Serializer):
+    """Validated public citation shape."""
+
+    scripture = serializers.CharField(max_length=200)
+    file_name = serializers.CharField(max_length=500)
+    page = serializers.IntegerField(min_value=1)
+    score = serializers.FloatField(min_value=0, max_value=1)
+    excerpt = serializers.CharField(max_length=600)
+
+
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for Message model."""
+
+    sources: CitationSerializer = CitationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Message
@@ -53,7 +65,7 @@ class QueryResponseSerializer(serializers.Serializer):
     """Serializer for chat query responses."""
 
     response = serializers.CharField()
-    sources = serializers.ListField(child=serializers.DictField(), required=False)
+    sources: CitationSerializer = CitationSerializer(many=True, required=False)
     mode = serializers.CharField()
 
 
@@ -90,6 +102,7 @@ class GenerationRunSerializer(serializers.ModelSerializer):
     """Read-only serializer for a durable generation run."""
 
     attempts = GenerationAttemptSerializer(many=True, read_only=True)
+    final_sources: CitationSerializer = CitationSerializer(many=True, read_only=True)
 
     class Meta:
         model = GenerationRun

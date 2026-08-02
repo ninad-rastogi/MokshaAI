@@ -2,7 +2,12 @@
 
 from rest_framework import serializers
 
-from scriptures.models import IndexingJob, Scripture, Volume
+from scriptures.models import (
+    IndexingJob,
+    Scripture,
+    ScriptureIndexVersion,
+    Volume,
+)
 
 
 class VolumeSerializer(serializers.ModelSerializer):
@@ -24,6 +29,9 @@ class ScriptureSerializer(serializers.ModelSerializer):
     """Serializer for Scripture model with nested volumes."""
 
     volumes = VolumeSerializer(many=True, read_only=True)
+    active_index_version: serializers.PrimaryKeyRelatedField = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
 
     class Meta:
         model = Scripture
@@ -36,9 +44,31 @@ class ScriptureSerializer(serializers.ModelSerializer):
             "total_pages",
             "is_indexed",
             "last_indexed_at",
+            "active_index_version",
             "created_at",
             "volumes",
         )
+
+
+class ScriptureIndexVersionSerializer(serializers.ModelSerializer):
+    """Bounded immutable index-version status."""
+
+    class Meta:
+        model = ScriptureIndexVersion
+        fields = (
+            "id",
+            "status",
+            "embedding_model",
+            "qualification",
+            "chunk_count",
+            "volume_count",
+            "page_count",
+            "failure_code",
+            "created_at",
+            "qualified_at",
+            "activated_at",
+        )
+        read_only_fields = fields
 
 
 class IndexingJobSerializer(serializers.ModelSerializer):
@@ -52,6 +82,7 @@ class IndexingJobSerializer(serializers.ModelSerializer):
             "id",
             "scripture",
             "scripture_name",
+            "index_version",
             "status",
             "progress",
             "error_message",

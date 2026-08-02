@@ -1,10 +1,12 @@
 """URL configuration for the users app."""
 
 from django.urls import path
+
 from users.views import (
     CsrfTokenView,
     HealthCheckView,
     LoginView,
+    MetricsView,
     ProfileView,
     ReadinessCheckView,
     RefreshView,
@@ -25,4 +27,5 @@ urlpatterns = [
     path("me/", ProfileView.as_view(), name="profile"),
     path("health/", HealthCheckView.as_view(), name="health"),
     path("ready/", ReadinessCheckView.as_view(), name="ready"),
+    path("metrics/", MetricsView.as_view(), name="metrics"),
 ]

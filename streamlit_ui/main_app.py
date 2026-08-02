@@ -24,11 +24,11 @@ sys.path.insert(0, str(project_root))
 
 # Django setup for settings access
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "moksha.settings")
-import django  # noqa: E402
+import django
 
 django.setup()
 
-from streamlit_ui.api_client import MokshaAPIClient  # noqa: E402
+from streamlit_ui.api_client import MokshaAPIClient
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(
@@ -184,64 +184,60 @@ def login_screen(client: MokshaAPIClient) -> bool:
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<p style='text-align:center;color:#666;'>" "Your Vedic Spiritual Guide</p>",
+        "<p style='text-align:center;color:#666;'>" "Your Spiritual Guide</p>",
         unsafe_allow_html=True,
     )
 
     tab_login, tab_register = st.tabs(["Login", "Register"])
 
-    with tab_login:
-        with st.form("login_form"):
-            email = st.text_input("Email", key="login_email")
-            password = st.text_input("Password", type="password", key="login_password")
-            submitted = st.form_submit_button(
-                "Login", use_container_width=True, type="primary"
-            )
-            if submitted:
-                if not email or not password:
-                    st.error("Please fill in all fields.")
+    with tab_login, st.form("login_form"):
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_password")
+        submitted = st.form_submit_button(
+            "Login", use_container_width=True, type="primary"
+        )
+        if submitted:
+            if not email or not password:
+                st.error("Please fill in all fields.")
+            else:
+                result = client.login(email, password)
+                if result["success"]:
+                    st.success("Logged in successfully!")
+                    st.rerun()
                 else:
-                    result = client.login(email, password)
-                    if result["success"]:
-                        st.success("Logged in successfully!")
+                    error = result.get("error", {})
+                    st.error(f"Login failed: {error.get('detail', error)}")
+
+    with tab_register, st.form("register_form"):
+        reg_email = st.text_input("Email", key="reg_email")
+        reg_name = st.text_input("Spiritual Name (optional)", key="reg_name")
+        reg_password = st.text_input("Password", type="password", key="reg_password")
+        reg_confirm = st.text_input(
+            "Confirm Password", type="password", key="reg_confirm"
+        )
+        submitted = st.form_submit_button(
+            "Register", use_container_width=True, type="primary"
+        )
+        if submitted:
+            if not reg_email or not reg_password:
+                st.error("Email and password are required.")
+            elif reg_password != reg_confirm:
+                st.error("Passwords do not match.")
+            elif len(reg_password) < 8:
+                st.error("Password must be at least 8 characters.")
+            else:
+                result = client.register(reg_email, reg_password, reg_name)
+                if result["success"]:
+                    # Auto-login after registration
+                    login_result = client.login(reg_email, reg_password)
+                    if login_result["success"]:
+                        st.success("Registered and logged in!")
                         st.rerun()
                     else:
-                        error = result.get("error", {})
-                        st.error(f"Login failed: {error.get('detail', error)}")
-
-    with tab_register:
-        with st.form("register_form"):
-            reg_email = st.text_input("Email", key="reg_email")
-            reg_name = st.text_input("Spiritual Name (optional)", key="reg_name")
-            reg_password = st.text_input(
-                "Password", type="password", key="reg_password"
-            )
-            reg_confirm = st.text_input(
-                "Confirm Password", type="password", key="reg_confirm"
-            )
-            submitted = st.form_submit_button(
-                "Register", use_container_width=True, type="primary"
-            )
-            if submitted:
-                if not reg_email or not reg_password:
-                    st.error("Email and password are required.")
-                elif reg_password != reg_confirm:
-                    st.error("Passwords do not match.")
-                elif len(reg_password) < 8:
-                    st.error("Password must be at least 8 characters.")
+                        st.success("Registered! Please login.")
                 else:
-                    result = client.register(reg_email, reg_password, reg_name)
-                    if result["success"]:
-                        # Auto-login after registration
-                        login_result = client.login(reg_email, reg_password)
-                        if login_result["success"]:
-                            st.success("Registered and logged in!")
-                            st.rerun()
-                        else:
-                            st.success("Registered! Please login.")
-                    else:
-                        error = result.get("error", {})
-                        st.error(f"Registration failed: {error}")
+                    error = result.get("error", {})
+                    st.error(f"Registration failed: {error}")
 
     return False
 
@@ -371,7 +367,7 @@ def render_chat(
         )
     with col2:
         st.title("Moksha AI")
-        st.caption("Your Vedic Spiritual Guide")
+        st.caption("Your Spiritual Guide")
 
     messages = st.session_state.get("messages", [])
 
@@ -463,10 +459,9 @@ def _generate_response(
                 unsafe_allow_html=True,
             )
 
-    except Exception as e:
-        logger.exception(f"Error generating response: {e}")
-        error_msg = f"⚠️ An error occurred: {str(e)}"
-        st.session_state.messages.append({"role": "assistant", "content": error_msg})
+    except Exception:
+        logger.exception("Error generating response")
+        error_msg = "The response could not be completed. Please try again."
         response_placeholder.markdown(
             format_bot_message(error_msg, colors),
             unsafe_allow_html=True,
@@ -498,7 +493,7 @@ def main() -> None:
                 if isinstance(theme_dict, dict)
                 else "dark"
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - optional Streamlit theme plugin boundary
             theme = "dark"
     else:
         theme = "dark"

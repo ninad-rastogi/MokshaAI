@@ -7,6 +7,18 @@ import { describe, expect, it } from "vitest";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appPage = readFileSync(resolve(root, "pages/app.vue"), "utf8");
 const indexPage = readFileSync(resolve(root, "pages/index.vue"), "utf8");
+const sidebarComponent = readFileSync(
+  resolve(root, "components/app/ChatSidebar.vue"),
+  "utf8",
+);
+const settingsComponent = readFileSync(
+  resolve(root, "components/app/SettingsDialog.vue"),
+  "utf8",
+);
+const composerComponent = readFileSync(
+  resolve(root, "components/app/ChatComposer.vue"),
+  "utf8",
+);
 const apiComposable = readFileSync(
   resolve(root, "composables/useApi.ts"),
   "utf8",
@@ -18,21 +30,61 @@ const runStreamComposable = readFileSync(
 
 describe("app shell", () => {
   it("keeps theme and model controls inside a settings dialog", () => {
-    expect(appPage).toContain('aria-label="Theme"');
-    expect(appPage).toContain('id="model-profile"');
-    expect(appPage).toContain('role="dialog"');
+    expect(settingsComponent).toContain('aria-label="Theme"');
+    expect(settingsComponent).toContain('aria-label="Primary response model"');
+    expect(settingsComponent).toContain('id="fallback-model"');
+    expect(settingsComponent).toContain("<UModal");
     expect(appPage).toContain("settingsOpen");
+    expect(appPage).toContain("saveModelPreference");
+    expect(apiComposable).toContain("updateModelPreference");
     expect(appPage).not.toContain('aria-label="Model profile"');
+    expect(appPage).not.toContain("Admin default");
   });
 
   it("exposes production chat history actions", () => {
-    expect(appPage).toContain("Search conversations");
-    expect(appPage).toContain("Rename");
-    expect(appPage).toContain("Archive");
-    expect(appPage).toContain("Delete");
+    expect(sidebarComponent).toContain("Search conversations");
+    expect(sidebarComponent).toContain("Rename");
+    expect(sidebarComponent).toContain("Archive");
+    expect(sidebarComponent).toContain("Delete");
     expect(apiComposable).toContain("renameChat");
     expect(apiComposable).toContain("deleteChat");
     expect(apiComposable).toContain("archiveChat");
+  });
+
+  it("keeps archived conversations out of the active composer flow", () => {
+    expect(appPage).toContain("Restore it before continuing the conversation.");
+    expect(appPage).toContain("activeChat && !isArchivedChat");
+    expect(appPage).toContain("restoreActiveArchivedChat");
+  });
+
+  it("puts provider setup in settings with explicit remote data consent", () => {
+    expect(settingsComponent).toContain("Add connection");
+    expect(settingsComponent).toContain("remote_data_consent");
+    expect(settingsComponent).toMatch(
+      /subscription does not\s+automatically include API access/,
+    );
+    expect(apiComposable).toContain("createModelConnection");
+    expect(apiComposable).toContain("deleteModelConnection");
+    expect(settingsComponent).toContain("Remove API connection?");
+    expect(settingsComponent).toContain(
+      ":required=\"providerDialect === 'openai_compatible'\"",
+    );
+  });
+
+  it("loads model profiles before resolving saved fallback preferences", () => {
+    const profileLoad = appPage.indexOf("await Promise.allSettled");
+    const preferenceLoad = appPage.indexOf("await loadModelPreference()");
+
+    expect(profileLoad).toBeGreaterThan(-1);
+    expect(preferenceLoad).toBeGreaterThan(profileLoad);
+    expect(appPage).toContain("activeModelReady");
+    expect(composerComponent).toContain("modelReady");
+  });
+
+  it("keeps the closed mobile drawer inert and exposes its shortcut", () => {
+    expect(sidebarComponent).toContain(':inert="isMobile && !open"');
+    expect(sidebarComponent).toContain("Ctrl K");
+    expect(appPage).toContain('event.key.toLowerCase() !== "k"');
   });
 
   it("uses top-level v1 run endpoints for durable run follow-up", () => {
@@ -46,13 +98,24 @@ describe("app shell", () => {
   it("keeps refresh auth separate from workspace loading failures", () => {
     expect(appPage).toContain("await api.me()");
     expect(appPage).toContain("Promise.allSettled");
-    expect(indexPage).toContain("Account already exists. Sign in instead.");
+    expect(indexPage).toContain(
+      "An account with this email already exists. Sign in instead.",
+    );
     expect(apiComposable).toContain("class ApiRequestError");
   });
 
   it("frames Moksha AI as scripture-guided support for difficult moments", () => {
-    expect(indexPage).toContain("A quieter place for hard moments.");
-    expect(indexPage).toContain("expand the library as your study deepens");
-    expect(appPage).toContain("Bring the question you cannot carry alone.");
+    expect(indexPage).toContain("Bring what feels difficult to carry.");
+    expect(indexPage).toContain("scripture library");
+    expect(appPage).toContain("What is weighing on your mind?");
+  });
+
+  it("uses enter-to-send chat prompt semantics and keeps stop beside input", () => {
+    expect(composerComponent).toContain(':submit-on-enter="true"');
+    expect(composerComponent).toContain('aria-label="Stop response"');
+    expect(composerComponent).not.toContain("Reconnect");
+    expect(appPage).not.toContain(
+      'class="message-viewport" aria-live="polite"',
+    );
   });
 });

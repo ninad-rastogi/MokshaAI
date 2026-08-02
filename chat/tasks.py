@@ -1,14 +1,16 @@
 """Celery tasks for durable chat generation."""
 
-from dataclasses import dataclass
 import logging
-from typing import Any
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, cast
 
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from chat.citations import validate_citations
 from chat.events import publish_run_event
 from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
@@ -19,6 +21,10 @@ from llm.services import ModelSelection, resolve_model_selection
 from scriptures.models import Scripture
 
 logger = logging.getLogger("chat.tasks")
+
+
+class GenerationCancelled(RuntimeError):
+    """Stop provider streaming after an explicit user cancellation."""
 
 
 @dataclass(frozen=True)
@@ -116,6 +122,7 @@ def _generate_response(
     spec: GenerationAttemptSpec,
     recent_messages: list[dict[str, Any]],
     available_scriptures: list[str],
+    on_delta: Callable[[str], None],
 ) -> tuple[str, list[dict[str, Any]], str]:
     if spec.provider == ModelConnection.Dialect.OPENAI_COMPATIBLE:
         return _generate_remote_provider_response(
@@ -124,6 +131,7 @@ def _generate_response(
             spec=spec,
             recent_messages=recent_messages,
             available_scriptures=available_scriptures,
+            on_delta=on_delta,
         )
     if spec.provider == "ollama_compatible":
         return _generate_remote_provider_response(
@@ -132,6 +140,7 @@ def _generate_response(
             spec=spec,
             recent_messages=recent_messages,
             available_scriptures=available_scriptures,
+            on_delta=on_delta,
         )
     if spec.provider != "ollama" or not spec.ollama_server:
         raise RuntimeError("unsupported_provider_for_generation")
@@ -139,20 +148,32 @@ def _generate_response(
         vector_store=PgVectorStore(),
         ollama_model=spec.model,
         ollama_server=spec.ollama_server,
-        system_prompt=settings.VEDIC_SYSTEM_PROMPT,
+        system_prompt=settings.SPIRITUAL_GUIDE_SYSTEM_PROMPT,
         available_scriptures=available_scriptures,
     )
     route, requires_scripture = engine.route_query(run.prompt)
     sources: list[dict[str, Any]]
     if route == "safety":
-        response_text = engine.query_without_rag(run.prompt, recent_messages)
+        response_text = engine.query_without_rag(
+            run.prompt,
+            recent_messages,
+            on_delta=on_delta,
+        )
         sources = []
         mode = "SAFETY"
     elif route == "rag" and requires_scripture:
-        response_text, sources = engine.query_with_rag(run.prompt, recent_messages)
+        response_text, sources = engine.query_with_rag(
+            run.prompt,
+            recent_messages,
+            on_delta=on_delta,
+        )
         mode = "RAG"
     else:
-        response_text = engine.query_without_rag(run.prompt, recent_messages)
+        response_text = engine.query_without_rag(
+            run.prompt,
+            recent_messages,
+            on_delta=on_delta,
+        )
         sources = []
         mode = "GENERAL"
     return response_text, sources, mode
@@ -181,10 +202,11 @@ def _generate_remote_provider_response(
     spec: GenerationAttemptSpec,
     recent_messages: list[dict[str, Any]],
     available_scriptures: list[str],
+    on_delta: Callable[[str], None],
 ) -> tuple[str, list[dict[str, Any]], str]:
     if spec.connection is None:
         raise RuntimeError("provider_connection_missing")
-    system_prompt = settings.VEDIC_SYSTEM_PROMPT.format(
+    system_prompt = settings.SPIRITUAL_GUIDE_SYSTEM_PROMPT.format(
         available_scriptures=(
             ", ".join(available_scriptures)
             if available_scriptures
@@ -207,6 +229,7 @@ def _generate_remote_provider_response(
             ),
             temperature=spec.temperature,
             max_output_tokens=spec.max_output_tokens,
+            on_delta=on_delta,
         )
         spec.snapshot["reported_usage"] = usage
         return response_text, [], "GENERAL"
@@ -215,7 +238,7 @@ def _generate_remote_provider_response(
         vector_store=PgVectorStore(),
         ollama_model=settings.OLLAMA_MODEL,
         ollama_server=settings.OLLAMA_BASE_URL,
-        system_prompt=settings.VEDIC_SYSTEM_PROMPT,
+        system_prompt=settings.SPIRITUAL_GUIDE_SYSTEM_PROMPT,
         available_scriptures=available_scriptures,
     )
     route, requires_scripture = engine.route_query(run.prompt)
@@ -231,13 +254,13 @@ def _generate_remote_provider_response(
             chunk for chunk in chunks if chunk["score"] >= settings.RAG_MIN_SIMILARITY
         ]
         if not chunks:
-            return (
+            no_evidence = (
                 "I could not find a sufficiently relevant passage in the indexed "
                 "scriptures to answer that reliably. Please try a more specific "
-                "question or ask for general spiritual guidance.",
-                [],
-                "RAG",
+                "question or ask for general spiritual guidance."
             )
+            on_delta(no_evidence)
+            return no_evidence, [], "RAG"
         context_parts = []
         sources = []
         for index, chunk in enumerate(chunks):
@@ -277,16 +300,31 @@ def _generate_remote_provider_response(
         ),
         temperature=spec.temperature,
         max_output_tokens=spec.max_output_tokens,
+        on_delta=on_delta,
     )
     spec.snapshot["reported_usage"] = usage
     return response_text, sources, mode
 
 
-def _finish_cancelled(run: GenerationRun, attempt: GenerationAttempt) -> None:
+def _finish_cancelled(
+    run: GenerationRun,
+    attempt: GenerationAttempt,
+    partial_text: str = "",
+) -> None:
     attempt.outcome = GenerationAttempt.Outcome.CANCELLED
     attempt.finished_at = timezone.now()
     attempt.save(update_fields=["outcome", "finished_at"])
-    publish_run_event(run.stream_key, "state", {"state": run.state})
+    run.state = GenerationRun.State.CANCELLED
+    state_id = publish_run_event(run.stream_key, "state", {"state": run.state})
+    done_id = publish_run_event(run.stream_key, "done", {"state": run.state})
+    update_values: dict[str, Any] = {
+        "state": run.state,
+        "last_event_id": done_id or state_id,
+        "finished_at": timezone.now(),
+    }
+    if partial_text:
+        update_values["final_text"] = partial_text
+    GenerationRun.objects.filter(pk=run.pk).update(**update_values)
 
 
 @shared_task(bind=True, queue="generation")
@@ -340,16 +378,50 @@ def generate_chat_response(self, run_id: str) -> None:
             model_snapshot=spec.snapshot,
         )
 
+        emitted_any = False
+        streamed_parts: list[str] = []
+        last_delta_id = ""
+        checkpoint_size = 0
+        streamed_size = 0
+
+        def on_delta(text: str, parts: list[str] = streamed_parts) -> None:
+            nonlocal emitted_any, last_delta_id, checkpoint_size, streamed_size
+            if not text:
+                return
+            if GenerationRun.objects.filter(
+                pk=run.pk,
+                state=GenerationRun.State.CANCELLED,
+            ).exists():
+                raise GenerationCancelled("generation_cancelled")
+            emitted_any = True
+            parts.append(text)
+            streamed_size += len(text)
+            last_delta_id = publish_run_event(
+                run.stream_key,
+                "delta",
+                {"text": text},
+            )
+            if streamed_size - checkpoint_size >= 500:
+                GenerationRun.objects.filter(pk=run.pk).update(
+                    final_text="".join(parts),
+                    last_event_id=last_delta_id,
+                )
+                checkpoint_size = streamed_size
+
         try:
             response_text, sources, mode = _generate_response(
                 run=run,
                 spec=spec,
                 recent_messages=recent_messages,
                 available_scriptures=available_scriptures,
+                on_delta=on_delta,
             )
+            sources = cast(list[dict[str, Any]], validate_citations(sources))
+            if not emitted_any and response_text:
+                on_delta(response_text)
             run.refresh_from_db(fields=["state"])
             if run.state == GenerationRun.State.CANCELLED:
-                _finish_cancelled(run, attempt)
+                _finish_cancelled(run, attempt, "".join(streamed_parts))
                 return
 
             assistant_message = Message.objects.create(
@@ -359,13 +431,19 @@ def generate_chat_response(self, run_id: str) -> None:
                 mode=mode,
                 sources=sources,
             )
-            delta_id = publish_run_event(
-                run.stream_key,
-                "delta",
-                {"text": response_text, "message_id": assistant_message.pk},
-            )
             for source in sources:
                 publish_run_event(run.stream_key, "citation", source)
+            usage = spec.snapshot.get("reported_usage", {})
+            usage_id = publish_run_event(
+                run.stream_key,
+                "usage",
+                {
+                    "attempt_number": attempt_number,
+                    "provider": spec.provider,
+                    "model": spec.model,
+                    "usage": usage,
+                },
+            )
             done_id = publish_run_event(
                 run.stream_key,
                 "done",
@@ -376,7 +454,7 @@ def generate_chat_response(self, run_id: str) -> None:
             )
 
             attempt.outcome = GenerationAttempt.Outcome.SUCCEEDED
-            attempt.usage = spec.snapshot.get("reported_usage", {})
+            attempt.usage = usage
             attempt.finished_at = timezone.now()
             attempt.save(update_fields=["outcome", "usage", "finished_at"])
             GenerationRun.objects.filter(pk=run.pk).update(
@@ -384,9 +462,18 @@ def generate_chat_response(self, run_id: str) -> None:
                 assistant_message=assistant_message,
                 final_text=response_text,
                 final_sources=sources,
-                last_event_id=done_id or delta_id,
+                last_event_id=done_id or usage_id or last_delta_id,
                 finished_at=timezone.now(),
             )
+            return
+        except GenerationCancelled:
+            run.refresh_from_db(fields=["state"])
+            if run.state != GenerationRun.State.CANCELLED:
+                GenerationRun.objects.filter(pk=run.pk).update(
+                    state=GenerationRun.State.CANCELLED,
+                    finished_at=timezone.now(),
+                )
+            _finish_cancelled(run, attempt, "".join(streamed_parts))
             return
         except Exception:
             logger.exception("Generation attempt failed for run %s", run_id)
@@ -397,16 +484,24 @@ def generate_chat_response(self, run_id: str) -> None:
             attempt.save(update_fields=["outcome", "error_code", "finished_at"])
             run.refresh_from_db(fields=["state"])
             if run.state == GenerationRun.State.CANCELLED:
-                _finish_cancelled(run, attempt)
+                _finish_cancelled(run, attempt, "".join(streamed_parts))
                 return
+            if emitted_any:
+                GenerationRun.objects.filter(pk=run.pk).update(
+                    final_text="".join(streamed_parts),
+                    last_event_id=last_delta_id,
+                )
+                break
 
     error_id = publish_run_event(
         run.stream_key, "error", _public_error(last_error_code)
     )
-    publish_run_event(run.stream_key, "done", {"state": GenerationRun.State.FAILED})
+    done_id = publish_run_event(
+        run.stream_key, "done", {"state": GenerationRun.State.FAILED}
+    )
     GenerationRun.objects.filter(pk=run.pk).update(
         state=GenerationRun.State.FAILED,
         error_code=last_error_code,
-        last_event_id=error_id,
+        last_event_id=done_id or error_id,
         finished_at=timezone.now(),
     )

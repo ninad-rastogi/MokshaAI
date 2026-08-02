@@ -1,0 +1,8 @@
+.nuxt
+.output
+.npm-cache
+node_modules
+test-results
+dist
+coverage
+*.log

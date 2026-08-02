@@ -16,4 +16,4 @@ def test_high_stakes_request_gets_professional_boundary():
 
 
 def test_ordinary_spiritual_question_reaches_rag():
-    assert safety_response("What does the Mahabharata say about dharma?") is None
+    assert safety_response("What does this text teach about ethical action?") is None

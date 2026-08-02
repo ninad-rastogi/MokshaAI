@@ -4,6 +4,7 @@ from django.contrib import admin
 
 from llm.models import (
     HardwareProfile,
+    ModelCatalogRelease,
     ModelConnection,
     ModelInstallationJob,
     ModelProfile,
@@ -46,6 +47,26 @@ class HardwareProfileAdmin(admin.ModelAdmin):
     list_filter = ("source", "stale", "schema_version")
     search_fields = ("profile_hash", "whichllm_version", "catalog_version")
     readonly_fields = ("created_at",)
+
+
+@admin.register(ModelCatalogRelease)
+class ModelCatalogReleaseAdmin(admin.ModelAdmin):
+    list_display = ("version", "sequence", "active", "issued_at", "expires_at")
+    list_filter = ("active", "schema_version", "key_id")
+    search_fields = ("version", "catalog_hash")
+    readonly_fields = (
+        "schema_version",
+        "sequence",
+        "version",
+        "key_id",
+        "catalog_hash",
+        "signature",
+        "payload",
+        "issued_at",
+        "expires_at",
+        "active",
+        "accepted_at",
+    )
 
 
 @admin.register(ModelInstallationJob)

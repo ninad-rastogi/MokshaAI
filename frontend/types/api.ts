@@ -38,6 +38,19 @@ export type GenerationRun = {
   finished_at: string | null;
 };
 
+export type ModelConnection = {
+  id: string;
+  name: string;
+  dialect: "openai_compatible" | "ollama_compatible" | "builtin_ollama";
+  endpoint_url: string;
+  status: string;
+  sanitized_detail: string;
+  remote_data_consent_at: string | null;
+  last_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ModelProfile = {
   id: string;
   name: string;
@@ -49,7 +62,14 @@ export type ModelProfile = {
   is_admin_default: boolean;
   context_window: number;
   max_output_tokens: number;
-  temperature: string;
+  temperature: number;
+};
+
+export type UserModelPreference = {
+  primary_profile: string | null;
+  primary_profile_detail: ModelProfile | null;
+  ordered_fallback_profile_ids: string[];
+  updated_at: string;
 };
 
 export type Page<T> = {
@@ -62,6 +82,7 @@ export type UserProfile = {
   id: number;
   email: string;
   spiritual_name: string;
+  preferred_theme: "system" | "light" | "dark";
   created_at: string;
 };
 

@@ -1,11 +1,13 @@
 """Models for the scriptures app."""
 
+import uuid
+
 from django.conf import settings
 from django.db import models
 
 
 class Scripture(models.Model):
-    """Represents a scripture collection (e.g., Mahabharata, Ramayana)."""
+    """Represents one auto-discovered spiritual text collection."""
 
     name = models.CharField(max_length=200, unique=True)
     folder_path = models.CharField(max_length=500)
@@ -14,6 +16,13 @@ class Scripture(models.Model):
     total_pages = models.IntegerField(default=0)
     is_indexed = models.BooleanField(default=False)
     last_indexed_at = models.DateTimeField(null=True, blank=True)
+    active_index_version = models.ForeignKey(
+        "ScriptureIndexVersion",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="active_for_scriptures",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -45,6 +54,47 @@ class Volume(models.Model):
         return f"{self.scripture.name} - {self.file_name}"
 
 
+class ScriptureIndexVersion(models.Model):
+    """Immutable candidate or completed index build for one collection."""
+
+    class Status(models.TextChoices):
+        BUILDING = "building", "Building"
+        QUALIFIED = "qualified", "Qualified"
+        ACTIVE = "active", "Active"
+        RETIRED = "retired", "Retired"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scripture = models.ForeignKey(
+        Scripture,
+        on_delete=models.CASCADE,
+        related_name="index_versions",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.BUILDING,
+        db_index=True,
+    )
+    embedding_model = models.CharField(max_length=200)
+    source_manifest = models.JSONField(default=list)
+    qualification = models.JSONField(default=dict, blank=True)
+    chunk_count = models.PositiveIntegerField(default=0)
+    volume_count = models.PositiveIntegerField(default=0)
+    page_count = models.PositiveIntegerField(default=0)
+    failure_code = models.CharField(max_length=80, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    qualified_at = models.DateTimeField(null=True, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["scripture", "status"])]
+
+    def __str__(self) -> str:
+        return f"{self.scripture.name} {self.id} ({self.status})"
+
+
 class IndexingJob(models.Model):
     """Durable audit record for an asynchronous scripture indexing request."""
 
@@ -56,6 +106,13 @@ class IndexingJob(models.Model):
 
     scripture = models.ForeignKey(
         Scripture, on_delete=models.CASCADE, related_name="indexing_jobs"
+    )
+    index_version = models.ForeignKey(
+        ScriptureIndexVersion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="jobs",
     )
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="indexing_jobs"
@@ -74,6 +131,13 @@ class IndexingJob(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scripture"],
+                condition=models.Q(status__in=["PENDING", "RUNNING"]),
+                name="uniq_active_scripture_indexing_job",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.scripture.name} ({self.status})"

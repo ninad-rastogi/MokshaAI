@@ -1,90 +1,78 @@
-# chat/ — Chat Sessions & RAG Engine App
-
-This is the **core Django app** that handles chat sessions, message persistence, and the
-Retrieval-Augmented Generation (RAG) engine. It replaces the old `core/` package and
-`core/chat_manager.py`.
+# Chat Runs And Conversations
 
 ## Purpose
 
-The chat app provides:
-- **Chat CRUD**: Create, read, rename, delete chat sessions
-- **Message persistence**: Store all messages in PostgreSQL (replaces old JSON files)
-- **Query endpoint**: The main `/api/chat/<id>/query/` endpoint that processes user questions
-- **RAG engine**: Intelligent query routing + scripture-based answering
-- **Management commands**: `discover_scriptures` and `migrate_json_chats`
+`chat/` owns conversations, cursor-paginated messages, durable generation runs,
+attempt records, typed SSE replay, cancellation, and the application boundary
+around retrieval and model execution.
 
-## Files
+## Architecture And Data Flow
 
-### `models.py` — Chat & Message Models
+Creating a run persists the user prompt and idempotency key, then queues a
+dedicated Celery generation task. The worker resolves at most two model
+attempts, retrieves qualified evidence when required, persists one final
+assistant message, and publishes monotonic `state`, `delta`, `citation`,
+`usage`, `error`, and `done` events to a one-hour Redis Stream. DB checkpoints
+survive stream expiry and browser disconnects.
 
-**`Chat` model:**
-- `id`: UUID primary key (auto-generated)
-- `user`: ForeignKey to `users.User` (each chat belongs to one user)
-- `name`: Chat title (max 50 chars, defaults to "New Spiritual Conversation")
-- `created_at` / `updated_at`: Auto timestamps
-- Ordered by `-updated_at` (most recent first)
+## Files And Entrypoints
 
-**`Message` model:**
-- `chat`: ForeignKey to `Chat` (each message belongs to one chat)
-- `role`: Either "user" or "assistant"
-- `content`: The message text
-- `mode`: "RAG", "GENERAL", or "ERROR" — how the response was generated
-- `created_at`: Auto timestamp
-- Ordered by `created_at` (chronological)
+- `models.py`: chats, messages, runs, attempts, and document chunks.
+- `views.py`: chat/message pagination and run/SSE/cancel APIs.
+- `tasks.py`: generation worker and bounded fallback.
+- `events.py`: Redis Stream publication.
+- `serializers.py`: request, citation, run, and event-adjacent schemas.
+- `rag/`: corpus-neutral routing, retrieval, loading, and embeddings.
 
-### `serializers.py` — DRF Serializers
+## Interfaces
 
-- **`MessageSerializer`**: Serializes Message model (id, role, content, mode, created_at)
-- **`ChatSerializer`**: Serializes Chat with `message_count` annotation
-- **`ChatDetailSerializer`**: Serializes Chat with full nested messages list
-- **`QuerySerializer`**: Validates query requests (message field, max 5000 chars)
-- **`QueryResponseSerializer`**: Validates response format (response, sources, mode)
+- `POST /api/v1/chats/{chat_id}/runs`
+- `GET /api/v1/runs/{run_id}`
+- `GET /api/v1/runs/{run_id}/events`
+- `POST /api/v1/runs/{run_id}/cancel`
+- Cursor-paginated chat and message endpoints
 
-### `views.py` — ChatViewSet
+Run creation requires `Idempotency-Key`. Deleting a chat with an active run
+returns `409`. Overload returns `429` with `Retry-After`.
 
-A Django REST Framework `ViewSet` (not ModelViewSet — custom logic):
+## Configuration
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `list` | `GET /api/chat/` | List all chats for current user |
-| `create` | `POST /api/chat/` | Create new chat |
-| `retrieve` | `GET /api/chat/<id>/` | Get chat with all messages |
-| `destroy` | `DELETE /api/chat/<id>/` | Delete chat |
-| `rename` | `PATCH /api/chat/<id>/rename/` | Rename chat |
-| `query` | `POST /api/chat/<id>/query/` | Submit question, get AI response |
-| `discover` | `POST /api/chat/discover/` | Trigger scripture discovery |
+Configure Redis, the `generation` Celery queue, event TTL, retrieval thresholds,
+context bounds, provider limits, and model defaults through Django settings.
 
-**The `query` action** is the main endpoint:
-1. Saves the user's message to the database
-2. Calls the RAG engine (currently a placeholder — full integration in `chat/rag/engine.py`)
-3. Saves the assistant's response
-4. Auto-names the chat after 4+ messages
-5. Returns `{response, sources, mode}`
+## Commands
 
-### `urls.py`
-Uses DRF's `DefaultRouter` to auto-generate standard CRUD routes from the ViewSet.
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache celery -A moksha worker -Q generation --loglevel=INFO
+uv run --no-cache pytest chat/tests
+```
 
-### `admin.py`
-- `ChatAdmin`: Shows chats with inline messages, searchable by name/email
-- `MessageAdmin`: Shows messages filterable by role/mode/date
+## Tests
 
-### `apps.py`
-Django app configuration. Sets `verbose_name = "Chat & Conversations"`.
+Coverage includes idempotency, active-run deletion, cancellation, Redis replay,
+attempt fallback, citations, fail-closed routing, and persistence behavior.
+Real integration requires PostgreSQL/PgVector, Redis, and Celery.
 
-## Subdirectories
+## Dependencies
 
-### `rag/` — RAG Engine
-See [chat/rag/README.md](rag/README.md) for detailed documentation of:
-- `engine.py` — Query routing + RAG pipeline
-- `embeddings.py` — PgVector store (replaces ChromaDB)
-- `loader.py` — PDF loading with auto-discovery
-- `chunker.py` — Semantic chunking for shloka/translation/narration
+Django, DRF, Celery, Redis, PostgreSQL/PgVector, `llm`, `scriptures`, and the
+private embedding service.
 
-### `management/commands/` — Management Commands
-- `discover_scriptures.py` — Auto-discover and index scripture PDFs
-- `migrate_json_chats.py` — One-time migration from JSON files to PostgreSQL
+## Security
 
-### `tests/` — Tests
-- `test_models.py` — Chat and Message model tests
-- `test_views.py` — API endpoint tests (not yet created)
-- `test_rag.py` — RAG engine tests (not yet created)
+APIs scope every record to the authenticated user. Public errors use stable
+codes, never exception text. Synthetic error assistant messages are not
+persisted. Citation fields are validated and bounded.
+
+## Failure Modes And Troubleshooting
+
+- SSE reconnect gap: fetch run state; DB holds final/checkpoint data.
+- Cancel appears delayed: provider calls must honor bounded timeouts.
+- No evidence: verify active qualified scripture index and similarity threshold.
+- `429`: wait for `Retry-After`; generation concurrency is intentionally bounded.
+
+## Related Docs
+
+See `rag/README.md`, `../llm/README.md`, `../scriptures/README.md`, and
+`../frontend/README.md`.

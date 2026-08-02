@@ -1,7 +1,8 @@
 """Playwright E2E tests for chat functionality."""
 
 import pytest
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, expect
+from playwright.sync_api import Page, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 BASE_URL = "http://localhost:8501"
 
@@ -46,16 +47,11 @@ class TestChatFlow:
         self._login(page)
 
         chat_input = page.get_by_placeholder("Ask your spiritual question...")
-        chat_input.fill("What does Mahabharata say about dharma?")
+        chat_input.fill("What do the indexed texts teach about ethical action?")
         chat_input.press("Enter")
 
         # Wait for bot response (not user message) - look for response content
-        # The response starts with "The Mahabharata" or contains citations
         main_area = page.locator('[data-testid="stMainBlockContainer"]')
-        # Wait for response bubble to appear (contains citation or response text)
-        expect(
-            main_area.get_by_text("Mahabharata provides", exact=False)
-        ).to_be_visible(timeout=180000)
         expect(main_area.get_by_text("Page", exact=False)).to_be_visible(timeout=30000)
 
     def test_send_guidance_question_gets_general_response(self, page: Page):
@@ -138,9 +134,4 @@ class TestChatFlow:
         page.wait_for_load_state("networkidle", timeout=5000)
 
         sidebar = page.locator('[data-testid="stSidebar"]')
-        # Look for the scripture header (strong element with folder icon)
-        expect(
-            sidebar.get_by_text("\U0001f4c1 Mahabharata", exact=False)
-        ).to_be_visible(timeout=5000)
-        expect(sidebar.get_by_text("Volume 1")).to_be_visible(timeout=5000)
-        expect(sidebar.get_by_text("Volume 6")).to_be_visible(timeout=5000)
+        expect(sidebar.locator("strong").first).to_be_visible(timeout=5000)

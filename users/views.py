@@ -1,15 +1,20 @@
 """Views for the users app."""
 
+import secrets
+import shutil
+
 import requests
-from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.db import DatabaseError, connection
+from django.http import HttpResponse
 from django.middleware.csrf import get_token
-from django.db import connection
 from redis import Redis
+from redis.exceptions import RedisError
 from rest_framework import generics, permissions, status
-from rest_framework.serializers import CharField, EmailField, Serializer
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import CharField, EmailField, Serializer
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -52,7 +57,7 @@ class CsrfTokenView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request: Request) -> Response:
-        return Response({"csrfToken": get_token(request)})
+        return Response({"csrfToken": get_token(request._request)})
 
 
 class SessionLoginView(APIView):
@@ -74,7 +79,7 @@ class SessionLoginView(APIView):
                 {"error": "invalid_credentials"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        login(request, user)
+        login(request._request, user)
         return Response(UserSerializer(user).data)
 
 
@@ -84,7 +89,7 @@ class SessionLogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request: Request) -> Response:
-        logout(request)
+        logout(request._request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -99,6 +104,7 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        login(request._request, user)
         return Response(
             UserSerializer(user).data,
             status=status.HTTP_201_CREATED,
@@ -138,28 +144,60 @@ class ReadinessCheckView(APIView):
         database_ready = False
         redis_ready = False
         ollama_ready = False
+        embedding_ready = False
         try:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
             database_ready = True
-        except Exception:
-            pass
+        except DatabaseError:
+            database_ready = False
         try:
-            Redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1).ping()
+            redis = Redis.from_url(
+                settings.CELERY_BROKER_URL,
+                socket_connect_timeout=1,
+            )
+            redis.ping()
+            redis.close()
             redis_ready = True
-        except Exception:
-            pass
+        except RedisError:
+            redis_ready = False
+        session = requests.Session()
+        session.trust_env = False
         try:
-            response = requests.get(
-                f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags", timeout=2
+            response = session.get(
+                f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags",
+                timeout=(1, 2),
+                stream=True,
             )
             ollama_ready = response.ok
+            response.close()
         except requests.RequestException:
             pass
+        try:
+            response = session.get(
+                f"{settings.EMBEDDING_SERVICE_URL.rstrip('/')}/ready",
+                timeout=(1, 3),
+                stream=True,
+            )
+            embedding_ready = response.ok
+            response.close()
+        except requests.RequestException:
+            pass
+        finally:
+            session.close()
+        try:
+            disk_ready = (
+                shutil.disk_usage(settings.DATA_DIR).free
+                >= settings.DISK_MIN_FREE_BYTES
+            )
+        except OSError:
+            disk_ready = False
         dependencies = {
             "database": database_ready,
             "redis": redis_ready,
             "ollama": ollama_ready,
+            "embedding": embedding_ready,
+            "disk": disk_ready,
         }
         return Response(
             {
@@ -171,4 +209,54 @@ class ReadinessCheckView(APIView):
                 if all(dependencies.values())
                 else status.HTTP_503_SERVICE_UNAVAILABLE
             ),
+        )
+
+
+class MetricsView(APIView):
+    """Expose bounded Prometheus metrics to staff or configured scrapers."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request: Request) -> HttpResponse:
+        configured = settings.METRICS_TOKEN
+        supplied = request.headers.get("X-Metrics-Token", "")
+        authorized = bool(
+            getattr(request.user, "is_staff", False)
+            or (
+                configured and supplied and secrets.compare_digest(configured, supplied)
+            )
+        )
+        if not authorized:
+            return HttpResponse(status=403)
+
+        from chat.models import GenerationRun
+        from llm.models import ModelInstallationJob
+        from scriptures.models import IndexingJob
+
+        lines = [
+            "# HELP moksha_generation_runs Generation runs by durable state.",
+            "# TYPE moksha_generation_runs gauge",
+        ]
+        for state, _label in GenerationRun.State.choices:
+            count = GenerationRun.objects.filter(state=state).count()
+            lines.append(f'moksha_generation_runs{{state="{state}"}} {count}')
+        lines.extend(
+            [
+                "# HELP moksha_indexing_jobs Active indexing jobs.",
+                "# TYPE moksha_indexing_jobs gauge",
+                (
+                    "moksha_indexing_jobs "
+                    f"{IndexingJob.objects.filter(status__in=['PENDING', 'RUNNING']).count()}"
+                ),
+                "# HELP moksha_model_installations Active model installations.",
+                "# TYPE moksha_model_installations gauge",
+                (
+                    "moksha_model_installations "
+                    f"{ModelInstallationJob.objects.filter(status__in=['pending', 'running']).count()}"
+                ),
+            ]
+        )
+        return HttpResponse(
+            "\n".join(lines) + "\n",
+            content_type="text/plain; version=0.0.4; charset=utf-8",
         )

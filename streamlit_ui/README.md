@@ -1,116 +1,60 @@
-# streamlit_ui/ — Streamlit Frontend
-
-This package contains the **Streamlit-based user interface** for Moksha AI. It is a pure
-HTTP client that communicates with the Django REST API. This replaces the old `ui/` directory
-which directly imported `core/` modules.
+# Transitional Streamlit Client
 
 ## Purpose
 
-The Streamlit UI provides:
-- **Login/Register screen**: JWT-based authentication flow
-- **Chat interface**: Message display with typing animation
-- **Sidebar**: Chat history, scripture list, settings
-- **API client**: HTTP communication with Django backend
+`streamlit_ui/` is the rollback-only legacy client. Nuxt is the product
+frontend. Streamlit remains until Nuxt parity and rollback gates pass, then this
+package, dependency, Compose profile, and related tests are removed atomically.
 
-## Key Difference from Old Architecture
+## Architecture And Data Flow
 
-**Before (v1.0):** Streamlit imported `core/` modules directly:
-```python
-from core.chat_manager import ChatManager
-from core.rag_engine import RAGEngine
+Streamlit calls Django over HTTP and does not import product backend internals.
+It uses JWT compatibility intended for non-browser clients. It must not become a
+second implementation of new product features.
+
+## Files And Entrypoints
+
+- `main_app.py`: legacy UI entry point.
+- `api_client.py`: bounded Django API client.
+
+## Interfaces
+
+The client uses compatibility authentication, chat, and scripture endpoints.
+Nuxt session/CSRF flows remain authoritative for browser production behavior.
+
+## Configuration
+
+Set the Django API base URL. The Compose service is disabled unless the
+`legacy-streamlit` profile is selected.
+
+## Commands
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache streamlit run streamlit_ui/main_app.py
+docker compose --profile legacy-streamlit up streamlit
 ```
 
-**After (v2.0):** Streamlit makes HTTP API calls:
-```python
-from streamlit_ui.api_client import MokshaAPIClient
-client = MokshaAPIClient()
-result = client.query(chat_id, message)
-```
+## Tests
 
-This decoupling means the frontend and backend can be developed, tested, and deployed
-independently.
+Only regression tests needed for rollback remain. Production parity and
+accessibility gates belong to `frontend/`.
 
-## Files
+## Dependencies
 
-### `api_client.py` — MokshaAPIClient Class
+Streamlit and Requests. Both are transitional dependencies.
 
-HTTP client for the Django REST API. Handles:
-- **Token management**: Stores JWT access/refresh tokens in `st.session_state`
-- **Auto-refresh**: Automatically refreshes expired access tokens
-- **Error handling**: Graceful handling of network errors and auth failures
+## Security
 
-**Key methods:**
+Tokens live only in Streamlit session state. Errors remain generic and must not
+persist synthetic assistant messages or expose exception text.
 
-| Method | Description |
-|--------|-------------|
-| `register(email, password, spiritual_name)` | Create new account |
-| `login(email, password)` | Authenticate and store JWT |
-| `logout()` | Clear stored tokens |
-| `get_profile()` | Get current user profile |
-| `is_authenticated()` | Check if user has valid tokens |
-| `list_chats()` | Get all chats for current user |
-| `create_chat()` | Create new chat session |
-| `get_chat(chat_id)` | Get chat with messages |
-| `delete_chat(chat_id)` | Delete a chat |
-| `rename_chat(chat_id, name)` | Rename a chat |
-| `query(chat_id, message)` | Submit question, get AI response |
-| `list_scriptures()` | List available scriptures |
-| `discover_scriptures()` | Trigger scripture discovery |
-| `health_check()` | Check if API is reachable |
+## Failure Modes And Troubleshooting
 
-### `main_app.py` — Main Streamlit Application
+- Authentication failure: verify compatibility JWT routes and API base URL.
+- Missing feature: use Nuxt; new product behavior is not added here.
+- Removal blocked: complete Nuxt parity, rollback, and live walkthrough gates.
 
-The entry point. Contains:
+## Related Docs
 
-- **`login_screen(client)`**: Renders login/register tabs. Returns True if authenticated.
-- **`render_sidebar(client)`**: Renders the sidebar with:
-  - User profile display
-  - Logout button
-  - New chat button
-  - Chat history list (clickable)
-  - Available scriptures expander
-  - Settings with "Clear All Chats" option
-- **`render_chat(client, chat_id, colors)`**: Renders the main chat area with:
-  - Header with logo
-  - Message history display
-  - Thinking animation during response generation
-  - Typing effect for responses
-  - Chat input field
-- **`_generate_response(client, chat_id, colors)`**: Handles the response generation flow:
-  - Shows thinking animation
-  - Calls `client.query()` API
-  - Displays response with typing effect
-  - Handles errors gracefully
-- **`main()`**: Entry point that orchestrates everything:
-  - Sets page config
-  - Detects theme (light/dark)
-  - Injects CSS
-  - Checks authentication
-  - Renders appropriate screen
-
-### `__init__.py`
-Empty file making `streamlit_ui/` a Python package.
-
-## UI Flow
-
-```
-User opens browser → http://localhost:8501
-  → No token? → Login/Register screen
-  → Has token? → Validate with API
-    → Valid? → Main chat screen
-    → Invalid? → Try refresh token
-      → Success? → Main chat screen
-      → Failure? → Login/Register screen
-```
-
-## Running
-
-```bash
-# Make sure Django is running first:
-python manage.py runserver
-
-# Then start Streamlit:
-streamlit run streamlit_ui/main_app.py
-# Or:
-make streamlit
-```
+See `../frontend/README.md`, `../PRODUCT.md`, and `../deploy/README.md`.

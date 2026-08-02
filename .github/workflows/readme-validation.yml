@@ -1,0 +1,28 @@
+name: README validation
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Validate README boundaries
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python scripts/validate_readmes.py --root . --warnings-as-errors
+
+      - name: Verify validation changed no tracked files
+        run: git diff --exit-code

@@ -1,9 +1,9 @@
 """Views for the chat app."""
 
-import logging
 import json
+import logging
 import time
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from django.conf import settings
@@ -18,6 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
+from chat.citations import validate_citations
 from chat.events import format_sse, publish_run_event, redis_client
 from chat.models import Chat, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
@@ -84,13 +85,13 @@ class ChatViewSet(viewsets.ViewSet):
         serializer = ChatSerializer(chat)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def retrieve(self, request: Request, pk: UUID = None) -> Response:
+    def retrieve(self, request: Request, pk: UUID | None = None) -> Response:
         """Get a chat with its full message history."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         serializer = ChatDetailSerializer(chat)
         return Response(serializer.data)
 
-    def destroy(self, request: Request, pk: UUID = None) -> Response:
+    def destroy(self, request: Request, pk: UUID | None = None) -> Response:
         """Delete a chat session."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         has_active_run = chat.runs.filter(
@@ -105,7 +106,7 @@ class ChatViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
-    def archive(self, request: Request, pk: UUID = None) -> Response:
+    def archive(self, request: Request, pk: UUID | None = None) -> Response:
         """Archive a chat session."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         chat.is_archived = True
@@ -113,7 +114,7 @@ class ChatViewSet(viewsets.ViewSet):
         return Response(ChatSerializer(chat).data)
 
     @action(detail=True, methods=["post"])
-    def unarchive(self, request: Request, pk: UUID = None) -> Response:
+    def unarchive(self, request: Request, pk: UUID | None = None) -> Response:
         """Restore an archived chat session."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         chat.is_archived = False
@@ -121,7 +122,7 @@ class ChatViewSet(viewsets.ViewSet):
         return Response(ChatSerializer(chat).data)
 
     @action(detail=True, methods=["get"])
-    def messages(self, request: Request, pk: UUID = None) -> Response:
+    def messages(self, request: Request, pk: UUID | None = None) -> Response:
         """Cursor-paginated messages for one chat."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         paginator = MessageCursorPagination()
@@ -132,7 +133,7 @@ class ChatViewSet(viewsets.ViewSet):
         return paginator.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="runs")
-    def runs(self, request: Request, pk: UUID = None) -> Response:
+    def runs(self, request: Request, pk: UUID | None = None) -> Response:
         """Create a durable generation run."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         user = cast(User, request.user)
@@ -184,7 +185,7 @@ class ChatViewSet(viewsets.ViewSet):
         )
 
     @action(detail=True, methods=["patch"])
-    def rename(self, request: Request, pk: UUID = None) -> Response:
+    def rename(self, request: Request, pk: UUID | None = None) -> Response:
         """Rename a chat session."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         new_name = request.data.get("name", "").strip()
@@ -198,7 +199,7 @@ class ChatViewSet(viewsets.ViewSet):
         return Response(ChatSerializer(chat).data)
 
     @action(detail=True, methods=["post"])
-    def query(self, request: Request, pk: UUID = None) -> Response:
+    def query(self, request: Request, pk: UUID | None = None) -> Response:
         """Submit a query and get an AI response via the RAG engine."""
         chat = get_object_or_404(Chat, pk=pk, user=request.user)
         serializer = QuerySerializer(data=request.data)
@@ -224,7 +225,7 @@ class ChatViewSet(viewsets.ViewSet):
                 vector_store=vector_store,
                 ollama_model=settings.OLLAMA_MODEL,
                 ollama_server=settings.OLLAMA_BASE_URL,
-                system_prompt=settings.VEDIC_SYSTEM_PROMPT,
+                system_prompt=settings.SPIRITUAL_GUIDE_SYSTEM_PROMPT,
                 available_scriptures=available_scriptures,
             )
 
@@ -245,6 +246,7 @@ class ChatViewSet(viewsets.ViewSet):
                 )
                 sources = []
                 mode = "GENERAL"
+            sources = cast(list[dict[str, Any]], validate_citations(sources))
 
         except Exception:
             logger.exception("RAG engine error")
@@ -301,12 +303,12 @@ class RunViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [JSONRenderer, EventStreamRenderer]
 
-    def retrieve(self, request: Request, pk: UUID = None) -> Response:
+    def retrieve(self, request: Request, pk: UUID | None = None) -> Response:
         run = get_object_or_404(GenerationRun, pk=pk, user=request.user)
         return Response(GenerationRunSerializer(run).data)
 
     @action(detail=True, methods=["post"])
-    def cancel(self, request: Request, pk: UUID = None) -> Response:
+    def cancel(self, request: Request, pk: UUID | None = None) -> Response:
         run = get_object_or_404(GenerationRun, pk=pk, user=request.user)
         if run.state in [
             GenerationRun.State.COMPLETED,
@@ -319,11 +321,13 @@ class RunViewSet(viewsets.ViewSet):
         run.error_code = "generation_cancelled"
         run.save(update_fields=["state", "finished_at", "error_code", "updated_at"])
         publish_run_event(run.stream_key, "state", {"state": run.state})
-        publish_run_event(run.stream_key, "done", {"state": run.state})
+        done_id = publish_run_event(run.stream_key, "done", {"state": run.state})
+        run.last_event_id = done_id
+        run.save(update_fields=["last_event_id", "updated_at"])
         return Response(GenerationRunSerializer(run).data)
 
     @action(detail=True, methods=["get"])
-    def events(self, request: Request, pk: UUID = None) -> StreamingHttpResponse:
+    def events(self, request: Request, pk: UUID | None = None) -> StreamingHttpResponse:
         run = get_object_or_404(GenerationRun, pk=pk, user=request.user)
         last_event_id = (
             request.headers.get("Last-Event-ID")

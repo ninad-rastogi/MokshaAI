@@ -93,7 +93,7 @@ class Command(BaseCommand):
                     )
                 )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - isolate each legacy input file
                 self.stdout.write(
                     self.style.ERROR(f"  Error migrating {json_file.name}: {e}")
                 )

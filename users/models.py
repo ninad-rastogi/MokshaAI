@@ -11,7 +11,7 @@ class UserManager(BaseUserManager["User"]):
 
     def create_user(
         self, email: str, password: str | None = None, **extra_fields: Any
-    ) -> "User":
+    ) -> User:
         if not email:
             raise ValueError("The Email field must be set")
         email = self.normalize_email(email)
@@ -22,7 +22,7 @@ class UserManager(BaseUserManager["User"]):
 
     def create_superuser(
         self, email: str, password: str | None = None, **extra_fields: Any
-    ) -> "User":
+    ) -> User:
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
@@ -37,6 +37,7 @@ class User(AbstractUser):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     spiritual_name = models.CharField(max_length=100, blank=True)
+    preferred_theme = models.CharField(max_length=20, default="system")
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()  # type: ignore[misc, assignment]

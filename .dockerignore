@@ -5,6 +5,9 @@
 .pytest_cache
 .ruff_cache
 .uv-cache
+.tmp
+graphify-out
+.venv
 **/__pycache__
 *.py[cod]
 *.log
@@ -15,6 +18,7 @@ docs
 tests
 response.json
 node_modules
+frontend
 frontend/node_modules
 frontend/.nuxt
 frontend/.output

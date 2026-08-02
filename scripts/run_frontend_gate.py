@@ -6,9 +6,9 @@ project venv while npm uses the checked-in frontend lockfile and node_modules.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 ALLOWED_COMMANDS = {"format", "lint", "test", "typecheck", "build"}

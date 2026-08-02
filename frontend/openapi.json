@@ -1,0 +1,2066 @@
+{
+  "components": {
+    "schemas": {
+      "CustomTokenObtainPair": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": ["email", "password"],
+        "type": "object"
+      },
+      "IndexingJob": {
+        "properties": {
+          "chunks_indexed": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "error_message": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "index_version": {
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "progress": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "scripture": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "scripture_name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"],
+            "readOnly": true,
+            "type": "string"
+          },
+          "volumes_processed": {
+            "readOnly": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ModelConnection": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "dialect": {
+            "enum": [
+              "openai_compatible",
+              "ollama_compatible",
+              "builtin_ollama"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
+          "endpoint_url": {
+            "format": "uri",
+            "pattern": "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:0|25[0-5]|2[0-4][0-9]|1[0-9]?[0-9]?|[1-9][0-9]?)(?:\\.(?:0|25[0-5]|2[0-4][0-9]|1[0-9]?[0-9]?|[1-9][0-9]?)){3}|\\[[0-9a-f:.]+\\]|([a-z\u00a1-\uffff0-9](?:[a-z\u00a1-\uffff0-9-]{0,61}[a-z\u00a1-\uffff0-9])?(?:\\.(?!-)[a-z\u00a1-\uffff0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\u00a1-\uffff-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::[0-9]{1,5})?(?:[/?#][^\\s]*)?\\z",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "last_checked_at": {
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "remote_data_consent_at": {
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "sanitized_detail": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "disconnected",
+              "checking",
+              "connected",
+              "degraded",
+              "auth_invalid",
+              "endpoint_invalid",
+              "unreachable",
+              "rate_limited",
+              "quota_limited",
+              "model_unavailable"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ModelConnectionCreate": {
+        "properties": {
+          "api_key": {
+            "maxLength": 500,
+            "type": "string",
+            "writeOnly": true
+          },
+          "dialect": {
+            "enum": ["openai_compatible", "ollama_compatible"],
+            "type": "string"
+          },
+          "endpoint_url": {
+            "format": "uri",
+            "maxLength": 500,
+            "pattern": "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:0|25[0-5]|2[0-4][0-9]|1[0-9]?[0-9]?|[1-9][0-9]?)(?:\\.(?:0|25[0-5]|2[0-4][0-9]|1[0-9]?[0-9]?|[1-9][0-9]?)){3}|\\[[0-9a-f:.]+\\]|([a-z\u00a1-\uffff0-9](?:[a-z\u00a1-\uffff0-9-]{0,61}[a-z\u00a1-\uffff0-9])?(?:\\.(?!-)[a-z\u00a1-\uffff0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\u00a1-\uffff-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::[0-9]{1,5})?(?:[/?#][^\\s]*)?\\z",
+            "type": "string"
+          },
+          "model_id": {
+            "maxLength": 180,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "remote_data_consent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "dialect",
+          "endpoint_url",
+          "model_id",
+          "remote_data_consent"
+        ],
+        "type": "object"
+      },
+      "ModelInstallationCreate": {
+        "properties": {
+          "entry_id": {
+            "maxLength": 120,
+            "pattern": "^[-a-zA-Z0-9_]+$",
+            "type": "string"
+          },
+          "keep_source": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": ["entry_id"],
+        "type": "object"
+      },
+      "ModelInstallationJob": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "error_code": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "keep_source": {
+            "readOnly": true,
+            "type": "boolean"
+          },
+          "model_profile": {
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "ollama_tag": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "qualification": {
+            "readOnly": true,
+            "type": "object"
+          },
+          "started_at": {
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": ["pending", "running", "succeeded", "failed", "cancelled"],
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ModelProfile": {
+        "properties": {
+          "connection": {
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "connection_dialect": {
+            "default": "",
+            "readOnly": true,
+            "type": "string"
+          },
+          "connection_status": {
+            "default": "",
+            "readOnly": true,
+            "type": "string"
+          },
+          "context_window": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "is_admin_default": {
+            "readOnly": true,
+            "type": "boolean"
+          },
+          "is_enabled": {
+            "readOnly": true,
+            "type": "boolean"
+          },
+          "max_output_tokens": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "model_id": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "temperature": {
+            "readOnly": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "Register": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "password": {
+            "minLength": 8,
+            "type": "string",
+            "writeOnly": true
+          },
+          "password_confirm": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "spiritual_name": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "required": ["email", "password", "password_confirm"],
+        "type": "object"
+      },
+      "Scripture": {
+        "properties": {
+          "active_index_version": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "folder_path": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "id": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "is_indexed": {
+            "type": "boolean"
+          },
+          "last_indexed_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "total_pages": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "total_volumes": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "volumes": {
+            "items": {
+              "properties": {
+                "file_name": {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                "file_path": {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                "file_size": {
+                  "format": "int64",
+                  "maximum": 9223372036854775807,
+                  "minimum": -9223372036854775808,
+                  "type": "integer"
+                },
+                "id": {
+                  "readOnly": true,
+                  "type": "integer"
+                },
+                "mtime": {
+                  "type": "number"
+                },
+                "page_count": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": "integer"
+                }
+              },
+              "required": ["file_name", "file_path"],
+              "type": "object"
+            },
+            "readOnly": true,
+            "type": "array"
+          }
+        },
+        "required": ["name", "folder_path"],
+        "type": "object"
+      },
+      "TokenRefresh": {
+        "properties": {
+          "access": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "refresh": {
+            "type": "string"
+          }
+        },
+        "required": ["refresh"],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Canonical Django REST API used by Moksha clients.",
+    "title": "Moksha AI API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.2",
+  "paths": {
+    "/api/v1/auth/csrf/": {
+      "get": {
+        "description": "Issue a CSRF cookie for browser clients.",
+        "operationId": "getApiV1AuthCsrf",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/health/": {
+      "get": {
+        "description": "Health check endpoint (no auth required).",
+        "operationId": "getApiV1AuthHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/login/": {
+      "post": {
+        "description": "",
+        "operationId": "postApiV1AuthLogin",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomTokenObtainPair"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomTokenObtainPair"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomTokenObtainPair"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomTokenObtainPair"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/me/": {
+      "get": {
+        "description": "Get or update current user profile.",
+        "operationId": "getApiV1AuthMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "put": {
+        "description": "Get or update current user profile.",
+        "operationId": "putApiV1AuthMe",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/metrics/": {
+      "get": {
+        "description": "Expose bounded Prometheus metrics to staff or configured scrapers.",
+        "operationId": "getApiV1AuthMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/ready/": {
+      "get": {
+        "description": "Check dependencies required to accept production traffic.",
+        "operationId": "getApiV1AuthReady",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/refresh/": {
+      "post": {
+        "description": "",
+        "operationId": "postApiV1AuthRefresh",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRefresh"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRefresh"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRefresh"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenRefresh"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/register/": {
+      "post": {
+        "description": "Register a new user and return user data.",
+        "operationId": "postApiV1AuthRegister",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Register"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Register"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Register"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Register"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/session/login/": {
+      "post": {
+        "description": "Create a Django session for first-party browser clients.",
+        "operationId": "postApiV1AuthSessionLogin",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/session/logout/": {
+      "post": {
+        "description": "Clear a Django browser session.",
+        "operationId": "postApiV1AuthSessionLogout",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/": {
+      "get": {
+        "description": "List all chats for the current user.",
+        "operationId": "getApiV1Chats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "post": {
+        "description": "Create a new chat session.",
+        "operationId": "postApiV1Chats",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/discover/": {
+      "post": {
+        "description": "Trigger scripture auto-discovery.",
+        "operationId": "postApiV1ChatsDiscover",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/": {
+      "delete": {
+        "description": "Delete a chat session.",
+        "operationId": "deleteApiV1ChatsById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "get": {
+        "description": "Get a chat with its full message history.",
+        "operationId": "getApiV1ChatsById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/archive/": {
+      "post": {
+        "description": "Archive a chat session.",
+        "operationId": "postApiV1ChatsByIdArchive",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/messages/": {
+      "get": {
+        "description": "Cursor-paginated messages for one chat.",
+        "operationId": "getApiV1ChatsByIdMessages",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/query/": {
+      "post": {
+        "description": "Submit a query and get an AI response via the RAG engine.",
+        "operationId": "postApiV1ChatsByIdQuery",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/rename/": {
+      "patch": {
+        "description": "Rename a chat session.",
+        "operationId": "patchApiV1ChatsByIdRename",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/runs/": {
+      "post": {
+        "description": "Create a durable generation run.",
+        "operationId": "postApiV1ChatsByIdRuns",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/chats/{id}/unarchive/": {
+      "post": {
+        "description": "Restore an archived chat session.",
+        "operationId": "postApiV1ChatsByIdUnarchive",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/catalog/": {
+      "get": {
+        "description": "Read active catalog metadata and allow staff-only file refresh.",
+        "operationId": "getApiV1ModelsCatalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/catalog/refresh/": {
+      "post": {
+        "description": "Read active catalog metadata and allow staff-only file refresh.",
+        "operationId": "postApiV1ModelsCatalogRefresh",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/connections/": {
+      "get": {
+        "description": "Read sanitized provider connection status for the current user.",
+        "operationId": "getApiV1ModelsConnections",
+        "parameters": [
+          {
+            "description": "A page number within the paginated result set.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "count": {
+                      "example": 123,
+                      "type": "integer"
+                    },
+                    "next": {
+                      "example": "http://api.example.org/accounts/?page=4",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous": {
+                      "example": "http://api.example.org/accounts/?page=2",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "results": {
+                      "items": {
+                        "$ref": "#/components/schemas/ModelConnection"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["count", "results"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "post": {
+        "description": "Read sanitized provider connection status for the current user.",
+        "operationId": "postApiV1ModelsConnections",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnectionCreate"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnectionCreate"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnectionCreate"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/connections/{id}/": {
+      "delete": {
+        "description": "Read sanitized provider connection status for the current user.",
+        "operationId": "deleteApiV1ModelsConnectionsById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "get": {
+        "description": "Read sanitized provider connection status for the current user.",
+        "operationId": "getApiV1ModelsConnectionsById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnection"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/connections/{id}/probe/": {
+      "post": {
+        "description": "Read sanitized provider connection status for the current user.",
+        "operationId": "postApiV1ModelsConnectionsByIdProbe",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnection"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnection"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnection"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/installations/": {
+      "get": {
+        "description": "Create and inspect one-at-a-time staff local installation jobs.",
+        "operationId": "getApiV1ModelsInstallations",
+        "parameters": [
+          {
+            "description": "A page number within the paginated result set.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "count": {
+                      "example": 123,
+                      "type": "integer"
+                    },
+                    "next": {
+                      "example": "http://api.example.org/accounts/?page=4",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous": {
+                      "example": "http://api.example.org/accounts/?page=2",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "results": {
+                      "items": {
+                        "$ref": "#/components/schemas/ModelInstallationJob"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["count", "results"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "post": {
+        "description": "Create and inspect one-at-a-time staff local installation jobs.",
+        "operationId": "postApiV1ModelsInstallations",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInstallationCreate"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInstallationCreate"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInstallationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallationCreate"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/installations/{id}/": {
+      "get": {
+        "description": "Create and inspect one-at-a-time staff local installation jobs.",
+        "operationId": "getApiV1ModelsInstallationsById",
+        "parameters": [
+          {
+            "description": "A UUID string identifying this model installation job.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallationJob"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/installations/{id}/cancel/": {
+      "post": {
+        "description": "Create and inspect one-at-a-time staff local installation jobs.",
+        "operationId": "postApiV1ModelsInstallationsByIdCancel",
+        "parameters": [
+          {
+            "description": "A UUID string identifying this model installation job.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInstallationJob"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInstallationJob"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelInstallationJob"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallationJob"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/preferences/me/": {
+      "get": {
+        "description": "Get or update the authenticated user's model preference.",
+        "operationId": "getApiV1ModelsPreferencesMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      },
+      "put": {
+        "description": "Get or update the authenticated user's model preference.",
+        "operationId": "putApiV1ModelsPreferencesMe",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/profiles/": {
+      "get": {
+        "description": "List selectable enabled model profiles.",
+        "operationId": "getApiV1ModelsProfiles",
+        "parameters": [
+          {
+            "description": "A page number within the paginated result set.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "count": {
+                      "example": 123,
+                      "type": "integer"
+                    },
+                    "next": {
+                      "example": "http://api.example.org/accounts/?page=4",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous": {
+                      "example": "http://api.example.org/accounts/?page=2",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "results": {
+                      "items": {
+                        "$ref": "#/components/schemas/ModelProfile"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["count", "results"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/models/profiles/{id}/": {
+      "get": {
+        "description": "List selectable enabled model profiles.",
+        "operationId": "getApiV1ModelsProfilesById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProfile"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/runs/{id}/": {
+      "get": {
+        "description": "Durable generation run endpoints.",
+        "operationId": "getApiV1RunsById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/runs/{id}/cancel/": {
+      "post": {
+        "description": "Durable generation run endpoints.",
+        "operationId": "postApiV1RunsByIdCancel",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {}
+            },
+            "multipart/form-data": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/runs/{id}/events/": {
+      "get": {
+        "description": "Durable generation run endpoints.",
+        "operationId": "getApiV1RunsByIdEvents",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {}
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/": {
+      "get": {
+        "description": "ViewSet for listing and retrieving scriptures.",
+        "operationId": "getApiV1Scriptures",
+        "parameters": [
+          {
+            "description": "A page number within the paginated result set.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "count": {
+                      "example": 123,
+                      "type": "integer"
+                    },
+                    "next": {
+                      "example": "http://api.example.org/accounts/?page=4",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous": {
+                      "example": "http://api.example.org/accounts/?page=2",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "results": {
+                      "items": {
+                        "$ref": "#/components/schemas/Scripture"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["count", "results"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/indexing-jobs/": {
+      "get": {
+        "description": "Staff-only observability endpoint for index job progress and failures.",
+        "operationId": "getApiV1ScripturesIndexingJobs",
+        "parameters": [
+          {
+            "description": "A page number within the paginated result set.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "count": {
+                      "example": 123,
+                      "type": "integer"
+                    },
+                    "next": {
+                      "example": "http://api.example.org/accounts/?page=4",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous": {
+                      "example": "http://api.example.org/accounts/?page=2",
+                      "format": "uri",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "results": {
+                      "items": {
+                        "$ref": "#/components/schemas/IndexingJob"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["count", "results"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/indexing-jobs/{id}/": {
+      "get": {
+        "description": "Staff-only observability endpoint for index job progress and failures.",
+        "operationId": "getApiV1ScripturesIndexingJobsById",
+        "parameters": [
+          {
+            "description": "",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexingJob"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/{id}/": {
+      "get": {
+        "description": "ViewSet for listing and retrieving scriptures.",
+        "operationId": "getApiV1ScripturesById",
+        "parameters": [
+          {
+            "description": "A unique integer value identifying this Scripture.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scripture"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/{id}/reindex/": {
+      "post": {
+        "description": "Queue a staff-authorized reindex and return its durable job record.",
+        "operationId": "postApiV1ScripturesByIdReindex",
+        "parameters": [
+          {
+            "description": "A unique integer value identifying this Scripture.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Scripture"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Scripture"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Scripture"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scripture"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/{id}/rollback/": {
+      "post": {
+        "description": "ViewSet for listing and retrieving scriptures.",
+        "operationId": "postApiV1ScripturesByIdRollback",
+        "parameters": [
+          {
+            "description": "A unique integer value identifying this Scripture.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Scripture"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Scripture"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Scripture"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scripture"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/scriptures/{id}/versions/": {
+      "get": {
+        "description": "ViewSet for listing and retrieving scriptures.",
+        "operationId": "getApiV1ScripturesByIdVersions",
+        "parameters": [
+          {
+            "description": "A unique integer value identifying this Scripture.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scripture"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    }
+  }
+}

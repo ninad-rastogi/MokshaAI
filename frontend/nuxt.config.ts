@@ -1,3 +1,5 @@
+import { defineNuxtConfig } from "nuxt/config";
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-25",
   modules: ["@nuxt/ui", "@nuxtjs/color-mode", "@nuxt/eslint"],
@@ -9,6 +11,9 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+      htmlAttrs: {
+        lang: "en",
+      },
       title: "Moksha AI",
       meta: [
         { name: "viewport", content: "width=device-width, initial-scale=1" },

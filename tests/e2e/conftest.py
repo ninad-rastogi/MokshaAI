@@ -27,8 +27,9 @@ def wait_for_server(url: str, timeout: int = 60) -> bool:
             resp = requests.get(url, timeout=2)
             if resp.status_code == 200:
                 return True
-        except Exception:
-            pass
+        except requests.RequestException:
+            time.sleep(1)
+            continue
         time.sleep(1)
     return False
 
@@ -107,7 +108,6 @@ def streamlit_server(django_server):
 @pytest.fixture(autouse=True)
 def _servers_ready(streamlit_server):
     """Auto-fixture to ensure servers are ready before each test."""
-    pass
 
 
 def pytest_configure(config):

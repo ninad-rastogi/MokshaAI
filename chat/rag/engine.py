@@ -6,6 +6,7 @@ Adapted from core/rag_engine.py to work with Django settings and PgVector.
 
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from django.conf import settings
@@ -40,7 +41,9 @@ class RAGEngine:
         self.ollama_server = ollama_server or settings.OLLAMA_BASE_URL
         self.available_scriptures = available_scriptures or []
 
-        self.system_prompt = (system_prompt or settings.VEDIC_SYSTEM_PROMPT).format(
+        self.system_prompt = (
+            system_prompt or settings.SPIRITUAL_GUIDE_SYSTEM_PROMPT
+        ).format(
             available_scriptures=(
                 ", ".join(self.available_scriptures)
                 if self.available_scriptures
@@ -85,9 +88,9 @@ class RAGEngine:
             "1. **SCRIPTURE** - User explicitly asks about specific "
             "scriptures, verses, or teachings FROM texts\n"
             "   Examples:\n"
-            '   - "What does Bhagavad Gita say about karma?"\n'
-            '   - "Tell me the story of Rama from Ramayana"\n'
-            '   - "Quote a shloka about dharma"\n\n'
+            '   - "What does this collection teach about ethical action?"\n'
+            '   - "Explain a story from one of my indexed texts"\n'
+            '   - "Quote a passage about courage from the library"\n\n'
             "2. **GUIDANCE** - User asks for spiritual guidance, life "
             "advice, or philosophical questions\n"
             "   Examples:\n"
@@ -129,12 +132,9 @@ class RAGEngine:
 
             # Strip markdown code fences
             response_text = response_text.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
+            response_text = response_text.removeprefix("```json")
+            response_text = response_text.removeprefix("```")
+            response_text = response_text.removesuffix("```")
             response_text = response_text.strip()
 
             classification = json.loads(response_text)
@@ -158,14 +158,17 @@ class RAGEngine:
 
             return route, requires_scripture
 
-        except Exception as e:
-            logger.error(f"Error in routing: {e}")
+        except Exception:
+            logger.exception("Query routing failed; using retrieval-first fallback")
+            if self.vector_store:
+                return "rag", True
             return "general", False
 
     def query_with_rag(
         self,
         query: str,
         messages_history: list[dict[str, Any]] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         """
         Process query using RAG.
@@ -181,12 +184,14 @@ class RAGEngine:
             chunk for chunk in chunks if chunk["score"] >= settings.RAG_MIN_SIMILARITY
         ]
         if not chunks:
-            return (
+            no_evidence = (
                 "I could not find a sufficiently relevant passage in the indexed "
                 "scriptures to answer that reliably. Please try a more specific "
-                "question or ask for general spiritual guidance.",
-                [],
+                "question or ask for general spiritual guidance."
             )
+            if on_delta:
+                on_delta(no_evidence)
+            return no_evidence, []
 
         context_parts = []
         sources = []
@@ -234,18 +239,22 @@ class RAGEngine:
 
         chat_msgs.append(HumanMessage(content=rag_prompt))
 
-        response = self.response_llm.invoke(chat_msgs)
-        response_text = _message_text(response.content)
+        response_text = self._complete(chat_msgs, on_delta)
 
         logger.info(f"RAG response generated with {len(sources)} sources")
         return response_text, sources
 
     def query_without_rag(
-        self, query: str, messages_history: list[dict[str, Any]] | None = None
+        self,
+        query: str,
+        messages_history: list[dict[str, Any]] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> str:
         """Query without RAG (general conversation)."""
         safe_response = safety_response(query)
         if safe_response:
+            if on_delta:
+                on_delta(safe_response)
             return safe_response
         chat_msgs: list[BaseMessage] = [SystemMessage(content=self.system_prompt)]
 
@@ -263,7 +272,24 @@ class RAGEngine:
 
         chat_msgs.append(HumanMessage(content=enhanced_query))
 
-        response = self.response_llm.invoke(chat_msgs)
-        response_text = _message_text(response.content)
+        response_text = self._complete(chat_msgs, on_delta)
 
         return response_text
+
+    def _complete(
+        self,
+        messages: list[BaseMessage],
+        on_delta: Callable[[str], None] | None,
+    ) -> str:
+        if on_delta is None:
+            response = self.response_llm.invoke(messages)
+            return _message_text(response.content)
+
+        parts: list[str] = []
+        for response in self.response_llm.stream(messages):
+            text = _message_text(response.content)
+            if not text:
+                continue
+            parts.append(text)
+            on_delta(text)
+        return "".join(parts)

@@ -1,37 +1,63 @@
-# docs/ — Project Documentation
+# Architecture Documentation
 
-This directory contains **project-level documentation** that explains the architecture,
-API reference, development workflow, and deployment guides.
+## Purpose
 
-## Files
+`docs/` holds durable cross-service decisions and generated API references that
+do not belong to one deployable service.
 
-### `architecture.md` (to be created)
-Detailed architecture documentation including:
-- System component diagram
-- Data flow diagrams
-- Authentication sequence
-- RAG pipeline flow
-- Database schema
+## Architecture And Data Flow
 
-### `api_reference.md` (to be created)
-Auto-generated and manually curated API documentation:
-- All endpoints with request/response schemas
-- Authentication requirements
-- Error codes and messages
-- Example requests/responses
+Documents describe the Caddy, Nuxt, Django, Celery, Redis, PostgreSQL/PgVector,
+private embedding-sidecar, and host-Ollama boundaries. Source code and tests
+remain authoritative when prose drifts.
 
-### `development.md` (to be created)
-Developer guide:
-- Local setup instructions
-- Common commands (`make` targets)
-- Code style guidelines
-- Testing conventions
-- How to add new features
+## Files And Entrypoints
 
-### `deployment.md` (to be created)
-Deployment guide:
-- Docker Compose setup
-- Environment variable reference
-- Production checklist
-- Scaling considerations
-- Backup procedures
+Add architecture decisions, API lifecycle notes, threat models, and evaluated
+operational procedures here. Keep product intent in `PRODUCT.md`, visual rules
+in `DESIGN.md`, and service commands in boundary READMEs.
+
+## Interfaces
+
+OpenAPI is generated from Django/DRF and consumed by the frontend type
+generation step. SSE remains a hand-written schema-validated adapter.
+
+## Configuration
+
+Documentation commands use the required Python environment and checked-in
+frontend lockfile. Generated outputs must identify their source command.
+
+## Commands
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache python scripts/validate_readmes.py
+```
+
+## Tests
+
+README validation checks required sections, boundary coverage, placeholders,
+duplicate content, broken relative links, and missing references. CI and
+pre-commit only validate; they never create or stage files.
+
+## Dependencies
+
+Project source, generated OpenAPI artifacts, and the standard-library README
+validator.
+
+## Security
+
+Do not include live credentials, internal DNS data, session values, personal
+information, or decrypted provider keys in documentation or examples.
+
+## Failure Modes And Troubleshooting
+
+- Broken link: use a path relative to the document containing it.
+- Stale API example: regenerate types/schema and update the owning service docs.
+- Missing boundary README: run the explicit scaffold command, edit all
+  placeholders, then rerun validation.
+
+## Related Docs
+
+See `../README.md`, `../PRODUCT.md`, `../DESIGN.md`, `../operations/README.md`,
+and `../scripts/README.md`.

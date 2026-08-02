@@ -8,9 +8,14 @@ from users.models import User
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for user profile."""
 
+    def validate_preferred_theme(self, value: str) -> str:
+        if value not in {"system", "light", "dark"}:
+            raise serializers.ValidationError("invalid_theme")
+        return value
+
     class Meta:
         model = User
-        fields = ("id", "email", "spiritual_name", "created_at")
+        fields = ("id", "email", "spiritual_name", "preferred_theme", "created_at")
         read_only_fields = ("id", "created_at")
 
 
@@ -27,7 +32,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("email", "password", "password_confirm", "spiritual_name")
-        extra_kwargs = {"email": {"validators": []}}
+        extra_kwargs: dict[str, dict[str, object]] = {"email": {"validators": []}}
 
     def validate_email(self, email: str) -> str:
         normalized_email = User.objects.normalize_email(email)

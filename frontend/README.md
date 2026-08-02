@@ -6,7 +6,7 @@ Nuxt 4, Vue 3, strict TypeScript product frontend for Moksha AI.
 
 ## Architecture And Data Flow
 
-The browser uses Django session cookies and CSRF for first-party auth. Chat requests create durable generation runs through `/api/v1/chats/{chat_id}/runs/`, then consume typed Server-Sent Events from `/api/v1/chats/runs/{run_id}/events/`.
+The browser uses Django session cookies and CSRF for first-party auth. Chat requests create durable generation runs through `/api/v1/chats/{chat_id}/runs/`, then consume typed Server-Sent Events from `/api/v1/runs/{run_id}/events/`.
 
 ## Files And Entrypoints
 
@@ -14,14 +14,22 @@ The browser uses Django session cookies and CSRF for first-party auth. Chat requ
 - `pages/app.vue`: authenticated chat workspace.
 - `composables/useApi.ts`: schema-validated API client.
 - `composables/useRunStream.ts`: handwritten SSE adapter.
+- `components/app/`: compact chat shell, history actions, composer, settings.
+- `openapi.json`: generated canonical v1 REST schema.
+- `types/openapi.d.ts`: generated REST types; never hand-edit.
 
 ## Interfaces
 
-Consumes the Django `/api/v1` REST API. Browser code must not store bearer tokens in local storage.
+Consumes Django `/api/v1`. Sessions survive refresh through HttpOnly cookies
+and `/auth/me/`. History supports search, rename, archive, restore, and delete.
+Enter sends; Shift+Enter inserts a newline. Composer and navigation remain
+fixed while only message history scrolls. Archived chats have no composer.
 
 ## Configuration
 
-Set `NUXT_PUBLIC_API_BASE` when the API is not served from the same origin.
+Set `NUXT_PUBLIC_API_BASE` only when API is not same-origin. Theme, primary
+profile, optional fallback, and provider connections persist through account
+APIs, not local storage. System/light/dark theme follows account preference.
 
 ## Commands
 
@@ -29,11 +37,19 @@ Set `NUXT_PUBLIC_API_BASE` when the API is not served from the same origin.
 - `npm run build`
 - `npm run typecheck`
 - `npm run lint`
+- `npm run stylelint`
+- `npm run format`
 - `npm run test`
+- `npm run generate:types`
+- `npm run build`
 
 ## Tests
 
-Use Vitest for component logic and Playwright for critical browser journeys.
+Use Vitest/Vue Test Utils for components and
+`python ../scripts/live_ui_walkthrough.py` for Chrome journeys at desktop and
+mobile sizes. Walkthrough must cover auth/refresh, Enter and Shift+Enter,
+stream/cancel/reconnect states, history actions, every settings section,
+preference persistence, archived behavior, focus, reduced motion, and axe.
 
 ## Dependencies
 
@@ -45,7 +61,14 @@ Markdown rendering disables raw HTML through sanitization. Auth uses cookies and
 
 ## Failure Modes And Troubleshooting
 
-If streaming disconnects, reconnect with the last seen event id. If the API returns 401, return to the welcome screen and sign in again.
+- 401 after refresh: inspect session/CSRF cookies and `/auth/me/`; do not add a
+  token-storage fallback.
+- Streaming disconnect: replay from last validated event ID; completed durable
+  DB checkpoint is final fallback.
+- Native select theme mismatch: use Nuxt UI menu/listbox styling, not unstyled
+  platform select.
+- Page scroll or hidden composer: shell must stay `100svh`; only message/history
+  viewports scroll.
 
 ## Related Docs
 

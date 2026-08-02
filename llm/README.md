@@ -1,40 +1,91 @@
-# LLM Platform
+# Provider-Neutral Model Platform
 
-Purpose: provider-neutral model routing state for Moksha AI. This app stores user
-connections, enabled model profiles, user model preferences, hardware scan
-snapshots, and staff-triggered local installation jobs.
+## Purpose
 
-Data flow: browser and non-browser clients read sanitized connection/profile
-status through `/api/v1/models/*`. Secrets are encrypted before persistence with
-AES-256-GCM. Ciphertext AAD binds each API key to the user, connection ID, and
-key version. User custom endpoints must be public HTTPS; private/local endpoints
-are only valid for admin-owned built-in/local connections.
+`llm/` owns model connections, profiles, account preferences, host hardware
+snapshots, and staff-controlled local installation records. Product code does
+not assume one provider or one scripture collection.
 
-Entry points:
+## Architecture And Data Flow
 
-- `models.py`: persistent model platform objects.
-- `security.py`: BYOK encryption and endpoint SSRF guardrails.
-- `providers.py`: safe provider probes for OpenAI-compatible and Ollama-compatible endpoints.
-- `services.py`: model selection precedence for chat override, user preference, fallback, and admin default.
-- `views.py`: read-only status/profile APIs plus user preference update.
-- `admin.py`: staff management surfaces.
+Users may add public HTTPS OpenAI-compatible or Ollama-compatible endpoints with
+explicit remote-data consent. Admin-owned built-in Ollama stays private.
+Selection precedence is chat override, user primary, one eligible fallback, then
+admin local default. Each generation attempt stores an immutable provider/model
+snapshot.
 
-Configuration:
+## Files And Entrypoints
 
-- `MOKSHA_BYOK_MASTER_KEY`: base64-url encoded 32-byte AES key.
-- `MOKSHA_BYOK_MASTER_KEY_FILE`: optional mounted file containing the same key.
+- `models.py`: connections, profiles, preferences, hardware scans, install jobs.
+- `security.py`: AES-256-GCM envelopes and SSRF validation.
+- `providers.py`: bounded provider probes and completion adapters.
+- `services.py`: deterministic model selection.
+- `views.py`: sanitized user APIs.
+- `admin.py`: staff controls.
+- `catalog.py`: signature, monotonic release, checksum, and revocation checks.
+- `tasks.py`: resumable download, Ollama import, qualification, cleanup.
 
-Security notes:
+## Interfaces
 
-- Missing or malformed BYOK master keys fail closed.
-- API keys are never serialized by API responses or admin list views.
-- Endpoint validation blocks credentials, non-HTTPS URLs, private, loopback,
-  link-local, multicast, reserved, and unspecified addresses for user-owned
-  connections.
-- Remote data consent is required before saving user-owned remote connections.
-- Provider probes do not follow redirects, do not use proxy environment variables,
-  cap response bodies, and persist only sanitized status details.
+Versioned APIs expose sanitized connections, selectable profiles, probes,
+preference updates, catalog releases, and staff-only install jobs. Secrets are
+write-only. V1 dialects are OpenAI-compatible, Ollama-compatible, and built-in
+Ollama. Only one install job may run, and enabling an installed profile never
+changes account preferences or the admin default.
 
-Tests: `llm/tests/test_security.py` and `llm/tests/test_services.py`.
+## Configuration
 
-Related docs: root README, `chat/README.md`, and `deploy/README.md`.
+Mount `MOKSHA_BYOK_KEYRING_FILE` outside DB. Keyring contains
+`active_version` and versioned 32-byte keys. Configure private Ollama, request
+limits, local concurrency 1, remote concurrency 4, imports bind mount, and
+signed catalog before enabling installation.
+
+## Commands
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache python manage.py check
+uv run --no-cache pytest llm/tests
+uv run moksha setup model scan --context-length 8192
+uv run moksha security rewrap-byok --target-version 2
+uv run python scripts/benchmark_ollama.py --models <temporary-qualified-tag>
+```
+
+Host hardware discovery belongs to the optional `moksha setup model scan`
+command and must never run in Django containers.
+
+## Tests
+
+Coverage includes encryption/rewrap fail-closed behavior, DNS pinning and SSRF
+guards, provider statuses, preference precedence, revocation, install checksum
+and cleanup, signed catalog replay controls, qualification, and attempt fallback
+limits. Real activation still requires structured JSON, multilingual, citation,
+grounding, safety, 8K context, throughput, and memory tests against host Ollama.
+
+## Dependencies
+
+Django, DRF, Cryptography, Requests/HTTP transport, and provider APIs.
+
+## Security
+
+BYOK uses versioned AES-256-GCM with AAD binding user, connection, and key
+version. Requests reject unsafe addresses, redirects, proxy inheritance,
+credentials in URLs, unsafe headers, and oversized responses. Missing keys fail
+closed.
+
+## Failure Modes And Troubleshooting
+
+- `auth_invalid`: replace or revoke the provider key.
+- `endpoint_invalid`: use a public HTTPS endpoint allowed by policy.
+- `unreachable`: inspect DNS pins and bounded probe detail.
+- Missing key version: restore matching mounted key before decrypting or
+  rewrapping; DB rollback cannot recover it.
+- Stale hardware profile: run the explicit host scan again.
+- Install checksum/signature failure: retain existing models/defaults, clean
+  task-created temporary artifacts, and reject activation.
+- Provider may bill failed attempt: disclose this before enabling fallback.
+
+## Related Docs
+
+See `../chat/README.md`, `../operations/README.md`, `../deploy/README.md`, and
+`../frontend/README.md`.

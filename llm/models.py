@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from llm.security import (
     aad_for_connection,
+    active_key_version,
     decrypt_secret,
     encrypt_secret,
     validate_public_https_endpoint,
@@ -100,14 +101,24 @@ class ModelConnection(models.Model):
     def set_api_key(self, secret: str) -> None:
         if not self.user_id:
             raise ValidationError("user_required_for_byok_encryption")
+        self.key_version = active_key_version()
         aad = aad_for_connection(self.user_id, str(self.pk), self.key_version)
-        self.api_key_nonce, self.encrypted_api_key = encrypt_secret(secret, aad)
+        self.api_key_nonce, self.encrypted_api_key = encrypt_secret(
+            secret,
+            aad,
+            key_version=self.key_version,
+        )
 
     def get_api_key(self) -> str:
         if not self.user_id or not self.encrypted_api_key or not self.api_key_nonce:
             return ""
         aad = aad_for_connection(self.user_id, str(self.pk), self.key_version)
-        return decrypt_secret(self.api_key_nonce, self.encrypted_api_key, aad)
+        return decrypt_secret(
+            self.api_key_nonce,
+            self.encrypted_api_key,
+            aad,
+            key_version=self.key_version,
+        )
 
     def record_remote_consent(self) -> None:
         self.remote_data_consent_at = timezone.now()
@@ -206,6 +217,28 @@ class HardwareProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.source} scan {self.profile_hash[:12]}"
+
+
+class ModelCatalogRelease(models.Model):
+    """Verified catalog release accepted through a staff-only refresh."""
+
+    schema_version = models.PositiveSmallIntegerField()
+    sequence = models.PositiveIntegerField(unique=True)
+    version = models.CharField(max_length=80, unique=True)
+    key_id = models.CharField(max_length=80)
+    catalog_hash = models.CharField(max_length=64, unique=True)
+    signature = models.CharField(max_length=160)
+    payload = models.JSONField()
+    issued_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    active = models.BooleanField(default=False, db_index=True)
+    accepted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-sequence"]
+
+    def __str__(self) -> str:
+        return f"{self.version} ({self.sequence})"
 
 
 class ModelInstallationJob(models.Model):

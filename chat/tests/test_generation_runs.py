@@ -3,12 +3,12 @@
 from unittest.mock import patch
 from uuid import UUID
 
-from django.urls import resolve
 import pytest
+from django.urls import resolve
 
 from chat.models import Chat, GenerationAttempt, GenerationRun, Message
-from llm.models import ModelConnection, ModelProfile
 from chat.tasks import generate_chat_response
+from llm.models import ModelConnection, ModelProfile
 
 
 def test_top_level_run_urls_resolve_to_v1_contract():
@@ -101,7 +101,7 @@ def test_top_level_run_endpoints_match_v1_contract(authenticated_client):
 
     detail = client.get(f"/api/v1/runs/{run.id}/")
     events = client.get(f"/api/v1/runs/{run.id}/events/")
-    with patch("chat.views.publish_run_event", return_value="1-0"):
+    with patch("chat.views.publish_run_event", side_effect=["1-0", "2-0"]):
         cancelled = client.post(f"/api/v1/runs/{run.id}/cancel/")
 
     assert detail.status_code == 200
@@ -110,10 +110,13 @@ def test_top_level_run_endpoints_match_v1_contract(authenticated_client):
     assert events["Content-Type"].startswith("text/event-stream")
     assert cancelled.status_code == 200
     assert cancelled.json()["state"] == GenerationRun.State.CANCELLED
+    assert cancelled.json()["last_event_id"] == "2-0"
 
 
 @pytest.mark.django_db
 def test_generation_run_uses_legacy_model_when_no_profiles(create_user):
+    ModelProfile.objects.all().delete()
+    ModelConnection.objects.all().delete()
     user = create_user(email="legacy-run@example.test")
     chat = Chat.objects.create(user=user)
     run = GenerationRun.objects.create(
@@ -146,6 +149,7 @@ def test_generation_run_uses_legacy_model_when_no_profiles(create_user):
 @pytest.mark.django_db
 def test_generation_run_falls_back_before_delta(create_user):
     user = create_user(email="fallback-run@example.test")
+    ModelProfile.objects.filter(is_admin_default=True).update(is_admin_default=False)
     chat = Chat.objects.create(user=user)
     connection = ModelConnection.objects.create(
         name="Built-in Ollama",
@@ -210,6 +214,59 @@ def test_generation_run_falls_back_before_delta(create_user):
 
 
 @pytest.mark.django_db
+def test_generation_run_does_not_fallback_after_first_delta(create_user):
+    user = create_user(email="no-late-fallback@example.test")
+    ModelProfile.objects.filter(is_admin_default=True).update(is_admin_default=False)
+    chat = Chat.objects.create(user=user)
+    connection = ModelConnection.objects.create(
+        name="Built-in Ollama stream",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    primary = ModelProfile.objects.create(
+        name="Streaming primary",
+        connection=connection,
+        model_id="stream-primary",
+        is_enabled=True,
+        is_admin_default=True,
+    )
+    fallback = ModelProfile.objects.create(
+        name="Streaming fallback",
+        connection=connection,
+        model_id="stream-fallback",
+        is_enabled=True,
+    )
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="no-late-fallback",
+        prompt="Please guide me.",
+        model_profile=str(primary.pk),
+        stream_key=f"generation:{chat.id}:no-late-fallback",
+    )
+
+    def fake_generate(**kwargs):
+        kwargs["on_delta"]("Partial answer")
+        raise RuntimeError("stream interrupted")
+
+    with (
+        patch("chat.tasks.resolve_model_selection") as resolve,
+        patch("chat.tasks.publish_run_event", return_value="1-0"),
+        patch("chat.tasks._generate_response", side_effect=fake_generate),
+    ):
+        resolve.return_value.attempts = (primary, fallback)
+        generate_chat_response(str(run.pk))
+
+    run.refresh_from_db()
+    attempts = list(run.attempts.order_by("attempt_number"))
+    assert run.state == GenerationRun.State.FAILED
+    assert run.final_text == "Partial answer"
+    assert [attempt.model for attempt in attempts] == ["stream-primary"]
+    assert attempts[0].outcome == GenerationAttempt.Outcome.FAILED
+    assert not Message.objects.filter(chat=chat, role="assistant").exists()
+
+
+@pytest.mark.django_db
 def test_generation_run_openai_profile_persists_usage(create_user):
     user = create_user(email="remote-run@example.test")
     chat = Chat.objects.create(user=user)
@@ -236,8 +293,15 @@ def test_generation_run_openai_profile_persists_usage(create_user):
         stream_key=f"generation:{chat.id}:remote",
     )
 
+    emitted_events = []
+
+    def fake_publish(_stream_key, event_type, payload):
+        event_id = f"{len(emitted_events) + 1}-0"
+        emitted_events.append((event_id, event_type, payload))
+        return event_id
+
     with (
-        patch("chat.tasks.publish_run_event", return_value="1-0"),
+        patch("chat.tasks.publish_run_event", side_effect=fake_publish),
         patch(
             "chat.tasks.openai_chat_completion",
             return_value=("Remote answer.", {"total_tokens": 9}),
@@ -247,10 +311,22 @@ def test_generation_run_openai_profile_persists_usage(create_user):
 
     run.refresh_from_db()
     attempt = run.attempts.get()
+    usage_event = next(event for event in emitted_events if event[1] == "usage")
+    done_event = next(event for event in emitted_events if event[1] == "done")
     assert run.state == GenerationRun.State.COMPLETED
+    assert run.last_event_id == done_event[0]
     assert attempt.provider == ModelConnection.Dialect.OPENAI_COMPATIBLE
     assert attempt.model == "remote-model"
     assert attempt.usage == {"total_tokens": 9}
+    assert usage_event[2] == {
+        "attempt_number": 1,
+        "provider": ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        "model": "remote-model",
+        "usage": {"total_tokens": 9},
+    }
+    assert [event[1] for event in emitted_events].index("usage") < [
+        event[1] for event in emitted_events
+    ].index("done")
     assert remote.call_count == 1
 
 

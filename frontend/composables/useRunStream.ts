@@ -8,13 +8,24 @@ export type RunEvent =
   | { type: "error"; id: string; code: string; message: string }
   | { type: "done"; id: string; state: string };
 
+type RunStreamHandlers = {
+  onEvent: (event: RunEvent) => void;
+  onOpen?: () => void;
+  onDisconnect?: () => void;
+};
+
 export function useRunStream() {
   const config = useRuntimeConfig();
   let source: EventSource | null = null;
   let lastEventId = "";
+  let currentRunId = "";
 
-  function connect(runId: string, onEvent: (event: RunEvent) => void) {
-    close();
+  function connect(runId: string, handlers: RunStreamHandlers) {
+    close(false);
+    if (currentRunId !== runId) {
+      currentRunId = runId;
+      lastEventId = "";
+    }
     const query = lastEventId
       ? `?last_event_id=${encodeURIComponent(lastEventId)}`
       : "";
@@ -24,25 +35,33 @@ export function useRunStream() {
         withCredentials: true,
       },
     );
+    source.onopen = () => handlers.onOpen?.();
+    source.onerror = () => handlers.onDisconnect?.();
 
     const parse = (event: MessageEvent, type: RunEvent["type"]) => {
       lastEventId = event.lastEventId || lastEventId;
       const data = JSON.parse(event.data);
       if (type === "state")
-        onEvent({ type, id: lastEventId, state: data.state });
-      if (type === "delta") onEvent({ type, id: lastEventId, text: data.text });
+        handlers.onEvent({ type, id: lastEventId, state: data.state });
+      if (type === "delta")
+        handlers.onEvent({ type, id: lastEventId, text: data.text });
       if (type === "citation")
-        onEvent({ type, id: lastEventId, citation: data as Citation });
-      if (type === "usage") onEvent({ type, id: lastEventId, usage: data });
+        handlers.onEvent({
+          type,
+          id: lastEventId,
+          citation: data as Citation,
+        });
+      if (type === "usage")
+        handlers.onEvent({ type, id: lastEventId, usage: data });
       if (type === "error")
-        onEvent({
+        handlers.onEvent({
           type,
           id: lastEventId,
           code: data.code,
           message: data.message,
         });
       if (type === "done")
-        onEvent({ type, id: lastEventId, state: data.state });
+        handlers.onEvent({ type, id: lastEventId, state: data.state });
     };
 
     for (const type of [
@@ -59,9 +78,13 @@ export function useRunStream() {
     }
   }
 
-  function close() {
+  function close(reset = true) {
     source?.close();
     source = null;
+    if (reset) {
+      currentRunId = "";
+      lastEventId = "";
+    }
   }
 
   return { connect, close };

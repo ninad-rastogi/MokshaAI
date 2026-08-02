@@ -3,7 +3,7 @@ Management command to auto-discover and index scripture PDFs.
 
 Usage:
     python manage.py discover_scriptures
-    python manage.py discover_scriptures --scripture Mahabharata
+    python manage.py discover_scriptures --scripture "Collection Name"
     python manage.py discover_scriptures --force
 """
 
@@ -46,8 +46,15 @@ class Command(BaseCommand):
             if options.get("scripture")
             else [
                 item.name
-                for item in docs_dir.iterdir()
-                if item.is_dir() and any(item.glob("*.pdf"))
+                for item in sorted(
+                    docs_dir.iterdir(), key=lambda path: path.name.casefold()
+                )
+                if item.is_dir()
+                and not item.is_symlink()
+                and any(
+                    path.is_file() and not path.is_symlink()
+                    for path in item.rglob("*.pdf")
+                )
             ]
         )
         if not requested_names:

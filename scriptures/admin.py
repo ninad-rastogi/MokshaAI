@@ -2,7 +2,12 @@
 
 from django.contrib import admin
 
-from scriptures.models import IndexingJob, Scripture, Volume
+from scriptures.models import (
+    IndexingJob,
+    Scripture,
+    ScriptureIndexVersion,
+    Volume,
+)
 
 
 class VolumeInline(admin.TabularInline):
@@ -37,6 +42,7 @@ class IndexingJobAdmin(admin.ModelAdmin):
     search_fields = ("scripture__name", "requested_by__email")
     readonly_fields = (
         "scripture",
+        "index_version",
         "requested_by",
         "status",
         "progress",
@@ -47,4 +53,32 @@ class IndexingJobAdmin(admin.ModelAdmin):
         "created_at",
         "started_at",
         "finished_at",
+    )
+
+
+@admin.register(ScriptureIndexVersion)
+class ScriptureIndexVersionAdmin(admin.ModelAdmin):
+    list_display = (
+        "scripture",
+        "status",
+        "chunk_count",
+        "volume_count",
+        "created_at",
+        "activated_at",
+    )
+    list_filter = ("status", "embedding_model")
+    search_fields = ("scripture__name",)
+    readonly_fields = (
+        "scripture",
+        "status",
+        "embedding_model",
+        "source_manifest",
+        "qualification",
+        "chunk_count",
+        "volume_count",
+        "page_count",
+        "failure_code",
+        "created_at",
+        "qualified_at",
+        "activated_at",
     )

@@ -7,7 +7,7 @@ to the Django backend, enabling clean separation between frontend and backend.
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 import streamlit as st
@@ -18,7 +18,7 @@ logger = logging.getLogger("streamlit_ui.api_client")
 class MokshaAPIClient:
     """Client for the Moksha AI Django REST API."""
 
-    def __init__(self, base_url: str = None):
+    def __init__(self, base_url: str | None = None):
         self.base_url = base_url or os.getenv("DJANGO_API_URL", "http://localhost:8000")
         self.session = requests.Session()
         self._load_tokens()
@@ -42,7 +42,7 @@ class MokshaAPIClient:
         self.access_token = ""
         self.refresh_token = ""
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Get authorization headers."""
         self._load_tokens()
         headers = {"Content-Type": "application/json"}
@@ -66,15 +66,15 @@ class MokshaAPIClient:
                     data["access"], data.get("refresh", self.refresh_token)
                 )
                 return True
-        except Exception as e:
-            logger.error(f"Token refresh failed: {e}")
+        except requests.RequestException, ValueError, KeyError:
+            logger.exception("Token refresh failed")
         return False
 
     def _request(
         self,
         method: str,
         endpoint: str,
-        data: Dict = None,
+        data: dict | None = None,
         retry: bool = True,
         timeout: int = 30,
     ) -> requests.Response:
@@ -91,16 +91,15 @@ class MokshaAPIClient:
         )
 
         # If unauthorized, try refreshing token
-        if resp.status_code == 401 and retry:
-            if self._refresh_access_token():
-                headers = self._get_headers()
-                resp = self.session.request(
-                    method,
-                    url,
-                    json=data,
-                    headers=headers,
-                    timeout=timeout,
-                )
+        if resp.status_code == 401 and retry and self._refresh_access_token():
+            headers = self._get_headers()
+            resp = self.session.request(
+                method,
+                url,
+                json=data,
+                headers=headers,
+                timeout=timeout,
+            )
 
         return resp
 
@@ -108,7 +107,7 @@ class MokshaAPIClient:
 
     def register(
         self, email: str, password: str, spiritual_name: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Register a new user."""
         resp = self.session.post(
             f"{self.base_url}/api/auth/register/",
@@ -124,10 +123,10 @@ class MokshaAPIClient:
             return {"success": True, "data": resp.json()}
         try:
             return {"success": False, "error": resp.json()}
-        except Exception:
+        except ValueError:
             return {"success": False, "error": {"detail": resp.text}}
 
-    def login(self, email: str, password: str) -> Dict[str, Any]:
+    def login(self, email: str, password: str) -> dict[str, Any]:
         """Login and store JWT tokens."""
         resp = self.session.post(
             f"{self.base_url}/api/auth/login/",
@@ -142,14 +141,14 @@ class MokshaAPIClient:
             return {"success": True, "data": data}
         try:
             return {"success": False, "error": resp.json()}
-        except Exception:
+        except ValueError:
             return {"success": False, "error": {"detail": resp.text}}
 
     def logout(self) -> None:
         """Clear stored tokens."""
         self._clear_tokens()
 
-    def get_profile(self) -> Optional[Dict]:
+    def get_profile(self) -> dict | None:
         """Get current user profile."""
         resp = self._request("GET", "/api/auth/me/")
         if resp.status_code == 200:
@@ -166,7 +165,7 @@ class MokshaAPIClient:
 
     # ─── Chats ─────────────────────────────────────────────────────────
 
-    def list_chats(self) -> List[Dict]:
+    def list_chats(self) -> list[dict]:
         """List all chats for the current user."""
         resp = self._request("GET", "/api/chat/")
         if resp.status_code == 200:
@@ -176,14 +175,14 @@ class MokshaAPIClient:
             return data if isinstance(data, list) else []
         return []
 
-    def create_chat(self) -> Optional[Dict]:
+    def create_chat(self) -> dict | None:
         """Create a new chat session."""
         resp = self._request("POST", "/api/chat/")
         if resp.status_code == 201:
             return resp.json()
         return None
 
-    def get_chat(self, chat_id: str) -> Optional[Dict]:
+    def get_chat(self, chat_id: str) -> dict | None:
         """Get a chat with its messages."""
         resp = self._request("GET", f"/api/chat/{chat_id}/")
         if resp.status_code == 200:
@@ -202,7 +201,7 @@ class MokshaAPIClient:
         )
         return resp.status_code == 200
 
-    def query(self, chat_id: str, message: str) -> Dict[str, Any]:
+    def query(self, chat_id: str, message: str) -> dict[str, Any]:
         """Submit a query to the chat."""
         resp = self._request(
             "POST",
@@ -219,7 +218,7 @@ class MokshaAPIClient:
 
     # ─── Scriptures ────────────────────────────────────────────────────
 
-    def list_scriptures(self) -> List[Dict]:
+    def list_scriptures(self) -> list[dict]:
         """List available scriptures."""
         resp = self._request("GET", "/api/scriptures/")
         if resp.status_code == 200:
@@ -229,7 +228,7 @@ class MokshaAPIClient:
             return data if isinstance(data, list) else []
         return []
 
-    def discover_scriptures(self) -> Dict:
+    def discover_scriptures(self) -> dict:
         """Trigger scripture auto-discovery."""
         resp = self._request("POST", "/api/chat/discover/")
         return resp.json() if resp.status_code == 200 else {}
@@ -241,5 +240,5 @@ class MokshaAPIClient:
         try:
             resp = self.session.get(f"{self.base_url}/api/auth/health/", timeout=5)
             return resp.status_code == 200
-        except Exception:
+        except requests.RequestException:
             return False

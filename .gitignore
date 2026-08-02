@@ -15,6 +15,7 @@ build/
 *.log
 staticfiles/
 db.sqlite3
+deploy/certs/*.crt
 
 # Frontend
 node_modules/
@@ -49,3 +50,10 @@ ui/sidebar_1.py
 htmlcov/
 .coverage
 .pytest_cache/
+
+# Local development indexes and package caches
+graphify-out/
+deploy/runtime-secrets/
+backups/
+.tmp/
+.uv-cache/

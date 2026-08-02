@@ -1,43 +1,98 @@
+@import "@fontsource-variable/manrope";
+@import "@fontsource-variable/noto-sans-devanagari";
+@import "tailwindcss";
+@import "@nuxt/ui";
+
 :root {
-  --moksha-bg: #f7f1e7;
-  --moksha-ink: #211a15;
-  --moksha-muted: #766859;
-  --moksha-line: #ddcdb8;
-  --moksha-surface: #fffaf1;
-  --moksha-surface-raised: #fffdf8;
-  --moksha-glass: rgb(255 250 241 / 74%);
-  --moksha-glass-line: rgb(122 86 45 / 22%);
-  --moksha-accent: #a76528;
-  --moksha-accent-strong: #794416;
-  --moksha-ember: #c47b36;
-  --moksha-leaf: #3f7158;
-  --moksha-focus: #19727d;
-  --moksha-danger: #a63b37;
-  --moksha-user-bubble: #f0c58e;
-  --moksha-user-ink: #22160c;
-  --moksha-shadow: 0 24px 70px rgb(72 52 29 / 16%);
-  --moksha-shadow-soft: 0 14px 34px rgb(72 52 29 / 10%);
+  color-scheme: light;
+  --moksha-font:
+    "Manrope Variable", "Noto Sans Devanagari Variable", "Nirmala UI",
+    "Segoe UI", sans-serif;
+  --moksha-bg: #edf0ed;
+  --moksha-bg-deep: #e3e8e4;
+  --moksha-ink: #17211c;
+  --moksha-muted: #5c6861;
+  --moksha-placeholder: #748078;
+  --moksha-line: #c9d0cb;
+  --moksha-surface: #f5f7f4;
+  --moksha-surface-raised: #fcfcfa;
+  --moksha-sidebar: rgb(245 247 244 / 88%);
+  --moksha-header: rgb(250 251 248 / 82%);
+  --moksha-modal: rgb(250 251 248 / 99%);
+  --moksha-settings-nav: rgb(235 239 235 / 92%);
+  --moksha-control: rgb(255 255 255 / 62%);
+  --moksha-glass: rgb(251 252 249 / 68%);
+  --moksha-glass-raised: rgb(255 255 253 / 86%);
+  --moksha-glass-line: rgb(40 58 48 / 16%);
+  --moksha-composer: rgb(252 252 249 / 91%);
+  --moksha-accent: #9b6527;
+  --moksha-accent-ink: #6e410f;
+  --moksha-accent-soft: rgb(174 111 41 / 12%);
+  --moksha-accent-line: rgb(147 91 30 / 32%);
+  --moksha-primary: #244c3c;
+  --moksha-primary-ink: #f7fbf7;
+  --moksha-user-bubble: #dce6df;
+  --moksha-user-line: rgb(35 79 59 / 18%);
+  --moksha-user-ink: #17251e;
+  --moksha-guide-mark: #17352a;
+  --moksha-focus: #8b5c25;
+  --moksha-focus-ring: rgb(139 92 37 / 14%);
+  --moksha-success: #2e7252;
+  --moksha-success-soft: rgb(46 114 82 / 13%);
+  --moksha-warning: #9a641e;
+  --moksha-error: #a23f3f;
+  --moksha-error-soft: rgb(162 63 63 / 10%);
+  --moksha-error-line: rgb(162 63 63 / 28%);
+  --moksha-info: #28647c;
+  --moksha-info-soft: rgb(40 100 124 / 9%);
+  --moksha-disabled: #d8ded9;
+  --moksha-shadow-composer: 0 0.9rem 2.6rem rgb(28 43 35 / 13%);
+  --moksha-shadow-modal: 0 1.8rem 5rem rgb(10 18 14 / 30%);
+  --ui-radius: 0.5rem;
 }
 
 .dark {
-  --moksha-bg: #0e1310;
-  --moksha-ink: #f6efe5;
-  --moksha-muted: #c2b5a2;
-  --moksha-line: #3d352c;
-  --moksha-surface: #161915;
-  --moksha-surface-raised: #211d18;
-  --moksha-glass: rgb(28 27 22 / 72%);
-  --moksha-glass-line: rgb(226 176 109 / 20%);
-  --moksha-accent: #d99b5f;
-  --moksha-accent-strong: #f1c38c;
-  --moksha-ember: #b86f3b;
-  --moksha-leaf: #91c5a4;
-  --moksha-focus: #76c8d2;
-  --moksha-danger: #f08a8a;
-  --moksha-user-bubble: #efc38b;
-  --moksha-user-ink: #1d130a;
-  --moksha-shadow: 0 24px 70px rgb(0 0 0 / 34%);
-  --moksha-shadow-soft: 0 14px 34px rgb(0 0 0 / 24%);
+  color-scheme: dark;
+  --moksha-bg: #101411;
+  --moksha-bg-deep: #0b100d;
+  --moksha-ink: #edf3ed;
+  --moksha-muted: #9baaa0;
+  --moksha-placeholder: #7f8f85;
+  --moksha-line: #28352e;
+  --moksha-surface: #111915;
+  --moksha-surface-raised: #18221d;
+  --moksha-sidebar: rgb(18 24 20 / 90%);
+  --moksha-header: rgb(18 24 20 / 84%);
+  --moksha-modal: rgb(20 27 22 / 99%);
+  --moksha-settings-nav: rgb(14 20 16 / 94%);
+  --moksha-control: rgb(255 255 255 / 5%);
+  --moksha-glass: rgb(25 33 28 / 70%);
+  --moksha-glass-raised: rgb(255 255 255 / 8%);
+  --moksha-glass-line: rgb(222 235 225 / 13%);
+  --moksha-composer: rgb(24 31 27 / 94%);
+  --moksha-accent: #d7a060;
+  --moksha-accent-ink: #f0c58d;
+  --moksha-accent-soft: rgb(215 160 96 / 11%);
+  --moksha-accent-line: rgb(215 160 96 / 30%);
+  --moksha-primary: #d8b178;
+  --moksha-primary-ink: #1b211d;
+  --moksha-user-bubble: #264638;
+  --moksha-user-line: rgb(171 214 190 / 18%);
+  --moksha-user-ink: #f0f5f0;
+  --moksha-guide-mark: #d8b178;
+  --moksha-focus: #d7a060;
+  --moksha-focus-ring: rgb(215 160 96 / 16%);
+  --moksha-success: #7fc29d;
+  --moksha-success-soft: rgb(127 194 157 / 12%);
+  --moksha-warning: #e2ad60;
+  --moksha-error: #ef9292;
+  --moksha-error-soft: rgb(239 146 146 / 10%);
+  --moksha-error-line: rgb(239 146 146 / 26%);
+  --moksha-info: #81c3dc;
+  --moksha-info-soft: rgb(129 195 220 / 10%);
+  --moksha-disabled: #2b3731;
+  --moksha-shadow-composer: 0 1.2rem 3.8rem rgb(0 0 0 / 32%);
+  --moksha-shadow-modal: 0 2rem 6rem rgb(0 0 0 / 48%);
 }
 
 *,
@@ -46,17 +101,23 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#__nuxt {
+  height: 100%;
+}
+
 html {
-  color: var(--moksha-ink);
   background: var(--moksha-bg);
+  color: var(--moksha-ink);
+  font-family: var(--moksha-font);
+  font-synthesis: none;
 }
 
 body {
   margin: 0;
-  font-family:
-    "Aptos", "Aptos Display", "Segoe UI Variable Text", "Segoe UI",
-    "Nirmala UI", "Kohinoor Devanagari", "Noto Sans Devanagari", sans-serif;
-  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  text-rendering: optimizelegibility;
 }
 
 button,
@@ -64,19 +125,37 @@ input,
 textarea,
 select {
   font: inherit;
+  letter-spacing: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: var(--moksha-accent-soft);
+  color: var(--moksha-ink);
 }
 
 :focus-visible {
-  outline: 3px solid var(--moksha-focus);
+  outline: 2px solid var(--moksha-focus);
   outline-offset: 2px;
 }
 
-a {
-  color: var(--moksha-focus);
-}
-
-a:visited {
-  color: var(--moksha-accent);
+.sr-only {
+  border: 0;
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -86,5 +165,15 @@ a:visited {
     animation-duration: 0.01ms !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --moksha-sidebar: var(--moksha-surface);
+    --moksha-header: var(--moksha-surface);
+    --moksha-modal: var(--moksha-surface-raised);
+    --moksha-control: var(--moksha-surface-raised);
+    --moksha-composer: var(--moksha-surface-raised);
   }
 }

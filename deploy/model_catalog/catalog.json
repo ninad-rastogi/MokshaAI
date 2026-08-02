@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "architecture": "qwen3",
+      "context_window": 262144,
+      "download_url": "https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF/resolve/23e445b2cc85f3c5d711408144dd1f977b6e90e6/Qwen_Qwen3-4B-Instruct-2507-Q3_K_M.gguf",
+      "file": "Qwen_Qwen3-4B-Instruct-2507-Q3_K_M.gguf",
+      "id": "qwen3-4b-instruct-2507-q3-k-m",
+      "license": "apache-2.0",
+      "ollama": {
+        "num_ctx": 8192,
+        "num_predict": 1024,
+        "temperature": 0.2,
+        "template": "qwen3"
+      },
+      "quantization": "Q3_K_M",
+      "repo": "bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF",
+      "revision": "23e445b2cc85f3c5d711408144dd1f977b6e90e6",
+      "sha256": "35295e9a0a42eff5ebc592412c754991c0b6cc36bf4f282b2a491b211476752d",
+      "size": 2075618016
+    }
+  ],
+  "expires_at": "2027-07-30T00:00:00Z",
+  "issued_at": "2026-07-30T00:00:00Z",
+  "key_id": "moksha-catalog-2026-01",
+  "revoked_entry_ids": [],
+  "schema_version": 1,
+  "sequence": 1,
+  "version": "2026.07.30.1"
+}

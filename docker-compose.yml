@@ -4,11 +4,9 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-moksha}
       POSTGRES_USER: ${POSTGRES_USER:-moksha_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moksha_pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
     mem_limit: 1536m
     mem_reservation: 256m
     healthcheck:
@@ -29,7 +27,7 @@ services:
         "python manage.py migrate && exec uvicorn moksha.asgi:application --host 0.0.0.0 --port 8000 --proxy-headers",
       ]
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-docker-dev-key}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=False
       - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,django
       - DJANGO_SECURE_SSL_REDIRECT=False
@@ -37,16 +35,17 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-moksha}
       - POSTGRES_USER=${POSTGRES_USER:-moksha_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-moksha_pass}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       - OLLAMA_BASE_URL=${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-moksha-qwen3:4b-instruct-q3km}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
-      - HF_HOME=/models/huggingface
+      - EMBEDDING_SERVICE_URL=http://embedding:8010
       - REDIS_URL=redis://redis:6379/0
+      - MOKSHA_METRICS_TOKEN=${MOKSHA_METRICS_TOKEN:-}
+      - MOKSHA_BYOK_KEYRING_FILE=/run/secrets/byok-keyring.json
       - DJANGO_ENV=production
     mem_limit: 4g
-    mem_reservation: 1g
+    mem_reservation: 256m
     healthcheck:
       test:
         [
@@ -64,15 +63,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      embedding:
+        condition: service_healthy
     volumes:
       - ./data:/app/data
-      - type: bind
-        source: ${HF_HOME:-D:/Softwares/HuggingFace}
-        target: /models/huggingface
+      - ${MOKSHA_BYOK_KEYRING_HOST_FILE:-./deploy/runtime-secrets/byok-keyring.json}:/run/secrets/byok-keyring.json:ro
 
   worker:
     image: moksha-ai-app:${MOKSHA_IMAGE_TAG:-local}
-    command: celery -A moksha worker --loglevel=INFO --concurrency=1 -Q indexing,default
+    command: celery -A moksha worker --loglevel=INFO --concurrency=1 -Q indexing,operations,default
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=False
@@ -82,12 +81,36 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-moksha}
       - POSTGRES_USER=${POSTGRES_USER:-moksha_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-moksha_pass}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       - OLLAMA_BASE_URL=${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-moksha-qwen3:4b-instruct-q3km}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
-      - HF_HOME=/models/huggingface
+      - EMBEDDING_SERVICE_URL=http://embedding:8010
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      embedding:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    mem_limit: 5g
+    mem_reservation: 128m
+
+  scheduler:
+    image: moksha-ai-app:${MOKSHA_IMAGE_TAG:-local}
+    command: celery -A moksha beat --loglevel=INFO
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=False
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-moksha}
+      - POSTGRES_USER=${POSTGRES_USER:-moksha_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - OLLAMA_IMPORTS_DIR=/ollama-imports
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
@@ -95,12 +118,11 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./data:/app/data
       - type: bind
-        source: ${HF_HOME:-D:/Softwares/HuggingFace}
-        target: /models/huggingface
-    mem_limit: 5g
-    mem_reservation: 1g
+        source: ${OLLAMA_IMPORTS_DIR:-D:/Softwares/Ollama/Imports}
+        target: /ollama-imports
+    mem_limit: 512m
+    mem_reservation: 64m
 
   generation-worker:
     image: moksha-ai-app:${MOKSHA_IMAGE_TAG:-local}
@@ -114,12 +136,43 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-moksha}
       - POSTGRES_USER=${POSTGRES_USER:-moksha_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-moksha_pass}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       - OLLAMA_BASE_URL=${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-moksha-qwen3:4b-instruct-q3km}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
-      - HF_HOME=/models/huggingface
+      - EMBEDDING_SERVICE_URL=http://embedding:8010
+      - REDIS_URL=redis://redis:6379/0
+      - MOKSHA_BYOK_KEYRING_FILE=/run/secrets/byok-keyring.json
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      embedding:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ${MOKSHA_BYOK_KEYRING_HOST_FILE:-./deploy/runtime-secrets/byok-keyring.json}:/run/secrets/byok-keyring.json:ro
+    mem_limit: 4g
+    mem_reservation: 256m
+
+  model-installer:
+    image: moksha-ai-app:${MOKSHA_IMAGE_TAG:-local}
+    command: celery -A moksha worker --loglevel=INFO --concurrency=1 -Q model-installation
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=False
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - DJANGO_SECURE_SSL_REDIRECT=False
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-moksha}
+      - POSTGRES_USER=${POSTGRES_USER:-moksha_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - OLLAMA_BASE_URL=${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_IMPORTS_DIR=/ollama-imports
+      - MODEL_MIN_TOKENS_PER_SECOND=${MODEL_MIN_TOKENS_PER_SECOND:-20}
+      - MODEL_MAX_VRAM_BYTES=${MODEL_MAX_VRAM_BYTES:-4294967296}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
@@ -127,12 +180,11 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./data:/app/data
       - type: bind
-        source: ${HF_HOME:-D:/Softwares/HuggingFace}
-        target: /models/huggingface
-    mem_limit: 4g
-    mem_reservation: 1g
+        source: ${OLLAMA_IMPORTS_DIR:-D:/Softwares/Ollama/Imports}
+        target: /ollama-imports
+    mem_limit: 768m
+    mem_reservation: 64m
 
   embedding:
     image: moksha-ai-app:${MOKSHA_IMAGE_TAG:-local}
@@ -140,13 +192,26 @@ services:
     environment:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
       - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1024}
       - HF_HOME=/models/huggingface
     volumes:
       - type: bind
         source: ${HF_HOME:-D:/Softwares/HuggingFace}
         target: /models/huggingface
     mem_limit: 4g
-    mem_reservation: 1g
+    mem_reservation: 1536m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/ready', timeout=5)",
+        ]
+      interval: 20s
+      timeout: 8s
+      retries: 10
+      start_period: 120s
 
   redis:
     image: redis:7-alpine
@@ -168,7 +233,7 @@ services:
       - DJANGO_QUERY_TIMEOUT_SECONDS=${DJANGO_QUERY_TIMEOUT_SECONDS:-180}
     profiles: ["legacy-streamlit"]
     mem_limit: 768m
-    mem_reservation: 256m
+    mem_reservation: 128m
     depends_on:
       django:
         condition: service_healthy
@@ -183,7 +248,7 @@ services:
       django:
         condition: service_healthy
     mem_limit: 768m
-    mem_reservation: 256m
+    mem_reservation: 128m
 
   caddy:
     image: caddy:2-alpine
@@ -191,14 +256,18 @@ services:
       - "${CADDY_HTTPS_PORT:-8443}:8443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
     depends_on:
       django:
         condition: service_healthy
       nuxt:
         condition: service_started
     mem_limit: 256m
-    mem_reservation: 64m
+    mem_reservation: 32m
 
 volumes:
   pgdata:
   redisdata:
+  caddydata:
+  caddyconfig:

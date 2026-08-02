@@ -20,6 +20,7 @@ from users.models import User
 @pytest.mark.django_db
 def test_resolve_model_selection_uses_override_then_user_then_admin_default() -> None:
     user = User.objects.create_user(email="models@example.test", password="pass")
+    ModelProfile.objects.filter(is_admin_default=True).update(is_admin_default=False)
     admin_connection = ModelConnection.objects.create(
         name="Built-in Ollama",
         dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
@@ -61,6 +62,7 @@ def test_resolve_model_selection_uses_override_then_user_then_admin_default() ->
 @pytest.mark.django_db
 def test_resolve_model_selection_falls_back_to_admin_default() -> None:
     user = User.objects.create_user(email="default@example.test", password="pass")
+    ModelProfile.objects.filter(is_admin_default=True).update(is_admin_default=False)
     connection = ModelConnection.objects.create(
         name="Built-in Ollama",
         dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
@@ -106,7 +108,10 @@ def test_probe_connection_maps_openai_models_success(settings) -> None:
     fake_http = Mock()
     fake_http.getresponse.return_value = response
 
-    with patch("llm.providers.NoRedirectHTTPSConnection", return_value=fake_http):
+    with patch(
+        "llm.providers.NoRedirectHTTPSConnection",
+        return_value=fake_http,
+    ) as connection_class:
         result = probe_connection(connection)
 
     assert result.status == ModelConnection.Status.CONNECTED
@@ -114,6 +119,10 @@ def test_probe_connection_maps_openai_models_success(settings) -> None:
     fake_http.request.assert_called_once()
     _, path = fake_http.request.call_args.args[:2]
     assert path == "/v1/models"
+    assert connection_class.call_args.args[:2] == (
+        "api.example.com",
+        "93.184.216.34",
+    )
 
 
 def test_probe_connection_sanitizes_http_failure() -> None:
@@ -177,6 +186,47 @@ def test_openai_chat_completion_posts_safe_payload(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_openai_chat_completion_streams_deltas(settings) -> None:
+    settings.BYOK_MASTER_KEY = ""
+    connection = ModelConnection.objects.create(
+        name="Streaming OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        remote_data_consent_at=timezone.now(),
+    )
+    response = Mock()
+    response.status = 200
+    response.readline.side_effect = [
+        b'data: {"choices":[{"delta":{"content":"Hello "}}]}\n',
+        b'data: {"choices":[{"delta":{"content":"there"}}]}\n',
+        b'data: {"choices":[],"usage":{"total_tokens":5}}\n',
+        b"data: [DONE]\n",
+    ]
+    fake_http = Mock()
+    fake_http.getresponse.return_value = response
+    deltas: list[str] = []
+
+    with patch("llm.providers.NoRedirectHTTPSConnection", return_value=fake_http):
+        text, usage = openai_chat_completion(
+            connection=connection,
+            model="remote-model",
+            messages=[{"role": "user", "content": "Hello"}],
+            temperature=0.2,
+            max_output_tokens=128,
+            on_delta=deltas.append,
+        )
+
+    assert text == "Hello there"
+    assert deltas == ["Hello ", "there"]
+    assert usage == {"total_tokens": 5}
+    body = fake_http.request.call_args.kwargs["body"]
+    payload = json.loads(body.decode("utf-8"))
+    assert payload["stream"] is True
+    assert payload["stream_options"] == {"include_usage": True}
+
+
+@pytest.mark.django_db
 def test_openai_chat_completion_rejects_crlf_api_key(settings) -> None:
     settings.BYOK_MASTER_KEY = ""
     user = User.objects.create_user(email="crlf@example.test", password="pass")
@@ -190,15 +240,17 @@ def test_openai_chat_completion_rejects_crlf_api_key(settings) -> None:
         encrypted_api_key="not-used",
         api_key_nonce="not-used",
     )
-    with patch.object(connection, "get_api_key", return_value="sk-test\r\nbad: x"):
-        with pytest.raises(Exception):
-            openai_chat_completion(
-                connection=connection,
-                model="remote-model",
-                messages=[{"role": "user", "content": "Hello"}],
-                temperature=0.2,
-                max_output_tokens=128,
-            )
+    with (
+        patch.object(connection, "get_api_key", return_value="sk-test\r\nbad: x"),
+        pytest.raises(Exception),
+    ):
+        openai_chat_completion(
+            connection=connection,
+            model="remote-model",
+            messages=[{"role": "user", "content": "Hello"}],
+            temperature=0.2,
+            max_output_tokens=128,
+        )
 
 
 @pytest.mark.django_db

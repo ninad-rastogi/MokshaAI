@@ -53,9 +53,9 @@ class TestUserModel:
         user = User.objects.create_user(
             email="test@example.com",
             password="testpass123",
-            spiritual_name="Krishna Bhakta",
+            spiritual_name="Ananda",
         )
-        assert user.spiritual_name == "Krishna Bhakta"
+        assert user.spiritual_name == "Ananda"
 
     def test_user_without_spiritual_name(self):
         """Test user without spiritual name has empty string."""

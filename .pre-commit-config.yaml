@@ -28,3 +28,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^frontend/
+
+      - id: readme-validation
+        name: README boundary validation
+        entry: python scripts/validate_readmes.py --root . --warnings-as-errors
+        language: system
+        pass_filenames: false
+        always_run: true

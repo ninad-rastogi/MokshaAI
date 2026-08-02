@@ -20,9 +20,11 @@ from users.models import User
 
 
 def test_byok_encryption_fails_closed_without_master_key() -> None:
-    with override_settings(BYOK_MASTER_KEY="", BYOK_MASTER_KEY_FILE=""):
-        with pytest.raises(KeyUnavailable):
-            encrypt_secret("secret", b"aad")
+    with (
+        override_settings(BYOK_MASTER_KEY="", BYOK_MASTER_KEY_FILE=""),
+        pytest.raises(KeyUnavailable),
+    ):
+        encrypt_secret("secret", b"aad")
 
 
 def test_byok_round_trip_and_aad_binding(settings) -> None:
@@ -34,6 +36,34 @@ def test_byok_round_trip_and_aad_binding(settings) -> None:
     assert decrypt_secret(nonce, ciphertext, b"aad-1") == "sk-test"
     with pytest.raises(DecryptionFailed):
         decrypt_secret(nonce, ciphertext, b"aad-2")
+
+
+def test_byok_keyring_selects_explicit_versions(settings, tmp_path) -> None:
+    first = base64.urlsafe_b64encode(AESGCM.generate_key(256)).decode("ascii")
+    second = base64.urlsafe_b64encode(AESGCM.generate_key(256)).decode("ascii")
+    keyring = tmp_path / "byok-keyring.json"
+    keyring.write_text(
+        ('{"active_version":2,"keys":{"1":"' + first + '","2":"' + second + '"}}'),
+        encoding="utf-8",
+    )
+    settings.BYOK_KEYRING_FILE = str(keyring)
+    nonce, ciphertext = encrypt_secret("secret", b"v1", key_version=1)
+    assert (
+        decrypt_secret(
+            nonce,
+            ciphertext,
+            b"v1",
+            key_version=1,
+        )
+        == "secret"
+    )
+    with pytest.raises(DecryptionFailed):
+        decrypt_secret(
+            nonce,
+            ciphertext,
+            b"v1",
+            key_version=2,
+        )
 
 
 def test_public_endpoint_validation_blocks_private_hosts() -> None:

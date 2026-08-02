@@ -1,75 +1,70 @@
-# users/ — Authentication & User Management App
-
-This Django app handles **user registration, authentication, and profile management**.
-It replaces the old system that had no authentication at all.
+# Session Authentication And Accounts
 
 ## Purpose
 
-In the old codebase, there were no users — anyone could access everything. This app introduces:
-- User accounts with email-based login (no usernames)
-- JWT token authentication for API access
-- User profile management
-- Django admin integration for user management
+`users/` owns email-based accounts, browser session authentication, CSRF
+bootstrap, registration, profile settings, theme persistence, logout, health,
+and JWT compatibility for non-browser clients.
 
-## Files
+## Architecture And Data Flow
 
-### `models.py` — Custom User Model
-Defines `User` model extending Django's `AbstractUser`:
-- **Email as primary key**: `username = None`, `USERNAME_FIELD = "email"`
-- **Unique email**: `email = models.EmailField(unique=True)`
-- **Spiritual name**: Optional `spiritual_name` field for a user's spiritual identity
-- **Timestamps**: `created_at` auto-set on creation
-- This model is referenced by `AUTH_USER_MODEL = "users.User"` in settings
+Nuxt first obtains a CSRF cookie, then submits credentials to Django. Successful
+login or registration creates a Django session cookie. SSR and page refreshes
+recover identity through `/api/v1/auth/me/`; browser bearer tokens are never
+stored. JWT obtain/refresh routes remain separate for API clients.
 
-### `serializers.py` — DRF Serializers
-Two serializers:
-- **`UserSerializer`**: Read-only profile data (id, email, spiritual_name, created_at)
-- **`RegisterSerializer`**: Handles registration with password validation:
-  - Requires password + password_confirm (must match)
-  - Minimum 8 character password
-  - Creates user via `create_user()` (properly hashes password)
+## Files And Entrypoints
 
-### `views.py` — API Views
-Three views:
-- **`RegisterView`** (`POST /api/auth/register/`): Creates new user, returns user data.
-  No authentication required.
-- **`ProfileView`** (`GET/PUT /api/auth/me/`): Get or update current user profile.
-  Requires authentication.
-- **`HealthCheckView`** (`GET /api/auth/health/`): Returns `{"status": "ok"}`.
-  No authentication required. Used by Streamlit to check if backend is running.
+- `models.py`: custom email user and account preferences.
+- `serializers.py`: registration/profile validation and stable field errors.
+- `views.py`: session login/logout/register, CSRF, profile, and health.
+- `urls.py`: versioned auth routing.
+- `admin.py`: staff account management.
 
-### `urls.py` — URL Routes
-| URL | View | Name |
-|-----|------|------|
-| `register/` | `RegisterView` | `register` |
-| `login/` | `TokenRefreshView` (SimpleJWT) | `login` |
-| `refresh/` | `TokenRefreshView` (SimpleJWT) | `token-refresh` |
-| `me/` | `ProfileView` | `profile` |
-| `health/` | `HealthCheckView` | `health` |
+## Interfaces
 
-Note: Login uses SimpleJWT's built-in token obtain/refresh views.
+Browser routes include CSRF bootstrap, register, login, logout, and current
+profile. Duplicate registration returns a field-specific conflict that the UI
+can render as an existing-account message.
 
-### `admin.py` — Django Admin
-`CustomUserAdmin` configures the admin panel:
-- List display: email, spiritual_name, is_staff, created_at
-- Search: email, spiritual_name
-- Fieldsets organized for email-based auth (no username)
-- Add fieldsets for creating new users
+## Configuration
 
-### `apps.py`
-Django app configuration. Sets `verbose_name = "User Management"`.
+Configure secure session/CSRF cookie flags, trusted origins, allowed hosts,
+session lifetime, password validators, and HTTPS termination. Caddy must be the
+published origin in production.
+
+## Commands
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache pytest users/tests
+uv run --no-cache python manage.py createsuperuser
+```
 
 ## Tests
 
-### `tests/test_models.py`
-Tests for the User model:
-- Creating regular users and superusers
-- Email uniqueness enforcement
-- Spiritual name (optional field)
-- String representation
+Coverage includes refresh persistence, duplicate registration, invalid
+credentials, CSRF enforcement, logout, JWT compatibility, profile updates, and
+theme persistence.
 
-### `tests/test_views.py`
-Tests for API endpoints:
-- Registration (success, password mismatch, duplicate email)
-- Profile access (authenticated vs unauthenticated)
-- Health check endpoint
+## Dependencies
+
+Django auth, DRF, SimpleJWT, PostgreSQL, Nuxt session clients, and Caddy.
+
+## Security
+
+Passwords use Django hashing and validation. Sessions are HttpOnly and secure in
+production. State-changing browser requests require CSRF. Responses never reveal
+whether unrelated accounts exist beyond the explicit registration conflict.
+
+## Failure Modes And Troubleshooting
+
+- Refresh logs out: inspect session cookie domain, Secure/SameSite, and Caddy URL.
+- CSRF failure: obtain the CSRF cookie and send `X-CSRFToken` on mutations.
+- Duplicate registration: sign in or recover the existing account.
+- Health fails: verify Django DB readiness rather than only process liveness.
+
+## Related Docs
+
+See `../frontend/README.md`, `../moksha/README.md`, `../deploy/README.md`, and
+`../tests/README.md`.

@@ -4,7 +4,9 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from llm.views import (
+    ModelCatalogViewSet,
     ModelConnectionViewSet,
+    ModelInstallationJobViewSet,
     ModelProfileViewSet,
     UserModelPreferenceViewSet,
 )
@@ -12,7 +14,13 @@ from llm.views import (
 app_name = "llm"
 
 router = DefaultRouter()
+router.register("catalog", ModelCatalogViewSet, basename="model-catalog")
 router.register("connections", ModelConnectionViewSet, basename="model-connection")
+router.register(
+    "installations",
+    ModelInstallationJobViewSet,
+    basename="model-installation",
+)
 router.register("profiles", ModelProfileViewSet, basename="model-profile")
 router.register("preferences", UserModelPreferenceViewSet, basename="model-preference")
 

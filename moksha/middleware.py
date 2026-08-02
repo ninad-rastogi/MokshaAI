@@ -1,6 +1,9 @@
 """Request correlation for API logs and client troubleshooting."""
 
+import logging
 import uuid
+
+logger = logging.getLogger("moksha.request")
 
 
 class RequestIDMiddleware:
@@ -15,4 +18,11 @@ class RequestIDMiddleware:
         request.request_id = request.META.get(self.header_name, str(uuid.uuid4()))
         response = self.get_response(request)
         response["X-Request-ID"] = request.request_id
+        logger.info(
+            "%s %s %s",
+            request.method,
+            request.path,
+            response.status_code,
+            extra={"request_id": request.request_id},
+        )
         return response

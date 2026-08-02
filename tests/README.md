@@ -1,70 +1,71 @@
-# tests/ — Test Suite
-
-This directory contains the **test suite** for Moksha AI. Tests are written using
-`pytest` with `pytest-django` for database support.
+# Test And Evaluation Suite
 
 ## Purpose
 
-The test suite covers:
-- **Model tests**: Verify database models work correctly (creation, validation, relationships)
-- **View tests**: Verify API endpoints return correct responses
-- **Integration tests**: End-to-end flows (register → login → chat → verify)
-- **RAG tests**: Query routing, embedding search, chunking logic
+`tests/` holds cross-app integration, browser, and versioned model-evaluation
+coverage. App-local unit tests stay beside their owning Django app.
 
-## Files
+## Architecture And Data Flow
 
-### `conftest.py` — Shared Fixtures
+Backend tests use ephemeral PostgreSQL/PgVector fixtures and Redis/Celery where
+the contract requires them. Browser tests exercise Caddy-facing session and
+CSRF flows. LLM evaluations use versioned cases for routing, grounding,
+citations, unsupported claims, safety, and multilingual context.
 
-Defines pytest fixtures used across all test files:
+## Files And Entrypoints
 
-- **`api_client`**: Unauthenticated DRF `APIClient` instance
-- **`create_user`**: Factory fixture that creates User instances with given email/password
-- **`authenticated_client`**: Returns a tuple of `(APIClient, User)` where the client
-  has valid JWT authentication. Registers, logs in, and sets the Authorization header.
+- `e2e/`: deterministic browser/API journeys.
+- `integration/`: cross-service backend flows.
+- `evals/`: versioned LLM evaluation data and runners when present.
+- `conftest.py`: shared fixtures and environment setup.
 
-### `integration/test_chat_flow.py` — End-to-End Flow Test
+## Interfaces
 
-Tests the complete user journey:
-1. Register a new account
-2. Login and get JWT token
-3. Get user profile
-4. Create a new chat
-5. List chats
-6. Submit a query (gets placeholder response)
-7. Verify chat has messages
-8. Rename the chat
-9. Delete the chat
+Tests call public APIs whenever possible. Lower-level tests may use application
+services and ports to isolate provider, retrieval, persistence, and event
+behavior.
 
-## Running Tests
+## Configuration
 
-```bash
-# All tests
-pytest
+`moksha.settings_test` supplies test defaults. Real integration runs still need
+PostgreSQL with the `vector` extension and Redis. Never point tests at
+production data.
 
-# With coverage
-pytest --cov=. --cov-report=html
+## Commands
 
-# Stop on first failure
-pytest -x
-
-# Specific test file
-pytest users/tests/test_models.py
-
-# Specific test class
-pytest users/tests/test_views.py::TestRegisterView
-
-# Specific test
-pytest users/tests/test_models.py::TestUserModel::test_create_user
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv run --no-cache pytest
+uv run --no-cache pytest tests/e2e -m e2e
 ```
 
-## Test Database
+Frontend gates run from `frontend/` with `npm run test` and the Playwright
+walkthrough described in `frontend/README.md`.
 
-pytest-django automatically creates a test database (prefixed with `test_`) for each
-test run. No need to configure a separate test database.
+## Tests
 
-## Adding New Tests
+Required release evidence includes unit tests, real database/queue integration,
+deterministic browser E2E, accessibility checks, model evaluations, and a real
+Compose/Caddy/Ollama qualification.
 
-1. Create test file in the appropriate `tests/` subdirectory
-2. Use `@pytest.mark.django_db` for tests that need database access
-3. Import fixtures from `conftest.py` as function parameters
-4. Follow the naming convention: `test_<what_is_being_tested>`
+## Dependencies
+
+pytest, pytest-django, pytest-asyncio, Playwright, Django, PostgreSQL/PgVector,
+Redis, Celery, and configured model services.
+
+## Security
+
+Fixtures use synthetic accounts and secrets. Logs, snapshots, and reports must
+not contain API keys, session cookies, or personal data.
+
+## Failure Modes And Troubleshooting
+
+- `type "vector" does not exist`: install/enable PgVector in the test database.
+- Redis/Celery timeout: verify worker queue names and isolated Redis database.
+- Browser auth failure: verify HTTPS origin, CSRF cookie, and Caddy trust.
+- Model eval drift: record model/catalog versions before accepting new baselines.
+
+## Related Docs
+
+See `../README.md`, `../frontend/README.md`, `../deploy/README.md`, and
+`../operations/README.md`.

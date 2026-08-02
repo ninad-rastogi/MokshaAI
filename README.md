@@ -1,220 +1,211 @@
-# 🕉️ Moksha AI — Vedic Spiritual Guide
+<!-- moksha-readme-boundary:v1 -->
+# Moksha AI
 
-A sophisticated AI-powered chatbot that serves as your spiritual companion, deeply rooted in
-Hindu Vedic wisdom and sacred scriptures. Moksha AI provides meaningful spiritual conversations,
-quotes authentic shlokas with Sanskrit text and Hindi translations, and answers questions based
-strictly on sacred texts stored in its knowledge base.
+## Purpose
 
-## ✨ Features
+Moksha AI is a self-hosted spiritual guidance product for difficult moments.
+It listens without judgment, retrieves relevant teachings from an expandable
+library of Indian spiritual texts, and keeps cited evidence separate from its
+own counsel. No product path assumes one scripture, teacher, dialogue, or PDF.
 
-- **📚 Scripture-Based RAG**: Answers grounded in authentic Vedic texts using
-  Retrieval-Augmented Generation
-- **🔍 Page-Level Citations**: Precise references with scripture name, page number, and text
-  previews
-- **👤 User Authentication**: JWT-based registration and login system
-- **💬 Smart Chat Management**: Sidebar with chat history, rename, delete, and auto-naming
-- **🌍 Multilingual Embeddings**: Uses `BAAI/bge-m3` model optimized for mixed
-  Sanskrit/Hindi/English content
-- **📖 Scripture Auto-Discovery**: Automatically detects and indexes PDF scriptures from
-  organized folders
-- **🎯 Intelligent Query Routing**: LLM classifies queries into Scripture, Guidance, or Casual
-  categories
-- **📊 Django Admin Panel**: Manage users, scriptures, chat logs, and volumes from a web
-  interface
-- **🐳 Docker-Ready**: Compose setup for Django + PostgreSQL/PgVector + Streamlit
+Nuxt is the primary client. Legacy Streamlit remains behind an opt-in Compose
+profile until real Caddy, recovery, accessibility, and cited-RAG parity gates
+pass; its later removal must be one atomic change.
 
-## 🏗️ Architecture
+## Architecture And Data Flow
 
-```
-┌──────────────────┐      HTTP/REST       ┌──────────────────┐
-│   Streamlit UI    │ ◄──────────────────► │  Django + DRF     │
-│   (Frontend)      │    JWT Bearer Tokens │  (Backend + API)  │
-└──────────────────┘                       └────────┬─────────┘
-                                                    │
-                         ┌─────────────────────────┼──────────────────┐
-                         ▼                         ▼                  ▼
-                  ┌──────────────┐          ┌──────────────┐   ┌────────────┐
-                  │  PostgreSQL   │          │   PgVector   │   │   Ollama   │
-                  │  (users,      │          │  (embeddings │   │  (LLM:     │
-                  │   chats,      │          │   stored as   │   │  llama3)   │
-                  │   messages,   │          │   vectors in  │   │            │
-                  │   metadata)   │          │   PostgreSQL) │   │            │
-                  └──────────────┘          └──────────────┘   └────────────┘
+```text
+Browser
+  |
+  | HTTPS, Django session cookie, CSRF
+  v
+Caddy (only published port)
+  |-- /api/v1/*, /admin/*, /static/* --> Django 6 + DRF + Uvicorn
+  `-- everything else ----------------> Nuxt 4 SSR
+
+Django --> PostgreSQL + PgVector     durable product and retrieval state
+       --> Redis Streams             one-hour typed SSE replay
+       --> Celery generation queue   durable, disconnect-safe generation
+       --> Celery indexing queue     candidate index build and qualification
+       --> Celery operations queue   recovery, disk, and cleanup jobs
+       --> private FastAPI sidecar    one BGE-M3 owner
+       --> Windows-host Ollama        local generation
+       --> public HTTPS providers     consented encrypted BYOK connections
 ```
 
-**Key Design Decisions:**
-- **Django** handles authentication, ORM, admin panel, and REST API (via DRF)
-- **PgVector** (PostgreSQL extension) replaces ChromaDB — single database for all data
-- **BAAI/bge-m3** embedding model handles mixed Sanskrit/Hindi/English content better than
-  the old distiluse model
-- **Semantic chunking** splits PDF pages into shloka, translation, and narration chunks
-- **Streamlit** is a pure HTTP client — it calls Django REST API for all operations
+Each request uses one durable `GenerationRun` and at most two immutable
+`GenerationAttempt` records. Typed events are `state`, `delta`, `citation`,
+`usage`, `error`, and `done`. Browser disconnect does not stop generation;
+explicit cancellation does. Fallback is allowed only before first token.
 
-## 🚀 Quick Start
+Indexing discovers every first-level directory containing PDFs, including
+nested volume directories. It builds an immutable candidate version, qualifies
+counts and real retrieval, then activates transactionally while retaining the
+prior complete version for rollback.
 
-### Prerequisites
+## Files And Entrypoints
 
-1. **Python 3.14.6** managed by uv (virtual environment at `D:\Ninad\Python\.env`)
-2. **PostgreSQL 16+** with PgVector extension
-3. **Ollama** installed and running locally
-   ```bash
-   ollama list
-   # The default local model is imported as:
-   # moksha-qwen3:4b-instruct-q3km
-   ```
+- `frontend/`: Nuxt 4, Vue 3, strict TypeScript product UI.
+- `moksha/`: Django settings, ASGI, logging, middleware, CLI, operations.
+- `users/`: session/CSRF auth, JWT compatibility, account settings.
+- `chat/`: chats, messages, generation lifecycle, SSE, citations, routing.
+- `chat/rag/`: PDF discovery, chunking, retrieval, embedding, prompts.
+- `scriptures/`: immutable index versions, jobs, qualification, rollback.
+- `llm/`: providers, profiles, preferences, catalog, local installation.
+- `embedding_service/`: private single-process BGE-M3 FastAPI service.
+- `deploy/`: Caddy and signed local-model catalog assets.
+- `operations/`: backup, restore, rotation, recovery, incident procedures.
+- `scripts/`: maintenance, generation, benchmark, and audit tools.
+- `tests/`: cross-service, browser, operations, and model evaluations.
+- `PRODUCT.md`: product intent and safety boundaries.
+- `DESIGN.md`: interaction, responsive, visual, accessibility contract.
 
-### Setup Steps
+## Interfaces
 
-1. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your PostgreSQL credentials
-   ```
+Canonical APIs live under `/api/v1/`. Important contracts:
 
-2. **Create the database:**
-   ```bash
-   createdb moksha
-   psql moksha -c "CREATE EXTENSION IF NOT EXISTS vector;"
-   ```
+- `POST /api/v1/auth/session/login/` and `/session/logout/`
+- `GET /api/v1/auth/me/` and `/csrf/`
+- `GET|POST /api/v1/chats/`
+- `GET|PATCH|DELETE /api/v1/chats/{chat_id}/`
+- `GET /api/v1/chats/{chat_id}/messages/`
+- `POST /api/v1/chats/{chat_id}/runs/` with `Idempotency-Key`
+- `GET /api/v1/runs/{run_id}/`
+- `GET /api/v1/runs/{run_id}/events/` with `Last-Event-ID`
+- `POST /api/v1/runs/{run_id}/cancel/`
+- `/api/v1/models/*` for profiles, preferences, connections, installs
+- `/api/v1/scriptures/*` for status, versions, reindex, rollback
 
-3. **Install dependencies with uv:**
-   ```bash
-   # PowerShell
-   $env:UV_PROJECT_ENVIRONMENT = "D:\Ninad\Python\.env"
-   uv sync --locked --extra dev --python 3.14.6
-   ```
+Browser code never stores bearer tokens. JWT remains for non-browser clients.
+`frontend/openapi.json` contains canonical v1 REST routes; generated types live
+in `frontend/types/openapi.d.ts`. SSE decoding stays handwritten and validated.
 
-4. **Run migrations:**
-   ```bash
-   python manage.py migrate
-   ```
+## Configuration
 
-5. **Add scripture PDFs:**
-   ```
-   data/docs/
-   └── Mahabharata/
-       ├── Mahabharata Volume 1.pdf
-       ├── Mahabharata Volume 2.pdf
-       └── ... (Volumes 3-6)
-   ```
+Use Python 3.14 through `uv` and the required environment:
 
-6. **Index scriptures:**
-   ```bash
-   python manage.py discover_scriptures
-   ```
-
-7. **Start Django backend:**
-   ```bash
-   python manage.py runserver
-   ```
-
-8. **Start Streamlit frontend (new terminal):**
-   ```bash
-   streamlit run streamlit_ui/main_app.py
-   ```
-
-9. **Open browser:** Navigate to `http://localhost:8501`
-
-## 📁 Project Structure & Documentation
-
-Each major folder has a detailed README explaining its contents:
-
-| Folder | README | Description |
-|--------|--------|-------------|
-| `moksha/` | [moksha/README.md](moksha/README.md) | Django project settings, URL routing, WSGI/ASGI config |
-| `users/` | [users/README.md](users/README.md) | Custom User model, JWT auth, registration/login API |
-| `chat/` | [chat/README.md](chat/README.md) | Chat/Message models, API views, RAG engine, management commands |
-| `scriptures/` | [scriptures/README.md](scriptures/README.md) | Scripture/Volume models, auto-discovery, admin |
-| `chat/rag/` | [chat/rag/README.md](chat/rag/README.md) | RAG engine, PgVector store, PDF loader, semantic chunker |
-| `streamlit_ui/` | [streamlit_ui/README.md](streamlit_ui/README.md) | Streamlit frontend, API client, UI components |
-| `tests/` | [tests/README.md](tests/README.md) | Test structure, fixtures, integration tests |
-| `docs/` | [docs/README.md](docs/README.md) | Architecture, API reference, deployment guides |
-
-## 🎯 Usage Examples
-
-### API Endpoints
-
-| Endpoint | Method | Description | Auth |
-|----------|--------|-------------|------|
-| `/api/auth/register/` | POST | Create new account | No |
-| `/api/auth/login/` | POST | Get JWT tokens | No |
-| `/api/auth/refresh/` | POST | Refresh JWT token | No |
-| `/api/auth/me/` | GET/PUT | Get/update profile | Yes |
-| `/api/auth/health/` | GET | Health check | No |
-| `/api/chat/` | GET | List user's chats | Yes |
-| `/api/chat/` | POST | Create new chat | Yes |
-| `/api/chat/<id>/` | GET | Get chat with messages | Yes |
-| `/api/chat/<id>/` | DELETE | Delete chat | Yes |
-| `/api/chat/<id>/query/` | POST | Submit query, get AI response | Yes |
-| `/api/chat/<id>/rename/` | PATCH | Rename chat | Yes |
-| `/api/scriptures/` | GET | List scriptures | Yes |
-| `/api/scriptures/<id>/` | GET | Scripture details | Yes |
-| `/api/scriptures/<id>/reindex/` | POST | Trigger re-indexing | Yes |
-
-### Example Questions
-
-- "What does the Mahabharata say about dharma?"
-- "How can I find inner peace according to Vedic wisdom?"
-- "Quote a shloka about karma from the scriptures"
-- "What is the purpose of meditation?"
-
-## ⚙️ Key Configuration
-
-| Setting | Default | Location |
-|---------|---------|----------|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | `.env` |
-| `OLLAMA_MODEL` | `moksha-qwen3:4b-instruct-q3km` | `.env` |
-| `EMBEDDING_MODEL` | `BAAI/bge-m3` | `.env` |
-| `EMBEDDING_DEVICE` | `cpu` | `.env` |
-| `POSTGRES_DB` | `moksha` | `.env` |
-| `DJANGO_SECRET_KEY` | (generated) | `.env` |
-| `DJANGO_API_URL` | `http://localhost:8000` | `.env` |
-
-## 🔧 Code Quality
-
-```bash
-make format        # Format code with black
-make lint          # Run flake8 and black --check
-make test          # Run pytest with coverage
-make help          # Show all available commands
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+$env:UV_CACHE_DIR = (Resolve-Path '.tmp\uv-cache').Path
 ```
 
-## 🧪 Testing
+Create runtime secrets once, then load
+`deploy/runtime-secrets/runtime.env` for Compose:
 
-```bash
-pytest                              # All tests
-pytest --cov=. --cov-report=html    # With coverage report
-pytest -x                           # Stop on first failure
-pytest users/tests/                 # Users app tests only
-pytest chat/tests/                  # Chat app tests only
+```powershell
+.\scripts\generate_runtime_secrets.ps1
+Get-Content .\deploy\runtime-secrets\runtime.env
 ```
 
-## 🐳 Docker Deployment
+Never regenerate a BYOK keyring after storing remote keys. Back up keyring and
+runtime environment in an encrypted secret store separate from DB backups.
+See `.env.example` and `operations/README.md` for all settings and rotation.
 
-```bash
-docker-compose up --build    # Start all services
-docker-compose up db         # Start only PostgreSQL
-docker-compose up django     # Start only Django
-docker-compose up streamlit  # Start only Streamlit
+## Commands
+
+Install locked dependencies without replacing unrelated packages in the shared
+environment:
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
+uv sync --locked --inexact --extra dev --extra model-setup
+Push-Location frontend
+npm ci
+npm run generate:types
+Pop-Location
 ```
 
-## 📝 Development Workflow
+Start production-shaped local services and open `https://localhost:8443`:
 
-1. **Model changes:** Edit `models.py` → `python manage.py makemigrations` → `python manage.py migrate`
-2. **New management command:** Add to `management/commands/` → `python manage.py <command>`
-3. **New API endpoint:** Add to `views.py` + `urls.py` → test via DRF browsable API at `http://localhost:8000/api/`
-4. **Re-index scriptures:** Add PDFs to `data/docs/<ScriptureName>/` → `python manage.py discover_scriptures`
+```powershell
+docker compose up --build -d
+docker compose ps
+```
 
-## 📄 License
+Index every discovered collection and optionally scan host hardware:
 
-MIT License. Please respect the sacred nature of the scriptures and use this tool with reverence.
+```powershell
+uv run python manage.py discover_scriptures
+uv run moksha setup model scan --context-length 8192
+uv run python scripts/benchmark_ollama.py --models <qualified-ollama-tag>
+```
 
-## 🙏 Acknowledgments
+## Tests
 
-- Built with Django, Django REST Framework, Streamlit, LlamaIndex, and LangChain
-- Powered by Ollama for local LLM inference
-- Inspired by the timeless wisdom of Vedic texts
+Core gates:
 
----
+```powershell
+uv run black --check .
+uv run ruff check .
+uv run mypy moksha users chat scriptures llm embedding_service scripts
+uv run python manage.py check --deploy
+uv run python manage.py makemigrations --check --dry-run
+uv run pytest
 
-**May this tool serve your spiritual journey. Om Shanti. 🕉️**
+Push-Location frontend
+npm run format
+npm run lint
+npm run stylelint
+npm run typecheck
+npm run test
+npm run build
+Pop-Location
+```
+
+Primary Compose publishes only Caddy. Host integration tests can add the
+loopback-only PostgreSQL override:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db redis
+$env:POSTGRES_PORT = '55432'
+$env:REDIS_URL = 'redis://localhost:56379/0'
+uv run pytest
+```
+
+Release evidence also needs live Chrome and axe walkthroughs, real
+Compose/Caddy/Ollama qualification, multilingual LLM evaluations, restart
+recovery, backup/restore, secret-loss drills, and measured memory.
+
+## Dependencies
+
+Runtime uses Django 6, DRF, Uvicorn, PostgreSQL/PgVector, Redis, Celery,
+FastAPI, BGE-M3, Ollama or compatible providers, Nuxt 4, Vue 3, Nuxt UI 4,
+and Caddy. Python is locked in `uv.lock`; frontend in
+`frontend/package-lock.json`.
+
+WhichLLM is optional Windows-host setup code. Django containers never import
+it or scan hardware. BGE-M3 belongs only to private embedding service.
+
+## Security
+
+Caddy is sole published Compose port. Browser auth uses secure session cookies
+and CSRF. Raw HTML is disabled in Markdown and rendered output is sanitized.
+
+BYOK keys use versioned AES-256-GCM with AAD binding to user and connection.
+Custom endpoints require explicit consent and public HTTPS. Requests pin
+validated DNS, reject private and metadata ranges, disable redirects and proxy
+inheritance, cap ports/time/body, and allow only safe headers. Logs and errors
+expose stable sanitized codes, never secrets or exception strings.
+
+Safety routing fails closed and never invents scripture evidence. Missing
+qualified evidence produces an honest no-evidence response. Spiritual guidance
+is not emergency, medical, legal, or financial authority.
+
+## Failure Modes And Troubleshooting
+
+- Refresh signs out: verify Caddy origin, session and CSRF cookies, and
+  `/api/v1/auth/me/`; never fall back to browser bearer storage.
+- `type "vector" does not exist`: enable PgVector in actual test database.
+- Generation stays queued: inspect generation worker, Redis, durable run state.
+- Embedding is unready: inspect model cache, disk, memory, and sidecar logs.
+- Local generation fails: verify host Ollama and exact enabled profile tag.
+- BYOK decrypt fails: restore matching keyring before rewrap. DB-only backup
+  cannot recover encrypted keys.
+- Local HTTPS is blocked: narrowly trust Caddy CA. Never disable Kaspersky or
+  create broad endpoint-protection exclusions.
+- `docker compose down -v` destroys DB and index volumes. Never use for restart.
+
+## Related Docs
+
+Read `PRODUCT.md` and `DESIGN.md` first. See `operations/README.md` for runbooks,
+`deploy/README.md` for topology, and each service/domain README listed above.

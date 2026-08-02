@@ -23,7 +23,23 @@ class ScriptureDocumentLoader:
     def __init__(self, docs_dir: Path | None = None):
         self.docs_dir = docs_dir or settings.DOCS_DIR
         self.chunker = ScriptureChunker()
-        self.available_scriptures = self._scan_scriptures()
+
+    @property
+    def available_scriptures(self) -> list[str]:
+        """Return current PDF collections without requiring a process restart."""
+        return self._scan_scriptures()
+
+    @staticmethod
+    def _pdf_files(collection_path: Path) -> list[Path]:
+        """Return regular PDFs from every volume folder in one collection."""
+        return sorted(
+            (
+                path
+                for path in collection_path.rglob("*.pdf")
+                if path.is_file() and not path.is_symlink()
+            ),
+            key=lambda path: str(path.relative_to(collection_path)).casefold(),
+        )
 
     def _scan_scriptures(self) -> list[str]:
         """Scan docs directory for scripture folders."""
@@ -33,11 +49,13 @@ class ScriptureDocumentLoader:
             logger.warning(f"Docs directory not found: {self.docs_dir}")
             return scriptures
 
-        for item in self.docs_dir.iterdir():
-            if item.is_dir() and any(item.glob("*.pdf")):
+        for item in sorted(
+            self.docs_dir.iterdir(), key=lambda path: path.name.casefold()
+        ):
+            if item.is_dir() and not item.is_symlink() and self._pdf_files(item):
                 scriptures.append(item.name)
 
-        logger.info(f"Found scriptures: {', '.join(scriptures)}")
+        logger.info("Discovered %d scripture collections", len(scriptures))
         return scriptures
 
     def load_all(self) -> list[dict[str, Any]]:
@@ -55,7 +73,7 @@ class ScriptureDocumentLoader:
             scripture_path = self.docs_dir / scripture_name
             logger.info(f"Loading scripture: {scripture_name}")
 
-            pdf_files = sorted(scripture_path.glob("*.pdf"))
+            pdf_files = self._pdf_files(scripture_path)
 
             for pdf_path in pdf_files:
                 chunks = self._load_pdf(pdf_path, scripture_name)
@@ -74,7 +92,7 @@ class ScriptureDocumentLoader:
             return []
 
         all_chunks: list[dict[str, Any]] = []
-        for pdf_path in sorted(scripture_path.glob("*.pdf")):
+        for pdf_path in self._pdf_files(scripture_path):
             chunks = self._load_pdf(pdf_path, scripture_name)
             all_chunks.extend(chunks)
 
@@ -106,8 +124,8 @@ class ScriptureDocumentLoader:
 
             pdf_doc.close()
 
-        except Exception as e:
-            logger.error(f"Error loading PDF {pdf_path}: {e}")
+        except Exception:
+            logger.exception("Could not load PDF %s", pdf_path.name)
 
         return chunks
 
@@ -120,6 +138,6 @@ class ScriptureDocumentLoader:
         summary: dict[str, int] = {}
         for scripture_name in self.available_scriptures:
             scripture_path = self.docs_dir / scripture_name
-            pdf_count = len(list(scripture_path.glob("*.pdf")))
+            pdf_count = len(self._pdf_files(scripture_path))
             summary[scripture_name] = pdf_count
         return summary
