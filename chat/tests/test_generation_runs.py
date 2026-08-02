@@ -214,6 +214,75 @@ def test_generation_run_falls_back_before_delta(create_user):
 
 
 @pytest.mark.django_db
+def test_generation_run_replaces_invented_source_claim(create_user):
+    user = create_user(email="grounding-guard@example.test")
+    ModelProfile.objects.filter(is_admin_default=True).update(is_admin_default=False)
+    chat = Chat.objects.create(user=user)
+    connection = ModelConnection.objects.create(
+        name="Built-in Ollama guard",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Guarded Profile",
+        connection=connection,
+        model_id="guard-model",
+        is_enabled=True,
+        is_admin_default=True,
+    )
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="grounding-guard",
+        prompt="How can I act without resentment?",
+        model_profile=str(profile.pk),
+        stream_key=f"generation:{chat.id}:grounding-guard",
+    )
+    sources = [
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "excerpt": "Exact source passage.",
+        }
+    ]
+
+    def fake_generate(**_kwargs):
+        return (
+            "Fake answer. (From The Book of Life, File: Wisdom, Page 34)",
+            sources,
+            "RAG",
+        )
+
+    emitted_events = []
+
+    def fake_publish(_stream_key, event_type, payload):
+        emitted_events.append((event_type, payload))
+        return f"{len(emitted_events)}-0"
+
+    with (
+        patch("chat.tasks.resolve_model_selection") as resolve,
+        patch("chat.tasks.publish_run_event", side_effect=fake_publish),
+        patch("chat.tasks._generate_response", side_effect=fake_generate),
+    ):
+        resolve.return_value.attempts = (profile,)
+        generate_chat_response(str(run.pk))
+
+    run.refresh_from_db()
+    message = Message.objects.get(chat=chat, role="assistant")
+    delta_payloads = [
+        payload["text"]
+        for event_type, payload in emitted_events
+        if event_type == "delta"
+    ]
+    assert run.state == GenerationRun.State.COMPLETED
+    assert "The Book of Life" not in message.content
+    assert "Exact source passage." in message.content
+    assert all("The Book of Life" not in payload for payload in delta_payloads)
+
+
+@pytest.mark.django_db
 def test_generation_run_does_not_fallback_after_first_delta(create_user):
     user = create_user(email="no-late-fallback@example.test")
     ModelProfile.objects.filter(is_admin_default=True).update(is_admin_default=False)

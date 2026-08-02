@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from chat.citations import validate_citations
+from chat.citations import enforce_grounded_response, validate_citations
 from chat.events import publish_run_event
 from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
@@ -165,7 +165,7 @@ def _generate_response(
         response_text, sources = engine.query_with_rag(
             run.prompt,
             recent_messages,
-            on_delta=on_delta,
+            on_delta=None,
         )
         mode = "RAG"
     else:
@@ -264,12 +264,18 @@ def _generate_remote_provider_response(
         context_parts = []
         sources = []
         for index, chunk in enumerate(chunks):
-            context_parts.append(f"[Context {index + 1}]\n{chunk['text']}\n")
+            scripture = chunk.get("scripture", "Unknown")
+            file_name = chunk.get("file_name", "Unknown")
+            page = chunk.get("page", "N/A")
+            context_parts.append(
+                f"[Source {index + 1}: {scripture}, {file_name}, p. {page}]\n"
+                f"{chunk['text']}\n"
+            )
             sources.append(
                 {
-                    "scripture": chunk.get("scripture", "Unknown"),
-                    "page": chunk.get("page", "N/A"),
-                    "file_name": chunk.get("file_name", "Unknown"),
+                    "scripture": scripture,
+                    "page": page,
+                    "file_name": file_name,
                     "score": chunk.get("score", 0.0),
                     "excerpt": (
                         chunk["text"][:200] + "..."
@@ -282,7 +288,15 @@ def _generate_remote_provider_response(
             "Based ONLY on the following scripture context, answer the user's "
             f"question.\n\nScripture Context:\n{'\n'.join(context_parts)}\n\n"
             f"User Question: {run.prompt}\n\n"
-            "Cite every factual scripture claim inline as [Scripture, file, p. N]."
+            "Instructions:\n"
+            "- Start with a section named 'Source verse' and include one exact "
+            "quotation copied from the context.\n"
+            "- If the exact quotation is Sanskrit or Devanagari, preserve it "
+            "exactly and then translate it.\n"
+            "- Add sections named 'Meaning' and 'Guidance'.\n"
+            "- Cite every factual scripture claim inline as [Scripture, file, p. N].\n"
+            "- Never cite, name, or invent a scripture, book, file, page, chapter, "
+            "or verse that is not in the provided context source labels."
         )
         mode = "RAG"
     else:
@@ -300,7 +314,7 @@ def _generate_remote_provider_response(
         ),
         temperature=spec.temperature,
         max_output_tokens=spec.max_output_tokens,
-        on_delta=on_delta,
+        on_delta=None if mode == "RAG" else on_delta,
     )
     spec.snapshot["reported_usage"] = usage
     return response_text, sources, mode
@@ -417,6 +431,7 @@ def generate_chat_response(self, run_id: str) -> None:
                 on_delta=on_delta,
             )
             sources = cast(list[dict[str, Any]], validate_citations(sources))
+            response_text = enforce_grounded_response(response_text, sources)
             if not emitted_any and response_text:
                 on_delta(response_text)
             run.refresh_from_db(fields=["state"])

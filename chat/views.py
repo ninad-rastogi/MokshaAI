@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from chat.citations import validate_citations
+from chat.citations import enforce_grounded_response, validate_citations
 from chat.events import format_sse, publish_run_event, redis_client
 from chat.models import Chat, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
@@ -247,6 +247,7 @@ class ChatViewSet(viewsets.ViewSet):
                 sources = []
                 mode = "GENERAL"
             sources = cast(list[dict[str, Any]], validate_citations(sources))
+            response_text = enforce_grounded_response(response_text, sources)
 
         except Exception:
             logger.exception("RAG engine error")
