@@ -78,11 +78,15 @@ describe("app shell", () => {
     expect(profileLoad).toBeGreaterThan(-1);
     expect(preferenceLoad).toBeGreaterThan(profileLoad);
     expect(appPage).toContain("activeModelReady");
-    expect(composerComponent).toContain("modelReady");
+    expect(appPage).toContain("connectionStatusText");
+    expect(composerComponent).not.toContain("modelLabel");
   });
 
   it("keeps the closed mobile drawer inert and exposes its shortcut", () => {
     expect(sidebarComponent).toContain(':inert="isMobile && !open"');
+    expect(sidebarComponent).toContain("function closeHistory()");
+    expect(sidebarComponent).toContain('@click.stop="closeHistory"');
+    expect(sidebarComponent).toContain("@keydown.esc.stop");
     expect(sidebarComponent).toContain("Ctrl K");
     expect(appPage).toContain('event.key.toLowerCase() !== "k"');
   });

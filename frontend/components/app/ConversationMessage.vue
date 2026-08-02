@@ -63,6 +63,15 @@ defineProps<{
   min-width: 0;
 }
 
+.message--assistant .message__content {
+  backdrop-filter: blur(18px) saturate(1.05);
+  background: var(--moksha-assistant-bubble);
+  border: 1px solid var(--moksha-assistant-line);
+  border-radius: 0.95rem 0.95rem 0.95rem 0.25rem;
+  box-shadow: var(--moksha-assistant-shadow);
+  padding: 0.72rem 0.86rem;
+}
+
 .message--user {
   justify-items: end;
 }

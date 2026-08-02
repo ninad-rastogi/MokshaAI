@@ -42,7 +42,7 @@ python scripts/validate_readmes.py --root .
 python scripts/validate_readmes.py --root . --warnings-as-errors
 python scripts/scaffold_readme.py <opt-in-boundary> --root .
 python scripts/export_openapi.py --output frontend/openapi.json
-python scripts/benchmark_ollama.py --models <ollama-tag>
+python scripts/benchmark_ollama.py --models <ollama-tag> --min-tokens-per-second 20
 python scripts/live_ui_walkthrough.py --base-url https://localhost:8443/
 .\scripts\backup.ps1
 .\scripts\restore.ps1 -BackupDirectory <path> -ConfirmRestore
@@ -61,8 +61,11 @@ typed validator functions without Django or third-party packages.
 
 README tools use Python 3.14 standard library only. OpenAPI export needs Django
 runtime dependencies. Browser walkthrough needs Playwright/Chrome. Model
-benchmark needs Requests and host Ollama. Backup/restore need PowerShell,
-Docker Compose, PostgreSQL tools inside DB container.
+benchmark needs Requests and host Ollama; it reports functional pass,
+throughput pass, configured target, measured safe minimum, and median tokens per
+second while exiting fail-closed when the selected model misses the target.
+Backup/restore need PowerShell, Docker Compose, PostgreSQL tools inside DB
+container.
 
 ## Security
 

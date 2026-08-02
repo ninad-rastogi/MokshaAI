@@ -3,8 +3,6 @@ const props = defineProps<{
   modelValue: string;
   busy: boolean;
   error: string;
-  modelLabel: string;
-  modelReady: boolean;
   disabled?: boolean;
 }>();
 
@@ -42,13 +40,6 @@ function submit() {
     >
       <template #footer>
         <div class="composer-meta">
-          <span class="model-indicator">
-            <i
-              :class="{ 'model-indicator__offline': !modelReady }"
-              aria-hidden="true"
-            />
-            {{ modelLabel }}
-          </span>
           <span class="composer-hint">Shift + Enter for a new line</span>
         </div>
 
@@ -135,33 +126,9 @@ function submit() {
   min-width: 0;
 }
 
-.model-indicator,
 .composer-hint {
   color: var(--moksha-muted);
   font-size: 0.68rem;
-}
-
-.model-indicator {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.38rem;
-  max-width: 16rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.model-indicator i {
-  background: var(--moksha-success);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px var(--moksha-success-soft);
-  height: 0.38rem;
-  width: 0.38rem;
-}
-
-.model-indicator__offline {
-  background: var(--moksha-warning) !important;
-  box-shadow: 0 0 0 3px var(--moksha-accent-soft) !important;
 }
 
 .composer-action {

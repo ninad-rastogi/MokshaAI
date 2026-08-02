@@ -146,6 +146,7 @@ function trackPointer(event: PointerEvent) {
       class="session-check"
       aria-label="Checking session"
     >
+      <h1 class="sr-only">Moksha AI</h1>
       <span />
       <p>Returning to your conversations...</p>
     </section>

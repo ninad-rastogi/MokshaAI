@@ -315,6 +315,23 @@ def benchmark_model(
     }
 
 
+def qualification_summary(
+    report: dict[str, Any],
+    min_tokens_per_second: float,
+) -> dict[str, Any]:
+    """Return fail-closed qualification details with measured throughput."""
+    functional_passed = report["pass_rate"] == 1.0
+    throughput_passed = report["minimum_tokens_per_second"] >= min_tokens_per_second
+    return {
+        "functional_passed": functional_passed,
+        "throughput_passed": throughput_passed,
+        "qualified": functional_passed and throughput_passed,
+        "target_min_tokens_per_second": min_tokens_per_second,
+        "measured_safe_minimum_tokens_per_second": report["minimum_tokens_per_second"],
+        "measured_median_tokens_per_second": report["median_tokens_per_second"],
+    }
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -339,6 +356,12 @@ def main() -> int:
         default=Path(__file__).resolve().parents[1] / "data" / "docs",
         help="Root whose PDF-containing subfolders are auto-discovered.",
     )
+    parser.add_argument(
+        "--min-tokens-per-second",
+        type=float,
+        default=20.0,
+        help="Fail-closed per-case minimum generation throughput target.",
+    )
     args = parser.parse_args()
 
     collection_names = discover_collection_names(args.docs_root)
@@ -347,6 +370,11 @@ def main() -> int:
         benchmark_model(args.base_url, model, args.runs, args.timeout, cases)
         for model in args.models
     ]
+    for model_report in model_reports:
+        model_report["qualification"] = qualification_summary(
+            model_report,
+            args.min_tokens_per_second,
+        )
     report: dict[str, Any] = {
         "generated_at_unix": int(time.time()),
         "context_length": 8192,
@@ -368,11 +396,7 @@ def main() -> int:
     )
     if not selected:
         return 0
-    return (
-        0
-        if selected["pass_rate"] == 1.0 and selected["minimum_tokens_per_second"] >= 20
-        else 1
-    )
+    return 0 if selected["qualification"]["qualified"] else 1
 
 
 if __name__ == "__main__":

@@ -5,13 +5,11 @@ defineProps<{ citations: Citation[] }>();
 </script>
 
 <template>
-  <details v-if="citations.length" class="citations">
+  <details v-if="citations.length" class="citations" open>
     <summary>
       <UIcon name="i-lucide-book-open-text" aria-hidden="true" />
       {{ citations.length }}
-      {{
-        citations.length === 1 ? "scripture reference" : "scripture references"
-      }}
+      {{ citations.length === 1 ? "source quotation" : "source quotations" }}
       <UIcon class="chevron" name="i-lucide-chevron-down" aria-hidden="true" />
     </summary>
     <ol>
@@ -26,7 +24,11 @@ defineProps<{ citations: Citation[] }>();
           </span>
           <span class="page-reference">Page {{ citation.page }}</span>
         </header>
-        <blockquote>{{ citation.excerpt }}</blockquote>
+        <blockquote aria-label="Exact retrieved source passage">
+          <strong>Source passage</strong>
+          <UIcon name="i-lucide-quote" aria-hidden="true" />
+          <span>{{ citation.excerpt }}</span>
+        </blockquote>
       </li>
     </ol>
   </details>
@@ -113,9 +115,32 @@ li small {
 }
 
 blockquote {
-  color: var(--moksha-muted);
+  align-items: start;
+  background: var(--moksha-assistant-bubble);
+  border: 1px solid var(--moksha-assistant-line);
+  border-radius: 0.55rem;
+  color: var(--moksha-ink);
+  display: grid;
   font-size: 0.72rem;
+  gap: 0.4rem;
+  grid-template-columns: auto minmax(0, 1fr);
   line-height: 1.55;
   margin: 0.5rem 0 0;
+  padding: 0.55rem 0.6rem;
+}
+
+blockquote strong {
+  color: var(--moksha-accent);
+  font-size: 0.62rem;
+  grid-column: 1 / -1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+blockquote svg {
+  color: var(--moksha-accent);
+  height: 0.78rem;
+  margin-top: 0.12rem;
+  width: 0.78rem;
 }
 </style>

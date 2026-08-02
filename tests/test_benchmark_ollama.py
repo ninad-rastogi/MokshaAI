@@ -1,6 +1,10 @@
 """Tests for corpus-neutral Ollama benchmark discovery."""
 
-from scripts.benchmark_ollama import build_cases, discover_collection_names
+from scripts.benchmark_ollama import (
+    build_cases,
+    discover_collection_names,
+    qualification_summary,
+)
 
 
 def test_benchmark_discovers_every_pdf_collection(tmp_path):
@@ -33,4 +37,23 @@ def test_benchmark_cases_use_discovered_collection_without_fixed_text():
         "honest_no_evidence",
         "hindi_guidance",
         "sanskrit_context_grounding",
+    }
+
+
+def test_qualification_summary_reports_measured_throughput_gap():
+    report = {
+        "pass_rate": 1.0,
+        "minimum_tokens_per_second": 17.4,
+        "median_tokens_per_second": 21.17,
+    }
+
+    summary = qualification_summary(report, min_tokens_per_second=20)
+
+    assert summary == {
+        "functional_passed": True,
+        "throughput_passed": False,
+        "qualified": False,
+        "target_min_tokens_per_second": 20,
+        "measured_safe_minimum_tokens_per_second": 17.4,
+        "measured_median_tokens_per_second": 21.17,
     }

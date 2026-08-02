@@ -48,7 +48,7 @@ uv run --no-cache python manage.py check
 uv run --no-cache pytest llm/tests
 uv run moksha setup model scan --context-length 8192
 uv run moksha security rewrap-byok --target-version 2
-uv run python scripts/benchmark_ollama.py --models <temporary-qualified-tag>
+uv run python scripts/benchmark_ollama.py --models <temporary-qualified-tag> --min-tokens-per-second 20
 ```
 
 Host hardware discovery belongs to the optional `moksha setup model scan`
@@ -61,6 +61,9 @@ guards, provider statuses, preference precedence, revocation, install checksum
 and cleanup, signed catalog replay controls, qualification, and attempt fallback
 limits. Real activation still requires structured JSON, multilingual, citation,
 grounding, safety, 8K context, throughput, and memory tests against host Ollama.
+Throughput qualification records the configured floor plus measured safe minimum
+and median values so hardware-limited failures stay visible instead of being
+silently waived.
 
 ## Dependencies
 

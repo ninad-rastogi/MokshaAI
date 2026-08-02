@@ -29,6 +29,7 @@ const activeRunId = ref("");
 const streamingText = ref("");
 const streamingSources = ref<Citation[]>([]);
 const runState = ref("ready");
+const connectionState = ref<"online" | "offline" | "error">("online");
 const modelProfile = ref("");
 const fallbackModelProfile = ref("");
 const busy = ref(false);
@@ -101,15 +102,32 @@ const activeModelLabel = computed(
 );
 
 const runLabel = computed(() => {
-  if (streamDisconnected.value) return "Connection interrupted";
   const labels: Record<string, string> = {
     queued: "Preparing guidance",
-    connecting: "Connecting",
     running: "Reflecting",
     cancelled: "Stopped",
     failed: "Response failed",
   };
   return labels[runState.value] || runState.value;
+});
+
+const connectionLabel = computed(() => {
+  if (streamDisconnected.value || connectionState.value === "offline") {
+    return "Offline";
+  }
+  if (connectionState.value === "error" || error.value) return "Error";
+  if (!activeModelReady.value) return "Model offline";
+  return "Online";
+});
+
+const connectionStatusText = computed(
+  () => `${connectionLabel.value} · ${activeModelLabel.value}`,
+);
+
+const connectionTone = computed(() => {
+  if (connectionLabel.value === "Online") return "online";
+  if (connectionLabel.value === "Error") return "error";
+  return "offline";
 });
 
 const streamingMessage = computed<Message>(() => ({
@@ -514,6 +532,7 @@ async function send() {
   lastPrompt.value = message;
   busy.value = true;
   streamDisconnected.value = false;
+  connectionState.value = "online";
   error.value = "";
   streamingText.value = "";
   streamingSources.value = [];
@@ -560,15 +579,17 @@ function runStartError(runError: unknown) {
 
 function connectRun(runId = activeRunId.value) {
   if (!runId) return;
-  runState.value = "connecting";
   streamDisconnected.value = false;
   stream.connect(runId, {
     onOpen: () => {
       streamDisconnected.value = false;
-      if (runState.value === "connecting") runState.value = "queued";
+      connectionState.value = "online";
     },
     onDisconnect: () => {
-      if (busy.value) streamDisconnected.value = true;
+      if (busy.value) {
+        streamDisconnected.value = true;
+        connectionState.value = "offline";
+      }
     },
     onEvent: (event) => {
       if (event.type === "state") runState.value = event.state;
@@ -582,6 +603,7 @@ function connectRun(runId = activeRunId.value) {
             ? "Moksha AI could not complete this response. Try again."
             : event.message;
         runState.value = "failed";
+        connectionState.value = "error";
       }
       if (event.type === "done") {
         void finishRun(event.state);
@@ -594,6 +616,7 @@ async function finishRun(state: string) {
   runState.value = state;
   busy.value = false;
   streamDisconnected.value = false;
+  connectionState.value = state === "failed" ? "error" : "online";
   activeRunId.value = "";
   stream.close();
   try {
@@ -613,6 +636,7 @@ async function stopRun() {
     stream.close();
     busy.value = false;
     streamDisconnected.value = false;
+    connectionState.value = "online";
     activeRunId.value = "";
     runState.value = "cancelled";
     await loadMessages();
@@ -704,9 +728,18 @@ async function scrollToLatest(behavior: ScrollBehavior) {
         </div>
 
         <div class="chat-header__actions">
-          <span v-if="busy" class="run-status" role="status">
+          <span
+            :class="[
+              'connection-status',
+              `connection-status--${connectionTone}`,
+            ]"
+            role="status"
+            :aria-label="connectionStatusText"
+          >
             <i aria-hidden="true" />
-            {{ runLabel }}
+            <span>{{ connectionLabel }}</span>
+            <b aria-hidden="true">·</b>
+            <small>{{ activeModelLabel }}</small>
           </span>
           <UTooltip v-if="streamDisconnected" text="Reconnect response stream">
             <button
@@ -847,8 +880,6 @@ async function scrollToLatest(behavior: ScrollBehavior) {
           v-model="prompt"
           :busy="busy"
           :error="error"
-          :model-label="activeModelLabel"
-          :model-ready="activeModelReady"
           :disabled="workspaceLoading || !activeModelReady"
           @submit="send"
           @stop="stopRun"
@@ -1041,21 +1072,51 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   display: none;
 }
 
-.run-status {
+.connection-status {
   align-items: center;
   color: var(--moksha-muted);
   display: inline-flex;
   font-size: 0.68rem;
   gap: 0.4rem;
+  max-width: min(22rem, 38vw);
+  min-width: 0;
 }
 
-.run-status i {
-  animation: breathe 1.5s ease-in-out infinite;
-  background: var(--moksha-accent);
+.connection-status i {
+  background: var(--moksha-warning);
   border-radius: 50%;
   box-shadow: 0 0 0 3px var(--moksha-accent-soft);
   height: 0.42rem;
   width: 0.42rem;
+}
+
+.connection-status--online i {
+  background: var(--moksha-success);
+  box-shadow: 0 0 0 3px var(--moksha-success-soft);
+}
+
+.connection-status--error i {
+  background: var(--moksha-error);
+  box-shadow: 0 0 0 3px var(--moksha-error-soft);
+}
+
+.connection-status span {
+  color: var(--moksha-ink);
+  font-weight: 680;
+}
+
+.connection-status b {
+  color: var(--moksha-muted);
+  font-weight: 500;
+}
+
+.connection-status small {
+  color: var(--moksha-muted);
+  font-size: inherit;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message-viewport {
@@ -1213,10 +1274,10 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 
 .thinking-copy > i {
   animation: thinking 1.15s ease-in-out infinite;
-  background: var(--moksha-muted);
+  background: var(--moksha-accent);
   border-radius: 50%;
-  height: 0.28rem;
-  width: 0.28rem;
+  height: 0.34rem;
+  width: 0.34rem;
 }
 
 .thinking-copy > i:nth-child(2) {
@@ -1396,13 +1457,13 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   0%,
   60%,
   100% {
-    opacity: 0.32;
+    opacity: 0.38;
     transform: translateY(0);
   }
 
   30% {
     opacity: 1;
-    transform: translateY(-0.18rem);
+    transform: translateY(-0.32rem);
   }
 }
 
@@ -1446,8 +1507,15 @@ async function scrollToLatest(behavior: ScrollBehavior) {
     font-size: 0.6rem;
   }
 
-  .run-status {
+  .connection-status {
     font-size: 0;
+    max-width: none;
+  }
+
+  .connection-status span,
+  .connection-status b,
+  .connection-status small {
+    display: none;
   }
 
   .empty-conversation {

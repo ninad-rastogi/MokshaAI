@@ -35,6 +35,10 @@ const filteredChats = computed(() => {
 
 const isMobile = useMediaQuery("(max-width: 860px)");
 
+function closeHistory() {
+  emit("update:open", false);
+}
+
 function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
   return [
     [
@@ -68,8 +72,8 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
     v-if="open"
     class="sidebar-scrim"
     type="button"
-    aria-label="Close conversation history"
-    @click="emit('update:open', false)"
+    aria-label="Close conversation history overlay"
+    @click="closeHistory"
   />
 
   <aside
@@ -79,6 +83,7 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
     :role="isMobile ? 'dialog' : undefined"
     :aria-modal="isMobile && open ? 'true' : undefined"
     aria-label="Conversation history"
+    @keydown.esc.stop="closeHistory"
   >
     <div class="history__brand-row">
       <MokshaBrand />
@@ -86,8 +91,9 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
         <button
           class="icon-control mobile-close"
           type="button"
-          aria-label="Close conversation history"
-          @click="emit('update:open', false)"
+          aria-label="Close history panel"
+          @click.stop="closeHistory"
+          @pointerdown.stop
         >
           <UIcon name="i-lucide-x" aria-hidden="true" />
         </button>
@@ -268,14 +274,23 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
   font-weight: 680;
   gap: 0.55rem;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  margin-top: 0.9rem;
-  min-height: 2.6rem;
+  margin-top: 0.65rem;
+  min-height: 2.35rem;
   padding: 0 0.7rem;
   text-align: left;
 }
 
 .new-chat svg {
   color: var(--moksha-accent);
+  height: 0.92rem;
+  width: 0.92rem;
+}
+
+.new-chat span {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 kbd {
@@ -555,6 +570,10 @@ kbd {
 
   .conversation-item__menu {
     opacity: 1;
+  }
+
+  .new-chat kbd {
+    display: none;
   }
 }
 </style>

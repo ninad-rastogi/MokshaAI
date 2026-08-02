@@ -24,6 +24,7 @@ from scripts.benchmark_ollama import (
     benchmark_model,
     build_cases,
     discover_collection_names,
+    qualification_summary,
 )
 
 logger = logging.getLogger("llm.tasks")
@@ -270,11 +271,11 @@ def _qualify(tag: str) -> dict:
         timeout=float(settings.OLLAMA_TIMEOUT_SECONDS),
         cases=build_cases(collections),
     )
-    passed = (
-        report["pass_rate"] == 1.0
-        and report["minimum_tokens_per_second"] >= settings.MODEL_MIN_TOKENS_PER_SECOND
+    report["qualification"] = qualification_summary(
+        report,
+        float(settings.MODEL_MIN_TOKENS_PER_SECOND),
     )
-    if not passed:
+    if not report["qualification"]["qualified"]:
         raise InstallationError("model_qualification_failed")
     memory = _running_model_memory(tag)
     if memory["size_vram"] > settings.MODEL_MAX_VRAM_BYTES:

@@ -143,14 +143,15 @@ class RAGEngine:
 
             logger.info(f"Query classified as: {category} - Reasoning: {reasoning}")
 
-            if category == "SCRIPTURE" and self.vector_store:
+            if category in {"SCRIPTURE", "GUIDANCE"} and self.vector_store:
                 route = "rag"
                 requires_scripture = True
-            elif category == "SCRIPTURE" and not self.vector_store:
+            elif category in {"SCRIPTURE", "GUIDANCE"} and not self.vector_store:
                 route = "general"
                 requires_scripture = False
                 logger.warning(
-                    "SCRIPTURE query but no vector store, routing to GENERAL"
+                    "%s query but no vector store, routing to GENERAL",
+                    category,
                 )
             else:
                 route = "general"
@@ -197,12 +198,18 @@ class RAGEngine:
         sources = []
 
         for i, chunk in enumerate(chunks):
-            context_parts.append(f"[Context {i + 1}]\n{chunk['text']}\n")
+            scripture = chunk.get("scripture", "Unknown")
+            file_name = chunk.get("file_name", "Unknown")
+            page = chunk.get("page", "N/A")
+            context_parts.append(
+                f"[Source {i + 1}: {scripture}, {file_name}, p. {page}]\n"
+                f"{chunk['text']}\n"
+            )
             sources.append(
                 {
-                    "scripture": chunk.get("scripture", "Unknown"),
-                    "page": chunk.get("page", "N/A"),
-                    "file_name": chunk.get("file_name", "Unknown"),
+                    "scripture": scripture,
+                    "page": page,
+                    "file_name": file_name,
                     "score": chunk.get("score", 0.0),
                     "excerpt": (
                         chunk["text"][:200] + "..."
@@ -231,8 +238,17 @@ class RAGEngine:
             f"User Question: {query}\n\n"
             f"Instructions:\n"
             f"- Answer STRICTLY from the provided context\n"
-            f"- Quote Sanskrit shlokas if present\n"
+            f"- Start with a section named 'Source verse' and include one exact "
+            f"quotation copied from the context\n"
+            f"- If the exact quotation is Sanskrit or Devanagari, preserve it "
+            f"exactly and then translate it\n"
+            f"- Add a section named 'Meaning' with a plain-language translation "
+            f"or explanation of that quotation\n"
+            f"- Add a section named 'Guidance' that answers the user's situation "
+            f"using that source\n"
             f"- Cite every factual scripture claim inline as [Scripture, file, p. N]\n"
+            f"- Never cite, name, or invent a scripture, book, file, page, chapter, "
+            f"or verse that is not in the provided context source labels\n"
             f"- If context doesn't answer the question, say so\n"
             f"- Be clear and concise"
         )
@@ -267,7 +283,10 @@ class RAGEngine:
 
         enhanced_query = (
             f"{query}\n\nIMPORTANT: Answer this NEW question directly. "
-            f"Do NOT refer to or mention previous questions."
+            f"Do NOT refer to or mention previous questions. "
+            f"Do NOT quote, cite, name, or invent scriptures, books, pages, "
+            f"chapters, verses, files, or sources unless they were explicitly "
+            f"provided in this message."
         )
 
         chat_msgs.append(HumanMessage(content=enhanced_query))
