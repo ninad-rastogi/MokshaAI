@@ -192,7 +192,7 @@ def _generate_response(
         response_text = engine.query_without_rag(
             run.prompt,
             recent_messages,
-            on_delta=on_delta,
+            on_delta=None,
         )
         sources = []
         mode = "SAFETY"
@@ -207,7 +207,7 @@ def _generate_response(
         response_text = engine.query_without_rag(
             run.prompt,
             recent_messages,
-            on_delta=on_delta,
+            on_delta=None,
         )
         sources = []
         mode = "GENERAL"
@@ -264,7 +264,7 @@ def _generate_remote_provider_response(
             ),
             temperature=spec.temperature,
             max_output_tokens=spec.max_output_tokens,
-            on_delta=on_delta,
+            on_delta=None,
         )
         spec.snapshot["reported_usage"] = usage
         return response_text, [], "GENERAL"
@@ -337,7 +337,7 @@ def _generate_remote_provider_response(
         ),
         temperature=spec.temperature,
         max_output_tokens=spec.max_output_tokens,
-        on_delta=None if mode == "RAG" else on_delta,
+        on_delta=None,
     )
     spec.snapshot["reported_usage"] = usage
     return response_text, sources, mode
