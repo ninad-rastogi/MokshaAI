@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Citation } from "~/types/api";
 
 export type RunEvent =
@@ -13,6 +14,69 @@ type RunStreamHandlers = {
   onOpen?: () => void;
   onDisconnect?: () => void;
 };
+
+const runStateSchema = z.enum([
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+const citationSchema = z.object({
+  scripture: z.string(),
+  page: z.union([z.number(), z.string()]),
+  file_name: z.string(),
+  score: z.number(),
+  excerpt: z.string(),
+  source_text: z.string().optional(),
+  verse_text: z.string().optional(),
+  sanskrit_text: z.string().optional(),
+  translation: z.string().optional(),
+});
+
+const eventSchemas = {
+  state: z.object({ state: runStateSchema }),
+  delta: z.object({ text: z.string() }),
+  citation: citationSchema,
+  usage: z.record(z.unknown()),
+  error: z.object({ code: z.string(), message: z.string() }),
+  done: z.object({ state: runStateSchema }),
+} satisfies Record<RunEvent["type"], z.ZodTypeAny>;
+
+export function parseRunEvent(
+  type: RunEvent["type"],
+  id: string,
+  dataText: string,
+): RunEvent {
+  const data: unknown = JSON.parse(dataText);
+  switch (type) {
+    case "state": {
+      const parsed = eventSchemas.state.parse(data);
+      return { type, id, state: parsed.state };
+    }
+    case "delta": {
+      const parsed = eventSchemas.delta.parse(data);
+      return { type, id, text: parsed.text };
+    }
+    case "citation": {
+      const parsed = eventSchemas.citation.parse(data);
+      return { type, id, citation: parsed };
+    }
+    case "usage": {
+      const parsed = eventSchemas.usage.parse(data);
+      return { type, id, usage: parsed };
+    }
+    case "error": {
+      const parsed = eventSchemas.error.parse(data);
+      return { type, id, code: parsed.code, message: parsed.message };
+    }
+    case "done": {
+      const parsed = eventSchemas.done.parse(data);
+      return { type, id, state: parsed.state };
+    }
+  }
+}
 
 export function useRunStream() {
   const config = useRuntimeConfig();
@@ -39,29 +103,21 @@ export function useRunStream() {
     source.onerror = () => handlers.onDisconnect?.();
 
     const parse = (event: MessageEvent, type: RunEvent["type"]) => {
-      lastEventId = event.lastEventId || lastEventId;
-      const data = JSON.parse(event.data);
-      if (type === "state")
-        handlers.onEvent({ type, id: lastEventId, state: data.state });
-      if (type === "delta")
-        handlers.onEvent({ type, id: lastEventId, text: data.text });
-      if (type === "citation")
+      try {
+        const eventId = event.lastEventId || lastEventId;
+        const parsed = parseRunEvent(type, eventId, event.data);
+        lastEventId = parsed.id || lastEventId;
+        handlers.onEvent(parsed);
+      } catch {
         handlers.onEvent({
-          type,
+          type: "error",
           id: lastEventId,
-          citation: data as Citation,
+          code: "invalid_sse_event",
+          message: "Response stream sent an invalid event.",
         });
-      if (type === "usage")
-        handlers.onEvent({ type, id: lastEventId, usage: data });
-      if (type === "error")
-        handlers.onEvent({
-          type,
-          id: lastEventId,
-          code: data.code,
-          message: data.message,
-        });
-      if (type === "done")
-        handlers.onEvent({ type, id: lastEventId, state: data.state });
+        close(false);
+        handlers.onDisconnect?.();
+      }
     };
 
     for (const type of [
