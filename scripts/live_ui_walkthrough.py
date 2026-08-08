@@ -497,6 +497,12 @@ def run(
         page.reload(wait_until="networkidle")
         result["theme_after_refresh"] = page.locator("html").get_attribute("class")
         result["desktop_geometry"] = geometry(page)
+        result["connection_status_after_refresh"] = page.locator(
+            ".connection-status"
+        ).inner_text()
+        result["connection_status_aria"] = page.locator(
+            ".connection-status"
+        ).get_attribute("aria-label")
         result["primary_model_after_refresh"] = page.locator(
             ".history-footer .account-copy small"
         ).inner_text()

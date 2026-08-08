@@ -82,8 +82,21 @@ describe("app shell", () => {
     expect(profileLoad).toBeGreaterThan(-1);
     expect(preferenceLoad).toBeGreaterThan(profileLoad);
     expect(appPage).toContain("activeModelReady");
+    expect(appPage).toContain("activeModelStatusText");
+    expect(appPage).toContain("activeModelDetail");
     expect(appPage).toContain("connectionStatusText");
     expect(composerComponent).not.toContain("modelLabel");
+  });
+
+  it("keeps model connection health separate from response stream recovery", () => {
+    expect(appPage).toContain("return activeModelStatusText.value");
+    expect(appPage).not.toMatch(
+      /streamDisconnected\.value[\s\S]{0,160}return "Offline"/,
+    );
+    expect(appPage).toContain("Reconnect response stream");
+    expect(appPage).toContain(
+      "`${connectionLabel.value} · ${activeModelDetail.value}`",
+    );
   });
 
   it("keeps the closed mobile drawer inert and exposes its shortcut", () => {

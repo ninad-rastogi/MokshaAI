@@ -101,6 +101,31 @@ const activeModelLabel = computed(
   () => activeModelOption.value?.label || "Choose a model",
 );
 
+const activeModelStatus = computed(
+  () => activeModelOption.value?.status || "disconnected",
+);
+
+const activeModelStatusText = computed(() => {
+  const labels: Record<string, string> = {
+    connected: "Online",
+    degraded: "Degraded",
+    disconnected: "Offline",
+    checking: "Checking",
+    auth_invalid: "Key rejected",
+    endpoint_invalid: "Endpoint error",
+    unreachable: "Offline",
+    rate_limited: "Rate limited",
+    quota_limited: "Quota limited",
+    model_unavailable: "Model unavailable",
+  };
+  return labels[activeModelStatus.value] || "Offline";
+});
+
+const activeModelDetail = computed(() => {
+  if (!activeModelOption.value) return "No model selected";
+  return `${activeModelOption.value.label} · ${activeModelOption.value.modelId}`;
+});
+
 const runLabel = computed(() => {
   const labels: Record<string, string> = {
     queued: "Preparing guidance",
@@ -112,21 +137,30 @@ const runLabel = computed(() => {
 });
 
 const connectionLabel = computed(() => {
-  if (streamDisconnected.value || connectionState.value === "offline") {
-    return "Offline";
-  }
   if (connectionState.value === "error" || error.value) return "Error";
-  if (!activeModelReady.value) return "Model offline";
-  return "Online";
+  return activeModelStatusText.value;
 });
 
 const connectionStatusText = computed(
-  () => `${connectionLabel.value} · ${activeModelLabel.value}`,
+  () => `${connectionLabel.value} · ${activeModelDetail.value}`,
 );
 
 const connectionTone = computed(() => {
-  if (connectionLabel.value === "Online") return "online";
-  if (connectionLabel.value === "Error") return "error";
+  if (["Online", "Degraded", "Checking"].includes(connectionLabel.value)) {
+    return "online";
+  }
+  if (
+    [
+      "Error",
+      "Key rejected",
+      "Endpoint error",
+      "Rate limited",
+      "Quota limited",
+      "Model unavailable",
+    ].includes(connectionLabel.value)
+  ) {
+    return "error";
+  }
   return "offline";
 });
 
@@ -739,7 +773,7 @@ async function scrollToLatest(behavior: ScrollBehavior) {
             <i aria-hidden="true" />
             <span>{{ connectionLabel }}</span>
             <b aria-hidden="true">·</b>
-            <small>{{ activeModelLabel }}</small>
+            <small>{{ activeModelDetail }}</small>
           </span>
           <UTooltip v-if="streamDisconnected" text="Reconnect response stream">
             <button
