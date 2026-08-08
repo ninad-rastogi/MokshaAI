@@ -111,7 +111,9 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
         name="i-lucide-square-pen"
         aria-hidden="true"
       />
-      <span class="new-chat__label" title="New conversation">New chat</span>
+      <span class="new-chat__label" title="Start new conversation"
+        >New chat</span
+      >
       <kbd>Ctrl K</kbd>
     </button>
 
@@ -242,6 +244,7 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
 .history {
   background: var(--moksha-sidebar);
   border-right: 1px solid var(--moksha-glass-line);
+  container-type: inline-size;
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   height: 100svh;
@@ -293,7 +296,12 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
   width: 100%;
 }
 
+.new-chat > * {
+  min-width: 0;
+}
+
 .new-chat__icon {
+  flex: 0 0 auto;
   color: var(--moksha-accent);
   height: 0.86rem;
   width: 0.86rem;
@@ -313,6 +321,7 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
 kbd {
   color: var(--moksha-muted);
   font: 650 0.58rem/1 var(--moksha-font);
+  min-width: max-content;
   white-space: nowrap;
 }
 
@@ -590,6 +599,12 @@ kbd {
     opacity: 1;
   }
 
+  .new-chat kbd {
+    display: none;
+  }
+}
+
+@container (max-width: 17rem) {
   .new-chat kbd {
     display: none;
   }

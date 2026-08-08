@@ -9,6 +9,7 @@ from django.urls import resolve
 from chat.models import Chat, GenerationAttempt, GenerationRun, Message
 from chat.tasks import generate_chat_response
 from llm.models import ModelConnection, ModelProfile
+from llm.providers import ProviderRequestFailed
 
 
 def test_top_level_run_urls_resolve_to_v1_contract():
@@ -442,3 +443,111 @@ def test_generation_run_ollama_compatible_profile_persists_usage(create_user):
     assert attempt.model == "remote-ollama"
     assert attempt.usage == {"eval_count": 7}
     assert remote.call_count == 1
+
+
+@pytest.mark.django_db
+def test_generation_run_persists_sanitized_provider_error_before_fallback(create_user):
+    user = create_user(email="remote-error-code@example.test")
+    chat = Chat.objects.create(user=user)
+    connection = ModelConnection.objects.create(
+        user=user,
+        name="Remote",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        status=ModelConnection.Status.CONNECTED,
+    )
+    primary = ModelProfile.objects.create(
+        name="Remote Primary",
+        connection=connection,
+        model_id="remote-primary",
+        is_enabled=True,
+    )
+    fallback = ModelProfile.objects.create(
+        name="Remote Fallback",
+        connection=connection,
+        model_id="remote-fallback",
+        is_enabled=True,
+    )
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="remote-error-code",
+        prompt="Offer brief guidance.",
+        model_profile=str(primary.pk),
+        stream_key=f"generation:{chat.id}:remote-error-code",
+    )
+
+    def fake_generate(**kwargs):
+        if kwargs["spec"].model == "remote-primary":
+            raise ProviderRequestFailed(429)
+        return "Fallback answer.", [], "GENERAL"
+
+    with (
+        patch("chat.tasks.resolve_model_selection") as resolve,
+        patch("chat.tasks.publish_run_event", return_value="1-0"),
+        patch("chat.tasks._generate_response", side_effect=fake_generate),
+    ):
+        resolve.return_value.attempts = (primary, fallback)
+        generate_chat_response(str(run.pk))
+
+    run.refresh_from_db()
+    attempts = list(run.attempts.order_by("attempt_number"))
+    assert run.state == GenerationRun.State.COMPLETED
+    assert attempts[0].outcome == GenerationAttempt.Outcome.FAILED
+    assert attempts[0].error_code == ModelConnection.Status.RATE_LIMITED
+    assert attempts[1].outcome == GenerationAttempt.Outcome.SUCCEEDED
+    assert attempts[1].error_code == ""
+
+
+@pytest.mark.django_db
+def test_generation_run_emits_sanitized_provider_error(create_user):
+    user = create_user(email="remote-quota-error@example.test")
+    chat = Chat.objects.create(user=user)
+    connection = ModelConnection.objects.create(
+        user=user,
+        name="Remote",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Remote Primary",
+        connection=connection,
+        model_id="remote-primary",
+        is_enabled=True,
+    )
+    run = GenerationRun.objects.create(
+        chat=chat,
+        user=user,
+        idempotency_key="remote-quota-error",
+        prompt="Offer brief guidance.",
+        model_profile=str(profile.pk),
+        stream_key=f"generation:{chat.id}:remote-quota-error",
+    )
+    emitted_events = []
+
+    def fake_publish(_stream_key, event_type, payload):
+        emitted_events.append((event_type, payload))
+        return f"{len(emitted_events)}-0"
+
+    with (
+        patch("chat.tasks.resolve_model_selection") as resolve,
+        patch("chat.tasks.publish_run_event", side_effect=fake_publish),
+        patch("chat.tasks._generate_response", side_effect=ProviderRequestFailed(402)),
+    ):
+        resolve.return_value.attempts = (profile,)
+        generate_chat_response(str(run.pk))
+
+    run.refresh_from_db()
+    attempt = run.attempts.get()
+    error_payload = next(
+        payload for event, payload in emitted_events if event == "error"
+    )
+    assert run.state == GenerationRun.State.FAILED
+    assert run.error_code == ModelConnection.Status.QUOTA_LIMITED
+    assert attempt.outcome == GenerationAttempt.Outcome.FAILED
+    assert attempt.error_code == ModelConnection.Status.QUOTA_LIMITED
+    assert error_payload["code"] == ModelConnection.Status.QUOTA_LIMITED
+    assert "402" not in error_payload["message"]

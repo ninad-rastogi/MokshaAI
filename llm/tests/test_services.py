@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from llm.models import ModelConnection, ModelProfile, UserModelPreference
 from llm.providers import (
+    ProviderRequestFailed,
     ollama_chat_completion,
     openai_chat_completion,
     probe_connection,
@@ -143,6 +144,13 @@ def test_probe_connection_sanitizes_http_failure() -> None:
 
     assert result.status == ModelConnection.Status.AUTH_INVALID
     assert "secret" not in result.detail
+
+
+def test_provider_request_failed_maps_quota_status() -> None:
+    failure = ProviderRequestFailed(402)
+
+    assert failure.code == ModelConnection.Status.QUOTA_LIMITED
+    assert "402" not in str(failure)
 
 
 @pytest.mark.django_db

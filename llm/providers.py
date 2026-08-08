@@ -39,6 +39,15 @@ class ProviderResponseError(RuntimeError):
     """Raised when a provider returns a structurally invalid response."""
 
 
+class ProviderRequestFailed(RuntimeError):
+    """Raised for provider HTTP failures without exposing remote details."""
+
+    def __init__(self, status: int) -> None:
+        self.status = status
+        self.code = _classify_http_status(status)
+        super().__init__(self.code)
+
+
 class NoRedirectHTTPSConnection(HTTPSConnection):
     """HTTPS connection to a pinned IP with normal hostname TLS verification."""
 
@@ -82,6 +91,8 @@ def _sanitize_detail(value: str) -> str:
 
 
 def _classify_http_status(status: int) -> str:
+    if status == 402:
+        return ModelConnection.Status.QUOTA_LIMITED
     if status in {401, 403}:
         return ModelConnection.Status.AUTH_INVALID
     if status == 404:
@@ -191,7 +202,7 @@ def _stream_lines(
         response = connection.getresponse()
         if response.status < 200 or response.status >= 300:
             response.read(MAX_PROBE_BODY_BYTES)
-            raise RuntimeError(f"provider_http_{response.status}")
+            raise ProviderRequestFailed(response.status)
         while True:
             line = response.readline(MAX_COMPLETION_BODY_BYTES + 1)
             if not line:
@@ -380,7 +391,7 @@ def openai_chat_completion(
         resolved_ips=validation.resolved_ips,
     )
     if status < 200 or status >= 300:
-        raise RuntimeError(f"provider_http_{status}")
+        raise ProviderRequestFailed(status)
     choices = payload.get("choices", [])
     if not isinstance(choices, list) or not choices:
         raise RuntimeError("provider_response_empty")
@@ -468,7 +479,7 @@ def ollama_chat_completion(
         resolved_ips=validation.resolved_ips,
     )
     if status < 200 or status >= 300:
-        raise RuntimeError(f"provider_http_{status}")
+        raise ProviderRequestFailed(status)
     message = payload.get("message", {})
     if not isinstance(message, dict) or not isinstance(message.get("content"), str):
         raise ProviderResponseError("provider_response_invalid")

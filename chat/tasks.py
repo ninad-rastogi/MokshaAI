@@ -20,7 +20,11 @@ from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
 from chat.rag.engine import RAGEngine
 from llm.models import ModelConnection, ModelProfile
-from llm.providers import ollama_chat_completion, openai_chat_completion
+from llm.providers import (
+    ProviderRequestFailed,
+    ollama_chat_completion,
+    openai_chat_completion,
+)
 from llm.services import ModelSelection, resolve_model_selection
 from scriptures.models import Scripture
 
@@ -47,11 +51,38 @@ class GenerationAttemptSpec:
 def _public_error(code: str) -> dict[str, str]:
     messages = {
         "generation_cancelled": "This response was cancelled.",
+        ModelConnection.Status.AUTH_INVALID: (
+            "The selected provider rejected its credential. Check model settings."
+        ),
+        ModelConnection.Status.ENDPOINT_INVALID: (
+            "The selected provider endpoint is not usable. Check model settings."
+        ),
+        ModelConnection.Status.MODEL_UNAVAILABLE: (
+            "The selected provider does not have that model available."
+        ),
+        ModelConnection.Status.QUOTA_LIMITED: (
+            "The selected provider reported an account quota limit."
+        ),
+        ModelConnection.Status.RATE_LIMITED: (
+            "The selected provider is rate limited. Retry later or choose another model."
+        ),
+        ModelConnection.Status.UNREACHABLE: (
+            "The selected provider could not be reached. Check model settings."
+        ),
+        ModelConnection.Status.DEGRADED: (
+            "The selected provider is temporarily degraded. Retry later."
+        ),
         "generation_failed": (
             "I could not complete that response. Please retry in a moment."
         ),
     }
     return {"code": code, "message": messages.get(code, messages["generation_failed"])}
+
+
+def _error_code_from_exception(exc: Exception) -> str:
+    if isinstance(exc, ProviderRequestFailed):
+        return exc.code
+    return "generation_failed"
 
 
 def _spec_from_profile(profile: ModelProfile) -> GenerationAttemptSpec:
@@ -482,9 +513,9 @@ def generate_chat_response(self, run_id: str) -> None:
                 )
             _finish_cancelled(run, attempt, "".join(streamed_parts))
             return
-        except Exception:
+        except Exception as exc:
             logger.exception("Generation attempt failed for run %s", run_id)
-            last_error_code = "generation_failed"
+            last_error_code = _error_code_from_exception(exc)
             attempt.outcome = GenerationAttempt.Outcome.FAILED
             attempt.error_code = last_error_code
             attempt.finished_at = timezone.now()
