@@ -105,6 +105,8 @@ describe("app shell", () => {
     expect(sidebarComponent).toContain('@click.stop="closeHistory"');
     expect(sidebarComponent).toContain("@keydown.esc.stop");
     expect(sidebarComponent).toContain("Ctrl K");
+    expect(sidebarComponent).toContain(">New chat<");
+    expect(sidebarComponent).toContain("new-chat__label");
     expect(sidebarComponent).toContain('aria-label="Start new conversation"');
     expect(sidebarComponent).toContain("white-space: nowrap");
     expect(appPage).toContain('event.key.toLowerCase() !== "k"');

@@ -106,8 +106,12 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
       aria-label="Start new conversation"
       @click="emit('create')"
     >
-      <UIcon name="i-lucide-square-pen" aria-hidden="true" />
-      <span>New conversation</span>
+      <UIcon
+        class="new-chat__icon"
+        name="i-lucide-square-pen"
+        aria-hidden="true"
+      />
+      <span class="new-chat__label" title="New conversation">New chat</span>
       <kbd>Ctrl K</kbd>
     </button>
 
@@ -273,38 +277,42 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
   align-items: center;
   background: var(--moksha-glass-raised);
   border: 1px solid var(--moksha-glass-line);
-  border-radius: 0.6rem;
+  border-radius: 0.58rem;
   color: var(--moksha-ink);
   display: grid;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 720;
-  gap: 0.48rem;
-  grid-template-columns: 0.95rem minmax(0, 1fr) max-content;
-  height: 2.45rem;
+  gap: 0.42rem;
+  grid-template-columns: 0.88rem minmax(0, 1fr) auto;
+  height: 2.25rem;
   line-height: 1;
   margin-top: 0.55rem;
-  padding: 0 0.62rem;
+  min-width: 0;
+  padding: 0 0.58rem;
   text-align: left;
   width: 100%;
 }
 
-.new-chat svg {
+.new-chat__icon {
   color: var(--moksha-accent);
-  height: 0.9rem;
-  width: 0.9rem;
+  height: 0.86rem;
+  width: 0.86rem;
 }
 
-.new-chat span {
+.new-chat__label {
   display: block;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
+  line-height: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
 }
 
 kbd {
   color: var(--moksha-muted);
-  font: 650 0.62rem/1 var(--moksha-font);
+  font: 650 0.58rem/1 var(--moksha-font);
   white-space: nowrap;
 }
 
