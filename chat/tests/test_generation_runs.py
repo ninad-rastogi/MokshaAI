@@ -121,36 +121,43 @@ def test_top_level_run_endpoints_match_v1_contract(authenticated_client):
 
 
 @pytest.mark.django_db
-def test_generation_run_uses_legacy_model_when_no_profiles(create_user):
+def test_generation_run_fails_closed_when_no_profiles(create_user):
     ModelProfile.objects.all().delete()
     ModelConnection.objects.all().delete()
-    user = create_user(email="legacy-run@example.test")
+    user = create_user(email="no-profile-run@example.test")
     chat = Chat.objects.create(user=user)
     run = GenerationRun.objects.create(
         chat=chat,
         user=user,
-        idempotency_key="legacy",
+        idempotency_key="no-profile",
         prompt="What is steadiness?",
-        stream_key=f"generation:{chat.id}:legacy",
+        stream_key=f"generation:{chat.id}:no-profile",
     )
+    emitted_events: list[tuple[str, dict[str, object]]] = []
 
-    with (
-        patch("chat.tasks.publish_run_event", return_value="1-0"),
-        patch(
-            "chat.tasks._generate_response",
-            return_value=("Steadiness is practice.", [], "GENERAL"),
-        ) as generate,
-    ):
+    def fake_publish(_stream_key, event_type, payload):
+        emitted_events.append((event_type, payload))
+        return f"{len(emitted_events)}-0"
+
+    with patch("chat.tasks.publish_run_event", side_effect=fake_publish):
         generate_chat_response(str(run.pk))
 
     run.refresh_from_db()
-    attempt = run.attempts.get()
-    assert run.state == GenerationRun.State.COMPLETED
-    assert attempt.provider == "ollama"
-    assert attempt.outcome == GenerationAttempt.Outcome.SUCCEEDED
-    assert attempt.model_snapshot["legacy"] is True
-    assert generate.call_count == 1
-    assert Message.objects.filter(chat=chat, role="assistant").count() == 1
+    assert run.state == GenerationRun.State.FAILED
+    assert run.error_code == ModelConnection.Status.MODEL_UNAVAILABLE
+    assert run.attempts.count() == 0
+    assert emitted_events == [
+        ("state", {"state": GenerationRun.State.RUNNING}),
+        (
+            "error",
+            {
+                "code": ModelConnection.Status.MODEL_UNAVAILABLE,
+                "message": "The selected provider does not have that model available.",
+            },
+        ),
+        ("done", {"state": GenerationRun.State.FAILED}),
+    ]
+    assert not Message.objects.filter(chat=chat, role="assistant").exists()
 
 
 @pytest.mark.django_db

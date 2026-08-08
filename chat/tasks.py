@@ -137,32 +137,11 @@ def _spec_from_profile(profile: ModelProfile) -> GenerationAttemptSpec:
     )
 
 
-def _legacy_spec(run: GenerationRun) -> GenerationAttemptSpec:
-    model = run.model_profile or settings.OLLAMA_MODEL
-    return GenerationAttemptSpec(
-        provider="ollama",
-        model=model,
-        ollama_server=settings.OLLAMA_BASE_URL,
-        connection=None,
-        temperature=0.7,
-        max_output_tokens=1024,
-        snapshot={
-            "provider": "ollama",
-            "base_url": settings.OLLAMA_BASE_URL,
-            "profile": run.model_profile or "",
-            "legacy": True,
-        },
-    )
-
-
 def _attempt_specs(run: GenerationRun) -> tuple[GenerationAttemptSpec, ...]:
-    try:
-        selection: ModelSelection = resolve_model_selection(
-            user=run.user,
-            chat_override_profile_id=run.model_profile,
-        )
-    except ModelProfile.DoesNotExist:
-        return (_legacy_spec(run),)
+    selection: ModelSelection = resolve_model_selection(
+        user=run.user,
+        chat_override_profile_id=run.model_profile,
+    )
     return tuple(_spec_from_profile(profile) for profile in selection.attempts[:2])
 
 
@@ -427,7 +406,26 @@ def generate_chat_response(self, run_id: str) -> None:
     available_scriptures = list(
         Scripture.objects.filter(is_indexed=True).values_list("name", flat=True)
     )
-    specs = _attempt_specs(run)
+    try:
+        specs = _attempt_specs(run)
+    except ModelProfile.DoesNotExist:
+        error_id = publish_run_event(
+            run.stream_key,
+            "error",
+            _public_error(ModelConnection.Status.MODEL_UNAVAILABLE),
+        )
+        done_id = publish_run_event(
+            run.stream_key,
+            "done",
+            {"state": GenerationRun.State.FAILED},
+        )
+        GenerationRun.objects.filter(pk=run.pk).update(
+            state=GenerationRun.State.FAILED,
+            error_code=ModelConnection.Status.MODEL_UNAVAILABLE,
+            last_event_id=done_id or error_id,
+            finished_at=timezone.now(),
+        )
+        return
     last_error_code = "generation_failed"
     warnings: list[str] = []
 
