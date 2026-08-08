@@ -14,6 +14,7 @@ from llm.providers import (
     probe_connection,
     update_connection_probe,
 )
+from llm.security import KeyUnavailable
 from llm.services import resolve_model_selection
 from users.models import User
 
@@ -144,6 +145,25 @@ def test_probe_connection_sanitizes_http_failure() -> None:
 
     assert result.status == ModelConnection.Status.AUTH_INVALID
     assert "secret" not in result.detail
+
+
+def test_probe_connection_handles_missing_byok_key_without_leaking_detail() -> None:
+    connection = ModelConnection(
+        name="OpenAI Compatible",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        dns_pins=["93.184.216.34"],
+    )
+
+    with patch.object(
+        connection,
+        "get_api_key",
+        side_effect=KeyUnavailable("key file D:/secret/byok.json missing"),
+    ):
+        result = probe_connection(connection)
+
+    assert result.status == ModelConnection.Status.AUTH_INVALID
+    assert "D:/secret" not in result.detail
 
 
 def test_provider_request_failed_maps_quota_status() -> None:

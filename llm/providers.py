@@ -284,7 +284,13 @@ def probe_connection(connection: ModelConnection) -> ProbeResult:
             api_key,
             resolved_ips=validation.resolved_ips,
         )
-    except TimeoutError, OSError, ssl.SSLError, json.JSONDecodeError, ValidationError:
+    except (
+        TimeoutError,
+        OSError,
+        ssl.SSLError,
+        json.JSONDecodeError,
+        ValidationError,
+    ):
         return ProbeResult(
             status=ModelConnection.Status.UNREACHABLE,
             detail="Provider probe failed without exposing remote error details.",
