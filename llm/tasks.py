@@ -37,6 +37,14 @@ SAFE_TAG_RE = re.compile(r"[^a-z0-9._-]+")
 class InstallationError(RuntimeError):
     """Stable local installation failure."""
 
+    @property
+    def code(self) -> str:
+        """Return a stable public installation failure code."""
+        value = self.args[0] if self.args else ""
+        if isinstance(value, str) and re.fullmatch(r"[a-z0-9_]+", value):
+            return value
+        return "model_installation_failed"
+
 
 def _session() -> requests.Session:
     session = requests.Session()
@@ -371,7 +379,7 @@ def install_local_model(self, job_id: str) -> None:
     except (InstallationError, OSError, ValueError, KeyError) as error:
         logger.exception("Local model installation failed for job %s", job_id)
         error_code = (
-            str(error)
+            error.code
             if isinstance(error, InstallationError)
             else "model_installation_failed"
         )

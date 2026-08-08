@@ -24,6 +24,14 @@ def test_qualified_tag_is_versioned_and_safe():
     )
 
 
+def test_installation_error_code_fails_closed():
+    assert InstallationError("ollama_api_failure").code == "ollama_api_failure"
+    assert (
+        InstallationError("raw filesystem path D:/secret/model.gguf").code
+        == "model_installation_failed"
+    )
+
+
 @override_settings(OLLAMA_BASE_URL="http://ollama:11434")
 def test_copy_accepts_empty_success_response():
     session = Mock(spec=requests.Session)
