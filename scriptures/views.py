@@ -53,7 +53,7 @@ class ScriptureViewSet(viewsets.ReadOnlyModelViewSet):
         scripture = self.get_object()
         versions = scripture.index_versions.exclude(
             status=ScriptureIndexVersion.Status.BUILDING
-        )[:10]
+        ).order_by("-created_at")[:10]
         return Response(ScriptureIndexVersionSerializer(versions, many=True).data)
 
     @action(detail=True, methods=["post"])
