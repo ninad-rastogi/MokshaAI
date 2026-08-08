@@ -15,6 +15,7 @@ from llm.models import (
     ModelProfile,
     UserModelPreference,
 )
+from users.models import User
 
 
 @pytest.mark.django_db
@@ -41,6 +42,90 @@ def test_user_model_preference_api_persists_primary_profile(authenticated_client
     assert response.status_code == status.HTTP_200_OK
     assert str(response.data["primary_profile"]) == str(profile.pk)
     assert UserModelPreference.objects.get(user=user).primary_profile == profile
+
+
+@pytest.mark.django_db
+def test_user_model_preference_api_reads_saved_profile_after_refresh(
+    authenticated_client,
+):
+    client, user = authenticated_client
+    connection = ModelConnection.objects.create(
+        name="Installed local model",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Moksha Qwen local",
+        connection=connection,
+        model_id="moksha-qwen3:4b-instruct-q3km",
+        is_enabled=True,
+    )
+    UserModelPreference.objects.create(user=user, primary_profile=profile)
+
+    response = client.get("/api/v1/models/preferences/me/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert str(response.data["primary_profile"]) == str(profile.pk)
+    assert response.data["primary_profile_detail"]["name"] == "Moksha Qwen local"
+    assert response.data["primary_profile_detail"]["connection_status"] == (
+        ModelConnection.Status.CONNECTED
+    )
+
+
+@pytest.mark.django_db
+def test_profile_list_exposes_only_admin_and_current_user_models(
+    authenticated_client,
+):
+    client, user = authenticated_client
+    other_user = User.objects.create_user(
+        email="other-models@example.test",
+        password="pass",
+    )
+    admin_connection = ModelConnection.objects.create(
+        name="Built-in Ollama",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    own_connection = ModelConnection.objects.create(
+        user=user,
+        name="Own provider",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.example.com/v1",
+        remote_data_consent_at=timezone.now(),
+    )
+    other_connection = ModelConnection.objects.create(
+        user=other_user,
+        name="Other provider",
+        dialect=ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        endpoint_url="https://api.other.example/v1",
+        remote_data_consent_at=timezone.now(),
+    )
+    admin_profile = ModelProfile.objects.create(
+        name="Local installed",
+        connection=admin_connection,
+        model_id="local-model",
+        is_enabled=True,
+    )
+    own_profile = ModelProfile.objects.create(
+        name="Own remote",
+        connection=own_connection,
+        model_id="own-model",
+        is_enabled=True,
+    )
+    other_profile = ModelProfile.objects.create(
+        name="Other remote",
+        connection=other_connection,
+        model_id="other-model",
+        is_enabled=True,
+    )
+
+    response = client.get("/api/v1/models/profiles/")
+
+    assert response.status_code == status.HTTP_200_OK
+    profile_ids = {item["id"] for item in response.data["results"]}
+    assert str(admin_profile.pk) in profile_ids
+    assert str(own_profile.pk) in profile_ids
+    assert str(other_profile.pk) not in profile_ids
 
 
 @pytest.mark.django_db
@@ -113,6 +198,7 @@ def test_user_connection_create_adds_profile_without_replacing_preference(
     connection = ModelConnection.objects.get(user=user, name="Remote")
     profile = ModelProfile.objects.get(connection=connection)
     preference = UserModelPreference.objects.get(user=user)
+    assert connection.remote_data_consent_at is not None
     assert connection.remote_data_consent_at <= timezone.now()
     assert profile.model_id == "gpt-4.1-mini"
     assert preference.primary_profile == local_profile
