@@ -13,6 +13,17 @@ from playwright.sync_api import Page, Route, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
+def is_benign_abort(failure: dict[str, object]) -> bool:
+    """Ignore browser aborts caused by deliberate navigation or dialog closure."""
+    url = str(failure.get("url", ""))
+    error = str(failure.get("error", ""))
+    return "ERR_ABORTED" in error and (
+        "/_nuxt/builds/meta/" in url
+        or "/api/v1/models/connections/" in url
+        or "/shutdown/pagehide" in url
+    )
+
+
 def geometry(page: Page) -> dict[str, object]:
     return page.evaluate("""() => {
           const box = (selector) => {
@@ -46,7 +57,16 @@ def install_mock_api(page: Page) -> None:
         "page": 42,
         "file_name": "katha-upanishad.pdf",
         "score": 0.91,
-        "excerpt": "The wise learn to distinguish the enduring from the passing.",
+        "excerpt": "उत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत।",
+        "source_text": (
+            "Sanskrit verse:\n"
+            "उत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत।\n\n"
+            "Translation:\n"
+            "Arise, awake, and learn from the wise."
+        ),
+        "sanskrit_text": "उत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत।",
+        "verse_text": "उत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत।",
+        "translation": "Arise, awake, and learn from the wise.",
     }
     messages: list[dict[str, Any]] = [
         {
@@ -493,11 +513,13 @@ def run(
             failure
             for failure in request_failures
             if "kaspersky-labs.com" not in str(failure["url"])
+            and not is_benign_abort(failure)
         ]
         result["environment_request_failures"] = [
             failure
             for failure in request_failures
             if "kaspersky-labs.com" in str(failure["url"])
+            and not is_benign_abort(failure)
         ]
         browser.close()
 

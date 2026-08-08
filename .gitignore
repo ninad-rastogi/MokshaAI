@@ -23,6 +23,7 @@ frontend/node_modules/
 frontend/.nuxt/
 frontend/.output/
 frontend/dist/
+frontend/test-results/
 
 # Data
 data/embeddings/
@@ -40,6 +41,7 @@ images/MokshaAI_combined_*.png
 # OS
 Thumbs.db
 .DS_Store
+kaspersky-startup-memory-scan-*.txt
 
 # Old files (legacy)
 core/__pycache__/

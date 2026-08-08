@@ -41,6 +41,10 @@ _SOURCE_LIKE_RE = re.compile(
     r"\b(?:File:\s*[^,\n)]+|Page\s+\d+|From\s+(?:The\s+)?[A-Z][A-Za-z0-9 ':-]{2,80})",
 )
 _DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
+_LABEL_RE = re.compile(
+    r"^(?P<label>sanskrit(?:\s+verse)?|shloka|śloka|verse|translation|meaning)\s*:\s*(?P<text>.*)$",
+    re.IGNORECASE,
+)
 
 
 def _norm(value: object) -> str:
@@ -66,13 +70,59 @@ def _clean_lines(text: str) -> list[str]:
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
+def _metadata_text(chunk: dict[str, Any], *names: str) -> str:
+    for name in names:
+        value = chunk.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    metadata = chunk.get("metadata")
+    if isinstance(metadata, dict):
+        for name in names:
+            value = metadata.get(name)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
+
+
+def _labelled_text_parts(lines: list[str]) -> dict[str, str]:
+    parts: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in lines:
+        match = _LABEL_RE.match(line)
+        if match:
+            label = match.group("label").lower()
+            current = "translation" if label in {"translation", "meaning"} else "verse"
+            text = match.group("text").strip()
+            parts.setdefault(current, [])
+            if text:
+                parts[current].append(text)
+            continue
+        if current:
+            parts[current].append(line)
+    return {
+        key: "\n".join(value).strip()
+        for key, value in parts.items()
+        if "\n".join(value).strip()
+    }
+
+
 def _citation_text_parts(text: str) -> dict[str, str]:
     lines = _clean_lines(text)
+    labelled = _labelled_text_parts(lines)
     devanagari_lines = [line for line in lines if _DEVANAGARI_RE.search(line)]
     parts: dict[str, str] = {
         "source_text": _clip_text(text, MAX_SOURCE_TEXT_CHARS),
     }
-    if devanagari_lines:
+    if labelled:
+        verse = labelled.get("verse", "")
+        translation = labelled.get("translation", "")
+        if verse:
+            parts["verse_text"] = _clip_text(verse, MAX_VERSE_CHARS)
+            if _DEVANAGARI_RE.search(verse):
+                parts["sanskrit_text"] = parts["verse_text"]
+        if translation:
+            parts["translation"] = _clip_text(translation, MAX_TRANSLATION_CHARS)
+    elif devanagari_lines:
         sanskrit = "\n".join(devanagari_lines[:8])
         parts["sanskrit_text"] = _clip_text(sanskrit, MAX_VERSE_CHARS)
         parts["verse_text"] = parts["sanskrit_text"]
@@ -102,6 +152,15 @@ def citation_from_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
         "excerpt": _clip_text(text, MAX_EXCERPT_CHARS),
     }
     citation.update(_citation_text_parts(text))
+    verse_text = _metadata_text(chunk, "verse_text", "sanskrit_text", "shloka")
+    sanskrit_text = _metadata_text(chunk, "sanskrit_text", "shloka")
+    translation = _metadata_text(chunk, "translation", "meaning")
+    if verse_text:
+        citation["verse_text"] = _clip_text(verse_text, MAX_VERSE_CHARS)
+    if sanskrit_text:
+        citation["sanskrit_text"] = _clip_text(sanskrit_text, MAX_VERSE_CHARS)
+    if translation:
+        citation["translation"] = _clip_text(translation, MAX_TRANSLATION_CHARS)
     return citation
 
 
@@ -142,17 +201,27 @@ def enforce_grounded_response(
         )
 
     source = sources[0]
-    excerpt = str(source.get("excerpt", "")).strip()
+    verse = str(
+        source.get("sanskrit_text") or source.get("verse_text") or source.get("excerpt")
+    ).strip()
+    translation = str(source.get("translation", "")).strip()
     scripture = str(source.get("scripture", "Indexed source")).strip()
     file_name = str(source.get("file_name", "source")).strip()
     page = source.get("page", "N/A")
+    meaning = (
+        translation
+        if translation
+        else (
+            f"This is the exact retrieved passage from [{scripture}, {file_name}, "
+            f"p. {page}]. I cannot verify any other book, file, page, or verse for "
+            "this answer."
+        )
+    )
     return (
         "## Source verse\n"
-        f"> {excerpt}\n\n"
+        f"> {verse}\n\n"
         "## Meaning\n"
-        f"This is the exact retrieved passage from [{scripture}, {file_name}, "
-        f"p. {page}]. I cannot verify any other book, file, page, or verse for "
-        "this answer.\n\n"
+        f"{meaning}\n\n"
         "## Guidance\n"
         "Stay with what the retrieved passage directly supports. Pause, observe "
         "the pull inside you, and choose the clearest next action without adding "

@@ -46,6 +46,44 @@ def test_citation_from_chunk_extracts_sanskrit_and_translation():
     assert citation["source_text"].startswith("कर्मण्येवाधिकारस्ते")
 
 
+def test_citation_from_chunk_extracts_labelled_verse_and_translation():
+    citation = citation_from_chunk(
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "text": (
+                "Sanskrit verse:\n" "सत्यं वद।\n\n" "Translation:\n" "Speak truth."
+            ),
+        }
+    )
+
+    assert citation["sanskrit_text"] == "सत्यं वद।"
+    assert citation["verse_text"] == "सत्यं वद।"
+    assert citation["translation"] == "Speak truth."
+
+
+def test_citation_from_chunk_prefers_explicit_metadata():
+    citation = citation_from_chunk(
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "text": "Loose retrieved passage.",
+            "metadata": {
+                "sanskrit_text": "अहिंसा परमो धर्मः",
+                "translation": "Non-harm is a highest duty.",
+            },
+        }
+    )
+
+    assert citation["sanskrit_text"] == "अहिंसा परमो धर्मः"
+    assert citation["verse_text"] == "अहिंसा परमो धर्मः"
+    assert citation["translation"] == "Non-harm is a highest duty."
+
+
 @pytest.mark.parametrize(
     ("field", "value", "code"),
     [
@@ -129,3 +167,26 @@ def test_enforce_grounded_response_replaces_invented_source_claim():
     assert "The Book of Life" not in response
     assert "## Source verse" in response
     assert "Exact source passage." in response
+
+
+def test_enforce_grounded_response_uses_structured_verse_and_translation():
+    sources = [
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "excerpt": "Fallback excerpt.",
+            "sanskrit_text": "सत्यं वद।",
+            "translation": "Speak truth.",
+        }
+    ]
+
+    response = enforce_grounded_response(
+        "Fake answer. (From The Book of Life, File: Wisdom, Page 34)",
+        sources,
+    )
+
+    assert "> सत्यं वद।" in response
+    assert "Speak truth." in response
+    assert "Fallback excerpt." not in response

@@ -51,7 +51,7 @@ class ScriptureChunker:
             List of chunk dicts
         """
         chunks: list[dict[str, Any]] = []
-        sections = self._split_sections(text)
+        sections = self._pair_shloka_translations(self._split_sections(text))
 
         for section_type, section_text in sections:
             if not section_text.strip():
@@ -74,6 +74,39 @@ class ScriptureChunker:
                 )
 
         return chunks
+
+    def _pair_shloka_translations(
+        self,
+        sections: list[tuple[str, str]],
+    ) -> list[tuple[str, str]]:
+        """Keep adjacent verse and translation together for citation display."""
+        paired: list[tuple[str, str]] = []
+        index = 0
+        while index < len(sections):
+            section_type, section_text = sections[index]
+            next_section = sections[index + 1] if index + 1 < len(sections) else None
+            if (
+                section_type == "shloka"
+                and next_section is not None
+                and next_section[0] in {"translation", "narration"}
+                and len(next_section[1]) <= self.max_chunk_size
+            ):
+                paired.append(
+                    (
+                        "verse_with_translation",
+                        (
+                            "Sanskrit verse:\n"
+                            f"{section_text.strip()}\n\n"
+                            "Translation:\n"
+                            f"{next_section[1].strip()}"
+                        ),
+                    )
+                )
+                index += 2
+                continue
+            paired.append((section_type, section_text))
+            index += 1
+        return paired
 
     def _split_sections(self, text: str) -> list[tuple[str, str]]:
         """
@@ -113,7 +146,7 @@ class ScriptureChunker:
 
     def _classify_line(self, line: str) -> str:
         """Classify a line as shloka, translation, or narration."""
-        devanagari_chars = len(DEVANAGARI_PATTERN.findall(line))
+        devanagari_chars = _devanagari_char_count(line)
         total_chars = len(line.strip())
 
         if total_chars == 0:
@@ -139,7 +172,7 @@ class ScriptureChunker:
 
     def _detect_language(self, text: str) -> str:
         """Detect the primary language of a text chunk."""
-        devanagari_chars = len(DEVANAGARI_PATTERN.findall(text))
+        devanagari_chars = _devanagari_char_count(text)
         total_chars = len(text.strip())
 
         if total_chars == 0:
@@ -173,3 +206,7 @@ class ScriptureChunker:
             chunks.append(current_chunk.strip())
 
         return chunks
+
+
+def _devanagari_char_count(text: str) -> int:
+    return sum(len(match.group(0)) for match in DEVANAGARI_PATTERN.finditer(text))
