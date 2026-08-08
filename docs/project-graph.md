@@ -1,6 +1,6 @@
 # Moksha AI Project Graph
 
-Generated from source inspection through commit `86436a4`, with stale
+Generated from source inspection through commit `ac985ac`, with stale
 `graphify-out/` hub data used only as navigation hints. The `graphify` CLI was
 not available in this shell, so this file is the current compact graph for
 handoff and token-saving.
@@ -81,7 +81,7 @@ graph TD
     ModelsAPI --> Connection["ModelConnection\nadmin or user-owned"]
     Connection --> Keyring["AES-256-GCM BYOK keyring\noutside DB"]
     Connection --> Probe["llm.providers.update_connection_probe\nsanitized statuses"]
-    Preference --> Resolver["llm.services.resolve_model_plan"]
+    Preference --> Resolver["llm.services.resolve_model_selection"]
     Resolver --> Primary["primary attempt"]
     Resolver --> Fallback["one eligible fallback\nonly before first token"]
     Installer["ModelInstallationJob"] --> Catalog["signed Moksha catalog"]
@@ -104,13 +104,17 @@ graph TD
   installation jobs.
 - `llm/providers.py`: public HTTPS provider guardrails, probes, streaming
   adapters, sanitized provider failures.
-- `frontend/pages/app.vue`: authenticated app shell, chat workspace, status,
-  settings entrypoint.
+- `frontend/pages/app.vue`: authenticated app shell, chat workspace, live
+  connection/model status, settings entrypoint, fixed composer.
 - `frontend/components/app/SettingsDialog.vue`: theme, model, BYOK connection,
   scripture/account controls.
 - `frontend/composables/useApi.ts`: REST client schemas and account persistence.
 - `frontend/composables/useRunStream.ts`: hand-written SSE adapter.
 - `scripts/live_ui_walkthrough.py`: Playwright UI proof with mock API.
+- `tests/test_operations.py`: Compose/Caddy private edge topology and memory
+  reservation contract.
+- `users/tests/test_readiness_view.py`: no-DB readiness dependency regression
+  coverage.
 
 ## Current Verification Gaps
 
