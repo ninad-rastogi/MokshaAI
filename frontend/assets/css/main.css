@@ -34,9 +34,9 @@
   --moksha-user-bubble: #dce6df;
   --moksha-user-line: rgb(35 79 59 / 18%);
   --moksha-user-ink: #17251e;
-  --moksha-assistant-bubble: rgb(255 252 244 / 92%);
-  --moksha-assistant-line: rgb(95 73 43 / 22%);
-  --moksha-assistant-shadow: 0 0.9rem 2.2rem rgb(29 43 35 / 12%);
+  --moksha-assistant-bubble: rgb(255 249 234 / 97%);
+  --moksha-assistant-line: rgb(95 73 43 / 34%);
+  --moksha-assistant-shadow: 0 0.85rem 2.1rem rgb(29 43 35 / 17%);
   --moksha-guide-mark: #17352a;
   --moksha-focus: #8b5c25;
   --moksha-focus-ring: rgb(139 92 37 / 14%);
@@ -82,9 +82,9 @@
   --moksha-user-bubble: #264638;
   --moksha-user-line: rgb(171 214 190 / 18%);
   --moksha-user-ink: #f0f5f0;
-  --moksha-assistant-bubble: rgb(245 231 205 / 16%);
-  --moksha-assistant-line: rgb(232 199 150 / 26%);
-  --moksha-assistant-shadow: 0 1rem 2.3rem rgb(0 0 0 / 28%);
+  --moksha-assistant-bubble: rgb(245 231 205 / 23%);
+  --moksha-assistant-line: rgb(232 199 150 / 38%);
+  --moksha-assistant-shadow: 0 1rem 2.3rem rgb(0 0 0 / 34%);
   --moksha-guide-mark: #d8b178;
   --moksha-focus: #d7a060;
   --moksha-focus-ring: rgb(215 160 96 / 16%);

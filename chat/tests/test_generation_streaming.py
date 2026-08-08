@@ -56,7 +56,8 @@ def test_local_general_generation_buffers_before_grounding(monkeypatch) -> None:
 
     assert mode == "GENERAL"
     assert sources == []
-    assert "The Book of Life" in response
+    assert "The Book of Life" not in response
+    assert "no indexed source evidence was used" in response
     assert deltas == []
 
 
@@ -83,5 +84,6 @@ def test_remote_general_generation_buffers_before_grounding() -> None:
 
     assert mode == "GENERAL"
     assert sources == []
-    assert "The Book of Life" in response
+    assert "The Book of Life" not in response
+    assert "no indexed source evidence was used" in response
     assert deltas == []

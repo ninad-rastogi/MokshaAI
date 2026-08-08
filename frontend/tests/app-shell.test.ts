@@ -19,6 +19,10 @@ const composerComponent = readFileSync(
   resolve(root, "components/app/ChatComposer.vue"),
   "utf8",
 );
+const conversationMessage = readFileSync(
+  resolve(root, "components/app/ConversationMessage.vue"),
+  "utf8",
+);
 const citationComponent = readFileSync(
   resolve(root, "components/CitationList.vue"),
   "utf8",
@@ -31,6 +35,7 @@ const runStreamComposable = readFileSync(
   resolve(root, "composables/useRunStream.ts"),
   "utf8",
 );
+const mainCss = readFileSync(resolve(root, "assets/css/main.css"), "utf8");
 
 describe("app shell", () => {
   it("keeps theme and model controls inside a settings dialog", () => {
@@ -153,5 +158,22 @@ describe("app shell", () => {
     expect(citationComponent).toContain("Retrieved source passage");
     expect(apiComposable).toContain("sanskrit_text");
     expect(apiComposable).toContain("translation");
+  });
+
+  it("keeps assistant bubbles visibly framed in light and dark themes", () => {
+    expect(mainCss).toContain(
+      "--moksha-assistant-bubble: rgb(255 249 234 / 97%)",
+    );
+    expect(mainCss).toContain("--moksha-assistant-line: rgb(95 73 43 / 34%)");
+    expect(mainCss).toContain(
+      "--moksha-assistant-bubble: rgb(245 231 205 / 23%)",
+    );
+    expect(mainCss).toContain(
+      "--moksha-assistant-line: rgb(232 199 150 / 38%)",
+    );
+    expect(mainCss).toContain("--moksha-assistant-shadow");
+    expect(conversationMessage).toContain(
+      "message--assistant .message__content",
+    );
   });
 });

@@ -211,7 +211,7 @@ def _generate_response(
         )
         sources = []
         mode = "GENERAL"
-    return response_text, sources, mode
+    return enforce_grounded_response(response_text, sources), sources, mode
 
 
 def _chat_history_messages(
@@ -267,7 +267,7 @@ def _generate_remote_provider_response(
             on_delta=None,
         )
         spec.snapshot["reported_usage"] = usage
-        return response_text, [], "GENERAL"
+        return enforce_grounded_response(response_text, []), [], "GENERAL"
 
     engine = RAGEngine(
         vector_store=PgVectorStore(),
@@ -340,7 +340,7 @@ def _generate_remote_provider_response(
         on_delta=None,
     )
     spec.snapshot["reported_usage"] = usage
-    return response_text, sources, mode
+    return enforce_grounded_response(response_text, sources), sources, mode
 
 
 def _finish_cancelled(
