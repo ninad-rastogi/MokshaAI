@@ -45,3 +45,39 @@ def test_catalog_rejects_unpinned_or_unsafe_entry_paths(field, value, code):
 
     with pytest.raises(CatalogValidationError, match=code):
         verify_catalog(payload, signature)
+
+
+@pytest.mark.parametrize(
+    ("mutator", "code"),
+    [
+        (
+            lambda payload: payload["revoked_entry_ids"].append(
+                payload["entries"][0]["id"]
+            ),
+            "catalog_entry_revoked_or_invalid",
+        ),
+        (
+            lambda payload: payload["entries"].append(dict(payload["entries"][0])),
+            "catalog_entry_duplicate",
+        ),
+        (
+            lambda payload: payload["entries"][0].update(
+                {"download_url": "https://example.com/owner/repo/model.gguf"}
+            ),
+            "catalog_entry_url_invalid",
+        ),
+        (
+            lambda payload: payload["entries"][0].update(
+                {"download_url": payload["entries"][0]["download_url"] + "?token=x"}
+            ),
+            "catalog_entry_url_invalid",
+        ),
+    ],
+)
+def test_catalog_rejects_revoked_duplicate_or_untrusted_urls(mutator, code):
+    payload = json.loads(Path(settings.MODEL_CATALOG_FILE).read_text(encoding="utf-8"))
+    signature = Path(settings.MODEL_CATALOG_SIGNATURE_FILE).read_text(encoding="ascii")
+    mutator(payload)
+
+    with pytest.raises(CatalogValidationError, match=code):
+        verify_catalog(payload, signature)
