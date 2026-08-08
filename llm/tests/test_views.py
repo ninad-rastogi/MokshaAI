@@ -7,6 +7,7 @@ import pytest
 from django.utils import timezone
 from rest_framework import status
 
+from llm.catalog import CatalogValidationError
 from llm.models import (
     ModelCatalogRelease,
     ModelConnection,
@@ -273,3 +274,19 @@ def test_staff_starts_install_from_active_verified_catalog(authenticated_client)
     assert job.catalog_entry["_catalog_version"] == "2026.07.30.1"
     assert job.source_sha256 == "a" * 64
     assert not job.keep_source
+
+
+@pytest.mark.django_db
+def test_staff_catalog_refresh_returns_stable_validation_code(authenticated_client):
+    client, user = authenticated_client
+    user.is_staff = True
+    user.save(update_fields=["is_staff"])
+
+    with patch(
+        "llm.views.activate_configured_catalog",
+        side_effect=CatalogValidationError("catalog_signature_invalid"),
+    ):
+        response = client.post("/api/v1/models/catalog/refresh/", format="json")
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data == {"detail": "catalog_signature_invalid"}

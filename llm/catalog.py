@@ -46,6 +46,14 @@ CATALOG_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 class CatalogValidationError(ValueError):
     """Stable catalog rejection with no untrusted detail."""
 
+    @property
+    def code(self) -> str:
+        """Return a stable public catalog validation code."""
+        value = self.args[0] if self.args else ""
+        if isinstance(value, str) and re.fullmatch(r"[a-z0-9_]+", value):
+            return value
+        return "catalog_invalid"
+
 
 @dataclass(frozen=True)
 class VerifiedCatalog:

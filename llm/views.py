@@ -179,7 +179,7 @@ class ModelCatalogViewSet(viewsets.ViewSet):
             release = activate_configured_catalog()
         except CatalogValidationError as error:
             return Response(
-                {"detail": str(error)},
+                {"detail": error.code},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
