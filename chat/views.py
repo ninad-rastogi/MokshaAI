@@ -3,7 +3,7 @@
 import json
 import logging
 import time
-from typing import Any, cast
+from typing import cast
 from uuid import UUID
 
 from django.conf import settings
@@ -18,20 +18,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from chat.citations import enforce_grounded_response, validate_citations
 from chat.events import format_sse, publish_run_event, redis_client
-from chat.models import Chat, GenerationRun, Message
-from chat.rag.embeddings import PgVectorStore
-from chat.rag.engine import RAGEngine
+from chat.models import Chat, GenerationRun
 from chat.serializers import (
     ChatDetailSerializer,
     ChatSerializer,
     GenerationRunSerializer,
-    QuerySerializer,
     RunCreateSerializer,
 )
 from chat.tasks import generate_chat_response
-from scriptures.models import Scripture
 from users.models import User
 
 logger = logging.getLogger("chat.views")
@@ -200,83 +195,14 @@ class ChatViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=["post"])
     def query(self, request: Request, pk: UUID | None = None) -> Response:
-        """Submit a query and get an AI response via the RAG engine."""
-        chat = get_object_or_404(Chat, pk=pk, user=request.user)
-        serializer = QuerySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user_message = serializer.validated_data["message"]
-
-        # Save user message
-        Message.objects.create(chat=chat, role="user", content=user_message)
-
-        # Get recent message history for context
-        recent_messages = [
-            {"role": m.role, "content": m.content}
-            for m in Message.objects.filter(chat=chat).order_by("created_at")
-        ]
-
-        # Initialize RAG engine
-        try:
-            available_scriptures = list(
-                Scripture.objects.filter(is_indexed=True).values_list("name", flat=True)
-            )
-            vector_store = PgVectorStore()
-            engine = RAGEngine(
-                vector_store=vector_store,
-                ollama_model=settings.OLLAMA_MODEL,
-                ollama_server=settings.OLLAMA_BASE_URL,
-                system_prompt=settings.SPIRITUAL_GUIDE_SYSTEM_PROMPT,
-                available_scriptures=available_scriptures,
-            )
-
-            # Route the query
-            route, requires_scripture = engine.route_query(user_message)
-            logger.info(f"Query routed as: {route}")
-
-            if route == "rag" and requires_scripture:
-                response_text, sources = engine.query_with_rag(
-                    query=user_message,
-                    messages_history=recent_messages,
-                )
-                mode = "RAG"
-            else:
-                response_text = engine.query_without_rag(
-                    query=user_message,
-                    messages_history=recent_messages,
-                )
-                sources = []
-                mode = "GENERAL"
-            sources = cast(list[dict[str, Any]], validate_citations(sources))
-            response_text = enforce_grounded_response(response_text, sources)
-
-        except Exception:
-            logger.exception("RAG engine error")
-            return Response(
-                {
-                    "error": "generation_failed",
-                    "detail": "I could not complete that response. Please retry.",
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        # Save assistant message
-        Message.objects.create(
-            chat=chat,
-            role="assistant",
-            content=response_text,
-            mode=mode,
-            sources=sources,
-        )
-
-        # Auto-name chat after 4+ messages
-        message_count = Message.objects.filter(chat=chat).count()
-        if message_count >= 4 and chat.name == "New Spiritual Conversation":
-            chat.name = self._auto_name(user_message)
-            chat.save(update_fields=["name"])
-
+        """Reject the old synchronous path; clients must use durable runs."""
+        get_object_or_404(Chat, pk=pk, user=request.user)
         return Response(
-            {"response": response_text, "sources": sources, "mode": mode},
-            status=status.HTTP_200_OK,
+            {
+                "error": "legacy_query_removed",
+                "detail": "Create a generation run at /api/v1/chats/{id}/runs/.",
+            },
+            status=status.HTTP_410_GONE,
         )
 
     @action(detail=False, methods=["post"])
