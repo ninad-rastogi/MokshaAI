@@ -91,6 +91,8 @@ def validate_result(result: dict[str, object], *, mock_api: bool) -> list[str]:
     if mock_api:
         if result.get("connection_removed") is not True:
             failures.append("connection_remove_flow_failed")
+        if result.get("mobile_history_close") is not True:
+            failures.append("mobile_history_close_failed")
         if result.get("primary_model_after_refresh") != "Moksha local":
             failures.append("model_preference_not_persisted_after_refresh")
         connection_status = str(result.get("connection_status_aria", ""))
@@ -583,6 +585,11 @@ def run(
         page.get_by_label("Open conversation history").click()
         page.wait_for_timeout(350)
         page.screenshot(path=output_dir / "mobile-history.png", full_page=True)
+        page.get_by_label("Close history panel").click()
+        page.wait_for_timeout(350)
+        result["mobile_history_close"] = (
+            page.locator(".history.history--open").count() == 0
+        )
         result["mobile_geometry"] = geometry(page)
         result["console_errors"] = console_errors
         result["request_failures"] = [

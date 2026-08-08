@@ -12,6 +12,7 @@ def _passing_result() -> dict[str, object]:
         "console_errors": [],
         "request_failures": [],
         "connection_removed": True,
+        "mobile_history_close": True,
         "primary_model_after_refresh": "Moksha local",
         "connection_status_aria": "Online · Moksha local · qwen3:4b",
         "exact_verse_text": "Exact verse\nउत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत।",
