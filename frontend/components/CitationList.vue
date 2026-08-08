@@ -24,11 +24,25 @@ defineProps<{ citations: Citation[] }>();
           </span>
           <span class="page-reference">Page {{ citation.page }}</span>
         </header>
-        <blockquote aria-label="Exact retrieved source passage">
-          <strong>Source passage</strong>
+        <blockquote
+          v-if="citation.sanskrit_text || citation.verse_text"
+          class="verse-panel"
+          aria-label="Exact cited verse"
+        >
+          <strong>Exact verse</strong>
           <UIcon name="i-lucide-quote" aria-hidden="true" />
-          <span>{{ citation.excerpt }}</span>
+          <span class="verse-text">
+            {{ citation.sanskrit_text || citation.verse_text }}
+          </span>
         </blockquote>
+        <p v-if="citation.translation" class="translation-panel">
+          <strong>Translation</strong>
+          <span>{{ citation.translation }}</span>
+        </p>
+        <details class="source-details">
+          <summary>Retrieved source passage</summary>
+          <p>{{ citation.source_text || citation.excerpt }}</p>
+        </details>
       </li>
     </ol>
   </details>
@@ -114,27 +128,37 @@ li small {
   white-space: nowrap;
 }
 
-blockquote {
-  align-items: start;
+blockquote,
+.translation-panel,
+.source-details {
   background: var(--moksha-assistant-bubble);
   border: 1px solid var(--moksha-assistant-line);
   border-radius: 0.55rem;
   color: var(--moksha-ink);
+  margin: 0.5rem 0 0;
+}
+
+blockquote {
+  align-items: start;
   display: grid;
   font-size: 0.72rem;
   gap: 0.4rem;
   grid-template-columns: auto minmax(0, 1fr);
   line-height: 1.55;
-  margin: 0.5rem 0 0;
   padding: 0.55rem 0.6rem;
 }
 
-blockquote strong {
+blockquote strong,
+.translation-panel strong,
+.source-details summary {
   color: var(--moksha-accent);
   font-size: 0.62rem;
-  grid-column: 1 / -1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+blockquote strong {
+  grid-column: 1 / -1;
 }
 
 blockquote svg {
@@ -142,5 +166,39 @@ blockquote svg {
   height: 0.78rem;
   margin-top: 0.12rem;
   width: 0.78rem;
+}
+
+.verse-text,
+.translation-panel span,
+.source-details p {
+  white-space: pre-wrap;
+}
+
+.translation-panel {
+  display: grid;
+  font-size: 0.72rem;
+  gap: 0.32rem;
+  line-height: 1.55;
+  padding: 0.55rem 0.6rem;
+}
+
+.source-details {
+  padding: 0.48rem 0.6rem;
+}
+
+.source-details summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.source-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.source-details p {
+  color: var(--moksha-muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  margin: 0.45rem 0 0;
 }
 </style>

@@ -2,6 +2,7 @@ import pytest
 
 from chat.citations import (
     CitationValidationError,
+    citation_from_chunk,
     enforce_grounded_response,
     unsupported_citation_claims,
     validate_citations,
@@ -23,6 +24,26 @@ def test_validate_citations_normalizes_valid_record():
 
     assert result[0]["page"] == 4
     assert result[0]["score"] == 0.82
+
+
+def test_citation_from_chunk_extracts_sanskrit_and_translation():
+    citation = citation_from_chunk(
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "text": (
+                "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन\n"
+                "You have a right to action, not to its fruits."
+            ),
+        }
+    )
+
+    assert citation["sanskrit_text"] == "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन"
+    assert citation["verse_text"] == "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन"
+    assert citation["translation"] == "You have a right to action, not to its fruits."
+    assert citation["source_text"].startswith("कर्मण्येवाधिकारस्ते")
 
 
 @pytest.mark.parametrize(
@@ -47,6 +68,27 @@ def test_validate_citations_rejects_invalid_fields(field, value, code):
 
     with pytest.raises(CitationValidationError, match=code):
         validate_citations([source])
+
+
+def test_validate_citations_keeps_structured_optional_fields():
+    result = validate_citations(
+        [
+            {
+                "scripture": "Collection",
+                "file_name": "volume.pdf",
+                "page": 4,
+                "score": 0.82,
+                "excerpt": "A bounded source excerpt.",
+                "source_text": "Full retrieved passage.",
+                "verse_text": "Exact verse.",
+                "sanskrit_text": "कर्मण्येवाधिकारस्ते",
+                "translation": "Translation.",
+            }
+        ]
+    )
+
+    assert result[0]["source_text"] == "Full retrieved passage."
+    assert result[0]["sanskrit_text"] == "कर्मण्येवाधिकारस्ते"
 
 
 def test_unsupported_citation_claims_detects_invented_source():

@@ -13,6 +13,26 @@ class CitationSerializer(serializers.Serializer):
     page = serializers.IntegerField(min_value=1)
     score = serializers.FloatField(min_value=0, max_value=1)
     excerpt = serializers.CharField(max_length=600)
+    source_text = serializers.CharField(
+        max_length=2000,
+        required=False,
+        allow_blank=True,
+    )
+    verse_text = serializers.CharField(
+        max_length=1200,
+        required=False,
+        allow_blank=True,
+    )
+    sanskrit_text = serializers.CharField(
+        max_length=1200,
+        required=False,
+        allow_blank=True,
+    )
+    translation = serializers.CharField(
+        max_length=1600,
+        required=False,
+        allow_blank=True,
+    )
 
 
 class MessageSerializer(serializers.ModelSerializer):

@@ -100,7 +100,12 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
       </UTooltip>
     </div>
 
-    <button class="new-chat" type="button" @click="emit('create')">
+    <button
+      class="new-chat"
+      type="button"
+      aria-label="Start new conversation"
+      @click="emit('create')"
+    >
       <UIcon name="i-lucide-square-pen" aria-hidden="true" />
       <span>New conversation</span>
       <kbd>Ctrl K</kbd>
@@ -268,26 +273,30 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
   align-items: center;
   background: var(--moksha-glass-raised);
   border: 1px solid var(--moksha-glass-line);
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   color: var(--moksha-ink);
   display: grid;
-  font-weight: 680;
-  gap: 0.55rem;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  margin-top: 0.65rem;
-  min-height: 2.35rem;
-  padding: 0 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 720;
+  gap: 0.48rem;
+  grid-template-columns: 0.95rem minmax(0, 1fr) max-content;
+  height: 2.45rem;
+  line-height: 1;
+  margin-top: 0.55rem;
+  padding: 0 0.62rem;
   text-align: left;
+  width: 100%;
 }
 
 .new-chat svg {
   color: var(--moksha-accent);
-  height: 0.92rem;
-  width: 0.92rem;
+  height: 0.9rem;
+  width: 0.9rem;
 }
 
 .new-chat span {
-  font-size: 0.78rem;
+  display: block;
+  font-size: 0.82rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -295,7 +304,8 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
 
 kbd {
   color: var(--moksha-muted);
-  font: 600 0.68rem/1 var(--moksha-font);
+  font: 650 0.62rem/1 var(--moksha-font);
+  white-space: nowrap;
 }
 
 .history-search {

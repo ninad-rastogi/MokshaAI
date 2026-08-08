@@ -33,6 +33,10 @@ const citationSchema = z.object({
   file_name: z.string(),
   score: z.number(),
   excerpt: z.string(),
+  source_text: z.string().optional(),
+  verse_text: z.string().optional(),
+  sanskrit_text: z.string().optional(),
+  translation: z.string().optional(),
 });
 
 const messageSchema = z.object({

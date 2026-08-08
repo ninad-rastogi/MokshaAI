@@ -10,7 +10,11 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from chat.citations import enforce_grounded_response, validate_citations
+from chat.citations import (
+    citation_from_chunk,
+    enforce_grounded_response,
+    validate_citations,
+)
 from chat.events import publish_run_event
 from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
@@ -271,19 +275,7 @@ def _generate_remote_provider_response(
                 f"[Source {index + 1}: {scripture}, {file_name}, p. {page}]\n"
                 f"{chunk['text']}\n"
             )
-            sources.append(
-                {
-                    "scripture": scripture,
-                    "page": page,
-                    "file_name": file_name,
-                    "score": chunk.get("score", 0.0),
-                    "excerpt": (
-                        chunk["text"][:200] + "..."
-                        if len(chunk["text"]) > 200
-                        else chunk["text"]
-                    ),
-                }
-            )
+            sources.append(citation_from_chunk(chunk))
         prompt = (
             "Based ONLY on the following scripture context, answer the user's "
             f"question.\n\nScripture Context:\n{'\n'.join(context_parts)}\n\n"

@@ -13,6 +13,7 @@ from django.conf import settings
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
+from chat.citations import citation_from_chunk
 from chat.rag.safety import safety_response
 
 logger = logging.getLogger("chat.rag.engine")
@@ -205,19 +206,7 @@ class RAGEngine:
                 f"[Source {i + 1}: {scripture}, {file_name}, p. {page}]\n"
                 f"{chunk['text']}\n"
             )
-            sources.append(
-                {
-                    "scripture": scripture,
-                    "page": page,
-                    "file_name": file_name,
-                    "score": chunk.get("score", 0.0),
-                    "excerpt": (
-                        chunk["text"][:200] + "..."
-                        if len(chunk["text"]) > 200
-                        else chunk["text"]
-                    ),
-                }
-            )
+            sources.append(citation_from_chunk(chunk))
 
         context_str = "\n".join(context_parts)
 

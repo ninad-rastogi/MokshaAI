@@ -13,6 +13,10 @@ export type Citation = {
   file_name: string;
   score: number;
   excerpt: string;
+  source_text?: string;
+  verse_text?: string;
+  sanskrit_text?: string;
+  translation?: string;
 };
 
 export type Message = {

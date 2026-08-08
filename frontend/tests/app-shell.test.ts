@@ -19,6 +19,10 @@ const composerComponent = readFileSync(
   resolve(root, "components/app/ChatComposer.vue"),
   "utf8",
 );
+const citationComponent = readFileSync(
+  resolve(root, "components/CitationList.vue"),
+  "utf8",
+);
 const apiComposable = readFileSync(
   resolve(root, "composables/useApi.ts"),
   "utf8",
@@ -88,6 +92,8 @@ describe("app shell", () => {
     expect(sidebarComponent).toContain('@click.stop="closeHistory"');
     expect(sidebarComponent).toContain("@keydown.esc.stop");
     expect(sidebarComponent).toContain("Ctrl K");
+    expect(sidebarComponent).toContain('aria-label="Start new conversation"');
+    expect(sidebarComponent).toContain("white-space: nowrap");
     expect(appPage).toContain('event.key.toLowerCase() !== "k"');
   });
 
@@ -121,5 +127,14 @@ describe("app shell", () => {
     expect(appPage).not.toContain(
       'class="message-viewport" aria-live="polite"',
     );
+  });
+
+  it("renders exact verse and translation as first-class citation fields", () => {
+    expect(citationComponent).toContain("Exact verse");
+    expect(citationComponent).toContain("citation.sanskrit_text");
+    expect(citationComponent).toContain("citation.translation");
+    expect(citationComponent).toContain("Retrieved source passage");
+    expect(apiComposable).toContain("sanskrit_text");
+    expect(apiComposable).toContain("translation");
   });
 });
