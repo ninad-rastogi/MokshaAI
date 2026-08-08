@@ -1,3 +1,4 @@
+import builtins
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +18,21 @@ def test_model_scan_command_parses():
 
 def test_model_scan_rejects_non_windows_host():
     with patch("moksha.cli.sys.platform", "linux"):
+        assert main(["setup", "model", "scan"]) == 2
+
+
+def test_model_scan_does_not_import_whichllm_on_non_windows_host():
+    real_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name.startswith("whichllm"):
+            raise AssertionError("whichllm_must_not_import_outside_windows_scan")
+        return real_import(name, *args, **kwargs)
+
+    with (
+        patch("moksha.cli.sys.platform", "linux"),
+        patch("builtins.__import__", side_effect=guarded_import),
+    ):
         assert main(["setup", "model", "scan"]) == 2
 
 
