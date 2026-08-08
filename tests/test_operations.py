@@ -66,3 +66,28 @@ def test_compose_steady_memory_reservations_stay_below_target():
     ]
 
     assert sum(steady_reservations) <= 4096
+
+
+def test_backup_script_excludes_runtime_secrets():
+    backup_script = (PROJECT_ROOT / "scripts" / "backup.ps1").read_text()
+
+    assert "excludes_secrets = $true" in backup_script
+    assert "BYOK keyring is intentionally excluded" in backup_script
+    assert "runtime-secrets" not in backup_script
+    assert 'Join-Path $projectRoot "data"' in backup_script
+
+
+def test_restore_script_requires_confirmation_and_pre_restore_backup():
+    restore_script = (PROJECT_ROOT / "scripts" / "restore.ps1").read_text()
+
+    assert "if (-not $ConfirmRestore)" in restore_script
+    assert "Re-run with -ConfirmRestore" in restore_script
+    assert 'backup.ps1") -Destination "backups/pre-restore"' in restore_script
+    assert (
+        "docker compose stop django worker generation-worker model-installer scheduler"
+        in restore_script
+    )
+    assert (
+        "docker compose start django worker generation-worker model-installer scheduler"
+        in restore_script
+    )
