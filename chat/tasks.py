@@ -30,6 +30,9 @@ from scriptures.models import Scripture
 
 logger = logging.getLogger("chat.tasks")
 FINAL_DELTA_CHARS = 180
+REMOTE_BILLING_WARNING = (
+    "A failed remote provider attempt may still be billed by that provider."
+)
 
 
 class GenerationCancelled(RuntimeError):
@@ -84,6 +87,13 @@ def _error_code_from_exception(exc: Exception) -> str:
     if isinstance(exc, ProviderRequestFailed):
         return exc.code
     return "generation_failed"
+
+
+def _remote_attempt_may_bill(spec: GenerationAttemptSpec) -> bool:
+    return spec.provider in {
+        ModelConnection.Dialect.OPENAI_COMPATIBLE,
+        "ollama_compatible",
+    }
 
 
 def _emit_sanitized_deltas(
@@ -419,6 +429,7 @@ def generate_chat_response(self, run_id: str) -> None:
     )
     specs = _attempt_specs(run)
     last_error_code = "generation_failed"
+    warnings: list[str] = []
 
     for attempt_number, spec in enumerate(specs, start=1):
         attempt = GenerationAttempt.objects.create(
@@ -494,6 +505,7 @@ def generate_chat_response(self, run_id: str) -> None:
                     "provider": spec.provider,
                     "model": spec.model,
                     "usage": usage,
+                    "warnings": warnings,
                 },
             )
             done_id = publish_run_event(
@@ -530,6 +542,11 @@ def generate_chat_response(self, run_id: str) -> None:
         except Exception as exc:
             logger.exception("Generation attempt failed for run %s", run_id)
             last_error_code = _error_code_from_exception(exc)
+            if (
+                _remote_attempt_may_bill(spec)
+                and REMOTE_BILLING_WARNING not in warnings
+            ):
+                warnings.append(REMOTE_BILLING_WARNING)
             attempt.outcome = GenerationAttempt.Outcome.FAILED
             attempt.error_code = last_error_code
             attempt.finished_at = timezone.now()
@@ -545,9 +562,10 @@ def generate_chat_response(self, run_id: str) -> None:
                 )
                 break
 
-    error_id = publish_run_event(
-        run.stream_key, "error", _public_error(last_error_code)
-    )
+    error_payload = _public_error(last_error_code)
+    if warnings:
+        error_payload["warning"] = REMOTE_BILLING_WARNING
+    error_id = publish_run_event(run.stream_key, "error", error_payload)
     done_id = publish_run_event(
         run.stream_key, "done", {"state": GenerationRun.State.FAILED}
     )

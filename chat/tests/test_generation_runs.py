@@ -393,6 +393,7 @@ def test_generation_run_openai_profile_persists_usage(create_user):
         "provider": ModelConnection.Dialect.OPENAI_COMPATIBLE,
         "model": "remote-model",
         "usage": {"total_tokens": 9},
+        "warnings": [],
     }
     assert [event[1] for event in emitted_events].index("usage") < [
         event[1] for event in emitted_events
@@ -483,9 +484,15 @@ def test_generation_run_persists_sanitized_provider_error_before_fallback(create
             raise ProviderRequestFailed(429)
         return "Fallback answer.", [], "GENERAL"
 
+    emitted_events = []
+
+    def fake_publish(_stream_key, event_type, payload):
+        emitted_events.append((event_type, payload))
+        return f"{len(emitted_events)}-0"
+
     with (
         patch("chat.tasks.resolve_model_selection") as resolve,
-        patch("chat.tasks.publish_run_event", return_value="1-0"),
+        patch("chat.tasks.publish_run_event", side_effect=fake_publish),
         patch("chat.tasks._generate_response", side_effect=fake_generate),
     ):
         resolve.return_value.attempts = (primary, fallback)
@@ -498,6 +505,12 @@ def test_generation_run_persists_sanitized_provider_error_before_fallback(create
     assert attempts[0].error_code == ModelConnection.Status.RATE_LIMITED
     assert attempts[1].outcome == GenerationAttempt.Outcome.SUCCEEDED
     assert attempts[1].error_code == ""
+    usage_payload = next(
+        payload for event_type, payload in emitted_events if event_type == "usage"
+    )
+    assert usage_payload["warnings"] == [
+        "A failed remote provider attempt may still be billed by that provider."
+    ]
 
 
 @pytest.mark.django_db
@@ -550,4 +563,8 @@ def test_generation_run_emits_sanitized_provider_error(create_user):
     assert attempt.outcome == GenerationAttempt.Outcome.FAILED
     assert attempt.error_code == ModelConnection.Status.QUOTA_LIMITED
     assert error_payload["code"] == ModelConnection.Status.QUOTA_LIMITED
+    assert (
+        error_payload["warning"]
+        == "A failed remote provider attempt may still be billed by that provider."
+    )
     assert "402" not in error_payload["message"]
