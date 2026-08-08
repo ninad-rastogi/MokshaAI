@@ -137,6 +137,29 @@ describe("app shell", () => {
     expect(apiComposable).toContain("class ApiRequestError");
   });
 
+  it("does not store browser bearer tokens", () => {
+    const browserSources = [
+      appPage,
+      indexPage,
+      sidebarComponent,
+      settingsComponent,
+      composerComponent,
+      conversationMessage,
+      citationComponent,
+      apiComposable,
+      runStreamComposable,
+    ].join("\n");
+
+    expect(apiComposable).toContain('credentials: "include"');
+    expect(apiComposable).toContain('"X-CSRFToken"');
+    expect(browserSources).not.toContain("localStorage");
+    expect(browserSources).not.toContain("sessionStorage");
+    expect(browserSources).not.toContain("Authorization");
+    expect(browserSources).not.toContain("Bearer");
+    expect(browserSources).not.toContain("access_token");
+    expect(browserSources).not.toContain("refresh_token");
+  });
+
   it("frames Moksha AI as scripture-guided support for difficult moments", () => {
     expect(indexPage).toContain("Bring what feels difficult to carry.");
     expect(indexPage).toContain("scripture library");
