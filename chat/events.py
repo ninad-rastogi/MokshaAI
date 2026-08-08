@@ -7,6 +7,16 @@ from django.conf import settings
 from redis import Redis
 
 STREAM_TTL_SECONDS = 60 * 60
+RUN_EVENT_TYPES = frozenset(
+    {
+        "state",
+        "delta",
+        "citation",
+        "usage",
+        "error",
+        "done",
+    }
+)
 
 
 def redis_client() -> Redis:
@@ -15,6 +25,8 @@ def redis_client() -> Redis:
 
 def publish_run_event(stream_key: str, event_type: str, data: dict[str, Any]) -> str:
     """Publish a typed event and keep one hour of replay."""
+    if event_type not in RUN_EVENT_TYPES:
+        raise ValueError("run_event_type_invalid")
     client = redis_client()
     event_id = client.xadd(
         stream_key,
