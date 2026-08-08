@@ -11,6 +11,8 @@ from llm.tasks import (
     _copy_model,
     _qualified_tag,
     _running_model_memory,
+    _session,
+    _validated_download_response,
 )
 
 
@@ -30,6 +32,67 @@ def test_installation_error_code_fails_closed():
         InstallationError("raw filesystem path D:/secret/model.gguf").code
         == "model_installation_failed"
     )
+
+
+def test_download_session_ignores_proxy_environment():
+    session = _session()
+    try:
+        assert session.trust_env is False
+    finally:
+        session.close()
+
+
+@patch("llm.tasks.validate_public_https_endpoint")
+def test_validated_download_response_handles_https_redirect_without_auto_follow(
+    mock_validate,
+):
+    session = Mock(spec=requests.Session)
+    redirect = Mock()
+    redirect.status_code = 302
+    redirect.headers = {"Location": "https://downloads.example.com/model.gguf"}
+    final = Mock()
+    final.status_code = 200
+    final.headers = {}
+    session.get.side_effect = [redirect, final]
+
+    response = _validated_download_response(
+        session,
+        "https://catalog.example.com/model.gguf",
+        offset=0,
+    )
+
+    assert response == final
+    assert session.get.call_count == 2
+    assert all(
+        call.kwargs["allow_redirects"] is False for call in session.get.call_args_list
+    )
+    assert mock_validate.call_args_list[0].args == (
+        "https://catalog.example.com/model.gguf",
+    )
+    assert mock_validate.call_args_list[1].args == (
+        "https://downloads.example.com/model.gguf",
+    )
+    redirect.close.assert_called_once()
+
+
+@patch("llm.tasks.validate_public_https_endpoint")
+def test_validated_download_response_rejects_non_https_redirect(mock_validate):
+    session = Mock(spec=requests.Session)
+    redirect = Mock()
+    redirect.status_code = 302
+    redirect.headers = {"Location": "http://downloads.example.com/model.gguf"}
+    session.get.return_value = redirect
+
+    with pytest.raises(InstallationError, match="model_download_redirect_invalid"):
+        _validated_download_response(
+            session,
+            "https://catalog.example.com/model.gguf",
+            offset=0,
+        )
+
+    session.get.assert_called_once()
+    redirect.close.assert_called_once()
+    mock_validate.assert_called_once_with("https://catalog.example.com/model.gguf")
 
 
 @override_settings(OLLAMA_BASE_URL="http://ollama:11434")
