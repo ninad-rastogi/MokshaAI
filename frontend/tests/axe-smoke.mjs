@@ -123,11 +123,25 @@ async function scan(page, label) {
   console.log(`${label}: axe clean`);
 }
 
-const browser = await chromium.launch({
-  channel: process.env.PLAYWRIGHT_CHANNEL || "chrome",
+const launchOptions = {
   headless: true,
   args: ["--disable-extensions", "--ignore-certificate-errors"],
-});
+};
+if (process.env.PLAYWRIGHT_CHANNEL) {
+  launchOptions.channel = process.env.PLAYWRIGHT_CHANNEL;
+}
+
+async function launchBrowser() {
+  try {
+    return await chromium.launch(launchOptions);
+  } catch (error) {
+    if (process.env.PLAYWRIGHT_CHANNEL) throw error;
+    if (!String(error).includes("Executable doesn't exist")) throw error;
+    return chromium.launch({ ...launchOptions, channel: "chrome" });
+  }
+}
+
+const browser = await launchBrowser();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
 });
