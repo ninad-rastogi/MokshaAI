@@ -79,37 +79,37 @@ function submit() {
 <style scoped>
 .composer-wrap {
   margin: 0 auto;
-  max-width: 48rem;
+  max-width: 44rem;
   width: 100%;
 }
 
-.moksha-prompt {
-  background: var(--moksha-composer);
-  border: 1px solid var(--moksha-glass-line);
+:deep(.moksha-prompt) {
+  background: var(--moksha-composer) !important;
   backdrop-filter: blur(24px) saturate(1.08);
-  border-radius: 0.5rem;
-  box-shadow: var(--moksha-shadow-composer);
+  border: 1px solid var(--moksha-assistant-line) !important;
+  border-radius: 0.72rem;
+  box-shadow: var(--moksha-shadow-composer) !important;
   overflow: hidden;
 }
 
-.moksha-prompt:focus-within {
+:deep(.moksha-prompt:focus-within) {
   border-color: var(--moksha-focus);
   box-shadow:
     0 0 0 3px var(--moksha-focus-ring),
-    var(--moksha-shadow-composer);
+    var(--moksha-shadow-composer) !important;
 }
 
 :deep(.moksha-prompt__root) {
   background: transparent;
   border: 0;
   box-shadow: none;
-  min-height: 4rem;
-  padding: 0.5rem 0.6rem 0.42rem;
+  min-height: 3.2rem;
+  padding: 0.38rem 0.46rem 0.34rem;
 }
 
 :deep(.moksha-prompt__textarea) {
   color: var(--moksha-ink);
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   line-height: 1.5;
   min-height: 1.6rem;
   padding: 0.15rem 0.2rem;
@@ -170,7 +170,7 @@ function submit() {
   font-size: 0.65rem;
   gap: 0.3rem;
   justify-content: center;
-  margin: 0.35rem 0 0;
+  margin: 0.24rem 0 0;
   min-height: 1rem;
   text-align: center;
 }
@@ -189,7 +189,7 @@ function submit() {
   }
 
   :deep(.moksha-prompt__root) {
-    min-height: 3.8rem;
+    min-height: 3.15rem;
   }
 
   .composer-note,

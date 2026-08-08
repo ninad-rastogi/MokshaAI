@@ -1407,12 +1407,12 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 .composer-dock {
   background: linear-gradient(
     to top,
-    var(--moksha-bg) 24%,
-    color-mix(in srgb, var(--moksha-bg) 82%, transparent) 72%,
+    var(--moksha-bg) 18%,
+    color-mix(in srgb, var(--moksha-bg) 78%, transparent) 68%,
     transparent
   );
-  padding: 0.65rem clamp(1rem, 4vw, 3rem)
-    max(0.65rem, env(safe-area-inset-bottom));
+  padding: 0.48rem clamp(1rem, 4vw, 3rem)
+    max(0.48rem, env(safe-area-inset-bottom));
   pointer-events: none;
   z-index: 5;
 }
