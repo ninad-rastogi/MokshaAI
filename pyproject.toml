@@ -30,9 +30,6 @@ dependencies = [
     "langchain-ollama>=0.3",
     "numpy>=1.26",
     "PyMuPDF>=1.25",
-    # Transitional frontend kept until Nuxt reaches verified parity
-    "streamlit>=1.30",
-    "streamlit-theme>=0.58",
     # Utils
     "requests>=2.34",
     "python-dotenv>=1.0",

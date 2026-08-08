@@ -1,9 +1,8 @@
-.PHONY: help install lint format test run django streamlit migrate benchmark-model frontend-format frontend-lint frontend-test frontend-typecheck
+.PHONY: help install lint format test run django migrate benchmark-model frontend-format frontend-lint frontend-test frontend-typecheck
 
 export UV_PROJECT_ENVIRONMENT := D:/Ninad/Python/.env
 UV = uv run --active --no-cache
 PYTHON = D:/Ninad/Python/.env/Scripts/python.exe
-STREAMLIT = D:/Ninad/Python/.env/Scripts/streamlit.exe
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -42,9 +41,6 @@ migrate: ## Run Django migrations
 
 django: ## Start Django development server
 	$(UV) python manage.py runserver
-
-streamlit: ## Start Streamlit frontend
-	$(STREAMLIT) run streamlit_ui/main_app.py
 
 discover: ## Run scripture auto-discovery
 	$(UV) python manage.py discover_scriptures

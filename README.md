@@ -8,9 +8,9 @@ It listens without judgment, retrieves relevant teachings from an expandable
 library of Indian spiritual texts, and keeps cited evidence separate from its
 own counsel. No product path assumes one scripture, teacher, dialogue, or PDF.
 
-Nuxt is the primary client. Legacy Streamlit remains behind an opt-in Compose
-profile until real Caddy, recovery, accessibility, and cited-RAG parity gates
-pass; its later removal must be one atomic change.
+Nuxt is the product client. The legacy Streamlit client has been removed after
+Nuxt parity checks covered authentication, chat, settings, citations,
+accessibility, and responsive shell behavior.
 
 ## Architecture And Data Flow
 

@@ -54,7 +54,6 @@ KNOWN_BOUNDARIES = frozenset(
         "frontend",
         "operations",
         "scripts",
-        "streamlit_ui",
         "tests",
     }
 )

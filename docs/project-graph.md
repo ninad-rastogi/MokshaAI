@@ -118,5 +118,4 @@ graph TD
   Celery, Caddy, and real indexing smoke remain externally blocked locally.
 - `graphify-out/` was built from older commit `fe9e97e0`; regenerate with
   `graphify update .` when that CLI is available.
-- Legacy Streamlit still exists behind `legacy-streamlit` Compose profile until
-  production parity and rollback gates are fully proven.
+- Legacy Streamlit has been removed; Nuxt is the only product browser client.

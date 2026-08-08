@@ -62,9 +62,7 @@ def test_compose_steady_memory_reservations_stay_below_target():
     compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text())
     services = compose["services"]
     steady_reservations = [
-        _memory_to_mib(service["mem_reservation"])
-        for service in services.values()
-        if "legacy-streamlit" not in service.get("profiles", [])
+        _memory_to_mib(service["mem_reservation"]) for service in services.values()
     ]
 
     assert sum(steady_reservations) <= 4096
