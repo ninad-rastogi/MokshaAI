@@ -1,9 +1,23 @@
 """Unit tests for redacted logs and disk monitoring."""
 
 import logging
+from pathlib import Path
+
+import yaml
 
 from moksha.logging import JsonFormatter, redact
 from moksha.tasks import disk_report
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _memory_to_mib(value: str) -> int:
+    normalized = value.strip().lower()
+    if normalized.endswith("g"):
+        return int(normalized[:-1]) * 1024
+    if normalized.endswith("m"):
+        return int(normalized[:-1])
+    raise AssertionError(f"unsupported memory unit: {value}")
 
 
 def test_redact_removes_common_secret_shapes():
@@ -42,3 +56,15 @@ def test_disk_report_uses_configured_minimum(settings, tmp_path):
 
     assert report[0]["path"] == str(tmp_path)
     assert report[0]["healthy"] is True
+
+
+def test_compose_steady_memory_reservations_stay_below_target():
+    compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text())
+    services = compose["services"]
+    steady_reservations = [
+        _memory_to_mib(service["mem_reservation"])
+        for service in services.values()
+        if "legacy-streamlit" not in service.get("profiles", [])
+    ]
+
+    assert sum(steady_reservations) <= 4096
