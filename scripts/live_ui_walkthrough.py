@@ -74,9 +74,13 @@ def validate_result(result: dict[str, object], *, mock_api: bool) -> list[str]:
         settings_geometry.get("scroll", 0) > settings_geometry.get("client", 0) + 2
     ):
         failures.append("settings_dialog_scrolls_in_general_view")
+    raw_console_errors = result.get("console_errors", [])
+    console_error_values = (
+        raw_console_errors if isinstance(raw_console_errors, list) else []
+    )
     console_errors = [
         message
-        for message in result.get("console_errors", [])
+        for message in console_error_values
         if isinstance(message, str)
         and not is_benign_console_error(message, mock_api=mock_api)
     ]

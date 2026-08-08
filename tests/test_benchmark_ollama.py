@@ -37,7 +37,18 @@ def test_benchmark_cases_use_discovered_collection_without_fixed_text():
         "honest_no_evidence",
         "hindi_guidance",
         "sanskrit_context_grounding",
+        "long_context_grounding_8k",
     }
+
+
+def test_benchmark_long_context_case_keeps_evidence_near_end():
+    cases = build_cases(["New Collection"])
+    long_case = next(case for case in cases if case.name == "long_context_grounding_8k")
+    prompt = long_case.messages[-1]["content"]
+
+    assert len(prompt) > 8000
+    assert prompt.rfind("[New Collection, benchmark_excerpt.txt, p. 1]") > 8000
+    assert long_case.required_text == "[New Collection, benchmark_excerpt.txt, p. 1]"
 
 
 def test_qualification_summary_reports_measured_throughput_gap():

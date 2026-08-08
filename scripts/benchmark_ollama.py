@@ -42,6 +42,10 @@ def build_cases(collection_names: list[str]) -> list[Case]:
     collection = collection_names[0] if collection_names else "the indexed library"
     citation = f"[{collection}, benchmark_excerpt.txt, p. 1]"
     available = ", ".join(collection_names) or "none"
+    long_context_prefix = (
+        "Background note: patience, humility, discernment, breath, duty, "
+        "attention, compassion, and restraint are recurring guidance themes. "
+    ) * 80
     routing_prompt = (
         "Classify the query as SAFETY, SCRIPTURE, GUIDANCE, or CASUAL. "
         f"Available collections: {available}. "
@@ -171,6 +175,30 @@ def build_cases(collection_names: list[str]) -> list[Case]:
                         "Context: सत्यं वद। Speak truth. "
                         "[Wisdom Collection, verse.txt, v. 1]\n"
                         "Question: What conduct does the line request?"
+                    ),
+                },
+            ],
+        ),
+        Case(
+            name="long_context_grounding_8k",
+            required_text=citation,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You have an 8192-token context window. Ignore repetitive "
+                        "background notes. Answer only from the final evidence line "
+                        "and cite it exactly."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"{long_context_prefix}\n"
+                        "Final evidence: When pulled by many demands, take the "
+                        f"nearest truthful action without clinging. {citation}\n"
+                        "Question: What should be done when many demands pull at "
+                        "the mind?"
                     ),
                 },
             ],
