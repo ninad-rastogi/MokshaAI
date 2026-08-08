@@ -68,6 +68,59 @@ def test_compose_steady_memory_reservations_stay_below_target():
     assert sum(steady_reservations) <= 4096
 
 
+def test_compose_publishes_only_caddy_edge_port():
+    compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text())
+    services = compose["services"]
+
+    published = {
+        name: service.get("ports", [])
+        for name, service in services.items()
+        if service.get("ports")
+    }
+
+    assert published == {"caddy": ["${CADDY_HTTPS_PORT:-8443}:8443"]}
+
+
+def test_compose_keeps_embedding_sidecar_private():
+    compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text())
+    embedding = compose["services"]["embedding"]
+    django = compose["services"]["django"]
+    generation_worker = compose["services"]["generation-worker"]
+
+    assert "ports" not in embedding
+    assert (
+        django["environment"].count("EMBEDDING_SERVICE_URL=http://embedding:8010") == 1
+    )
+    assert (
+        generation_worker["environment"].count(
+            "EMBEDDING_SERVICE_URL=http://embedding:8010"
+        )
+        == 1
+    )
+
+
+def test_compose_uses_dedicated_generation_and_installation_queues():
+    compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text())
+    services = compose["services"]
+
+    assert "-Q generation" in services["generation-worker"]["command"]
+    assert "-Q model-installation" in services["model-installer"]["command"]
+    assert "-Q generation" not in services["worker"]["command"]
+    assert "-Q model-installation" not in services["worker"]["command"]
+
+
+def test_caddy_routes_only_public_edge_contract():
+    caddyfile = (PROJECT_ROOT / "deploy" / "Caddyfile").read_text()
+
+    assert "handle /api/v1/* {\n\t\treverse_proxy django:8000\n\t}" in caddyfile
+    assert "handle /admin/* {\n\t\treverse_proxy django:8000\n\t}" in caddyfile
+    assert "handle /static/* {\n\t\treverse_proxy django:8000\n\t}" in caddyfile
+    assert "handle {\n\t\treverse_proxy nuxt:3000\n\t}" in caddyfile
+    assert "reverse_proxy embedding:" not in caddyfile
+    assert "reverse_proxy redis:" not in caddyfile
+    assert "reverse_proxy db:" not in caddyfile
+
+
 def test_backup_script_excludes_runtime_secrets():
     backup_script = (PROJECT_ROOT / "scripts" / "backup.ps1").read_text()
 
