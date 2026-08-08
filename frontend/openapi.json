@@ -949,7 +949,7 @@
     },
     "/api/v1/chats/{id}/query/": {
       "post": {
-        "description": "Submit a query and get an AI response via the RAG engine.",
+        "description": "Reject the old synchronous path; clients must use durable runs.",
         "operationId": "postApiV1ChatsByIdQuery",
         "parameters": [
           {

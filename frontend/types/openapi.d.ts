@@ -269,7 +269,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** @description Submit a query and get an AI response via the RAG engine. */
+    /** @description Reject the old synchronous path; clients must use durable runs. */
     post: operations["postApiV1ChatsByIdQuery"];
     delete?: never;
     options?: never;
