@@ -34,6 +34,12 @@ const filteredChats = computed(() => {
 });
 
 const isMobile = useMediaQuery("(max-width: 860px)");
+const mounted = ref(false);
+const mobileSemantics = computed(() => mounted.value && isMobile.value);
+
+onMounted(() => {
+  mounted.value = true;
+});
 
 function closeHistory() {
   emit("update:open", false);
@@ -78,10 +84,10 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
 
   <aside
     :class="['history', { 'history--open': open }]"
-    :aria-hidden="isMobile && !open ? 'true' : undefined"
-    :inert="isMobile && !open"
-    :role="isMobile ? 'dialog' : undefined"
-    :aria-modal="isMobile && open ? 'true' : undefined"
+    :aria-hidden="mobileSemantics && !open ? 'true' : undefined"
+    :inert="mobileSemantics && !open"
+    :role="mobileSemantics ? 'dialog' : undefined"
+    :aria-modal="mobileSemantics && open ? 'true' : undefined"
     aria-label="Conversation history"
     @keydown.esc.stop="closeHistory"
   >

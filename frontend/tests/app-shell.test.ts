@@ -107,7 +107,8 @@ describe("app shell", () => {
   });
 
   it("keeps the closed mobile drawer inert and exposes its shortcut", () => {
-    expect(sidebarComponent).toContain(':inert="isMobile && !open"');
+    expect(sidebarComponent).toContain("mobileSemantics");
+    expect(sidebarComponent).toContain(':inert="mobileSemantics && !open"');
     expect(sidebarComponent).toContain("function closeHistory()");
     expect(sidebarComponent).toContain('@click.stop="closeHistory"');
     expect(sidebarComponent).toContain("@keydown.esc.stop");

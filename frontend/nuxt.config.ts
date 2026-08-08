@@ -2,6 +2,7 @@ import { defineNuxtConfig } from "nuxt/config";
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-25",
+  devtools: { enabled: false },
   modules: ["@nuxt/ui", "@nuxtjs/color-mode", "@nuxt/eslint"],
   css: ["~/assets/css/main.css"],
   ssr: true,
