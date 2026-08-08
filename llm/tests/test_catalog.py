@@ -1,10 +1,32 @@
 import json
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from django.conf import settings
 
-from llm.catalog import CatalogValidationError, load_configured_catalog, verify_catalog
+from llm.catalog import (
+    CatalogValidationError,
+    VerifiedCatalog,
+    activate_configured_catalog,
+    load_configured_catalog,
+    verify_catalog,
+)
+
+
+class _LatestReleaseManager:
+    def __init__(self, sequence: int) -> None:
+        self._latest = SimpleNamespace(sequence=sequence)
+
+    def select_for_update(self):
+        return self
+
+    def order_by(self, *_args):
+        return self
+
+    def first(self):
+        return self._latest
 
 
 def test_bundled_catalog_signature_and_pins_are_valid():
@@ -81,3 +103,39 @@ def test_catalog_rejects_revoked_duplicate_or_untrusted_urls(mutator, code):
 
     with pytest.raises(CatalogValidationError, match=code):
         verify_catalog(payload, signature)
+
+
+@pytest.mark.parametrize(
+    ("latest_sequence", "payload_sequence", "code"),
+    [
+        (7, 7, "catalog_replay"),
+        (7, 6, "catalog_downgrade"),
+    ],
+)
+def test_catalog_activation_rejects_replay_or_downgrade(
+    monkeypatch,
+    latest_sequence,
+    payload_sequence,
+    code,
+):
+    verified = load_configured_catalog()
+    payload = dict(verified.payload)
+    payload["sequence"] = payload_sequence
+    monkeypatch.setattr(
+        "llm.catalog.load_configured_catalog",
+        lambda: VerifiedCatalog(
+            payload=payload,
+            canonical_bytes=verified.canonical_bytes,
+            catalog_hash=verified.catalog_hash,
+            issued_at=verified.issued_at,
+            expires_at=verified.expires_at,
+        ),
+    )
+    monkeypatch.setattr(
+        "llm.catalog.ModelCatalogRelease.objects",
+        _LatestReleaseManager(latest_sequence),
+    )
+    monkeypatch.setattr("llm.catalog.transaction.atomic", nullcontext)
+
+    with pytest.raises(CatalogValidationError, match=code):
+        activate_configured_catalog()
