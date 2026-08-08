@@ -41,6 +41,11 @@ class ScriptureDocumentLoader:
             key=lambda path: str(path.relative_to(collection_path)).casefold(),
         )
 
+    @staticmethod
+    def _display_file_name(pdf_path: Path, collection_path: Path) -> str:
+        """Return stable source label for citations and manifests."""
+        return pdf_path.relative_to(collection_path).as_posix()
+
     def _scan_scriptures(self) -> list[str]:
         """Scan docs directory for scripture folders."""
         scriptures: list[str] = []
@@ -76,7 +81,7 @@ class ScriptureDocumentLoader:
             pdf_files = self._pdf_files(scripture_path)
 
             for pdf_path in pdf_files:
-                chunks = self._load_pdf(pdf_path, scripture_name)
+                chunks = self._load_pdf(pdf_path, scripture_name, scripture_path)
                 all_chunks.extend(chunks)
                 logger.info(f"Loaded {len(chunks)} chunks from {pdf_path.name}")
 
@@ -93,14 +98,24 @@ class ScriptureDocumentLoader:
 
         all_chunks: list[dict[str, Any]] = []
         for pdf_path in self._pdf_files(scripture_path):
-            chunks = self._load_pdf(pdf_path, scripture_name)
+            chunks = self._load_pdf(pdf_path, scripture_name, scripture_path)
             all_chunks.extend(chunks)
 
         return all_chunks
 
-    def _load_pdf(self, pdf_path: Path, scripture_name: str) -> list[dict[str, Any]]:
+    def _load_pdf(
+        self,
+        pdf_path: Path,
+        scripture_name: str,
+        collection_path: Path | None = None,
+    ) -> list[dict[str, Any]]:
         """Load a PDF and split into semantic chunks."""
         chunks: list[dict[str, Any]] = []
+        file_name = (
+            self._display_file_name(pdf_path, collection_path)
+            if collection_path
+            else pdf_path.name
+        )
 
         try:
             pdf_doc = fitz.open(str(pdf_path))
@@ -116,7 +131,7 @@ class ScriptureDocumentLoader:
                 page_chunks = self.chunker.chunk_page(
                     text=text,
                     scripture_name=scripture_name,
-                    file_name=pdf_path.name,
+                    file_name=file_name,
                     page_num=page_num + 1,
                     total_pages=len(pdf_doc),
                 )

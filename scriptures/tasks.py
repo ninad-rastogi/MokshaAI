@@ -51,11 +51,11 @@ def index_scripture(self, job_id: int) -> None:
     )
     try:
         scripture_path = Path(scripture.folder_path)
-        pdf_files = sorted(scripture_path.glob("*.pdf"))
+        loader = ScriptureDocumentLoader()
+        pdf_files = loader._pdf_files(scripture_path)
         if not pdf_files:
             raise FileNotFoundError(f"No PDFs found for {scripture.name}")
 
-        loader = ScriptureDocumentLoader()
         chunks = []
         volumes = []
         for number, pdf_path in enumerate(pdf_files, start=1):
@@ -63,7 +63,7 @@ def index_scripture(self, job_id: int) -> None:
             with fitz.open(str(pdf_path)) as pdf:
                 page_count = len(pdf)
             volumes.append((pdf_path, stat, page_count, compute_file_hash(pdf_path)))
-            chunks.extend(loader._load_pdf(pdf_path, scripture.name))
+            chunks.extend(loader._load_pdf(pdf_path, scripture.name, scripture_path))
             IndexingJob.objects.filter(pk=job.pk).update(
                 progress=min(70, 5 + int(number / len(pdf_files) * 65))
             )
@@ -72,7 +72,7 @@ def index_scripture(self, job_id: int) -> None:
 
         source_manifest = [
             {
-                "file_name": pdf_path.name,
+                "file_name": loader._display_file_name(pdf_path, scripture_path),
                 "sha256": content_hash,
                 "size": stat.st_size,
                 "pages": page_count,
@@ -133,7 +133,7 @@ def index_scripture(self, job_id: int) -> None:
             for pdf_path, stat, page_count, content_hash in volumes:
                 Volume.objects.update_or_create(
                     scripture=scripture,
-                    file_name=pdf_path.name,
+                    file_name=loader._display_file_name(pdf_path, scripture_path),
                     defaults={
                         "file_path": str(pdf_path),
                         "file_size": stat.st_size,

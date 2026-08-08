@@ -35,3 +35,14 @@ def test_collection_discovery_reflects_files_added_after_loader_creation(tmp_pat
     touch_pdf(tmp_path / "New Collection" / "new-volume" / "teaching.pdf")
 
     assert loader.get_available_scriptures() == ["New Collection"]
+
+
+def test_nested_volume_source_label_is_collection_relative(tmp_path):
+    collection = tmp_path / "Wisdom Collection"
+    pdf_path = collection / "volume-one" / "teaching.pdf"
+    touch_pdf(pdf_path)
+
+    assert (
+        ScriptureDocumentLoader._display_file_name(pdf_path, collection)
+        == "volume-one/teaching.pdf"
+    )
