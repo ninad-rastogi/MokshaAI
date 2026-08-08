@@ -131,12 +131,7 @@ function trackPointer(event: PointerEvent) {
           aria-label="Change theme"
           @click="toggleTheme"
         >
-          <UIcon
-            :name="
-              colorMode.value === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon'
-            "
-            aria-hidden="true"
-          />
+          <UIcon name="i-lucide-sun-moon" aria-hidden="true" />
         </button>
       </UTooltip>
     </header>
