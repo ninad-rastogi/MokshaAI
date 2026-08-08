@@ -60,7 +60,7 @@ class ChatViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_throttles(self):
-        if getattr(self, "action", None) in {"query", "runs"}:
+        if getattr(self, "action", None) == "runs":
             self.throttle_scope = "chat_query"
             return [ScopedRateThrottle()]
         return super().get_throttles()
@@ -192,18 +192,6 @@ class ChatViewSet(viewsets.ViewSet):
         chat.name = new_name[:50]
         chat.save(update_fields=["name"])
         return Response(ChatSerializer(chat).data)
-
-    @action(detail=True, methods=["post"])
-    def query(self, request: Request, pk: UUID | None = None) -> Response:
-        """Reject the old synchronous path; clients must use durable runs."""
-        get_object_or_404(Chat, pk=pk, user=request.user)
-        return Response(
-            {
-                "error": "legacy_query_removed",
-                "detail": "Create a generation run at /api/v1/chats/{id}/runs/.",
-            },
-            status=status.HTTP_410_GONE,
-        )
 
     @action(detail=False, methods=["post"])
     def discover(self, request: Request) -> Response:

@@ -75,20 +75,6 @@ class ChatDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at")
 
 
-class QuerySerializer(serializers.Serializer):
-    """Serializer for chat query requests."""
-
-    message = serializers.CharField(max_length=5000)
-
-
-class QueryResponseSerializer(serializers.Serializer):
-    """Serializer for chat query responses."""
-
-    response = serializers.CharField()
-    sources: CitationSerializer = CitationSerializer(many=True, required=False)
-    mode = serializers.CharField()
-
-
 class RunCreateSerializer(serializers.Serializer):
     """Create a durable generation run."""
 

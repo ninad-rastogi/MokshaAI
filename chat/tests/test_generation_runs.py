@@ -1,10 +1,11 @@
 """Tests for durable generation run API behavior."""
 
+from typing import Any
 from unittest.mock import patch
 from uuid import UUID
 
 import pytest
-from django.urls import resolve
+from django.urls import Resolver404, resolve
 
 from chat.models import Chat, GenerationAttempt, GenerationRun, Message
 from chat.tasks import generate_chat_response
@@ -25,6 +26,11 @@ def test_top_level_run_urls_resolve_to_v1_contract():
     assert events.kwargs["pk"] == run_id
     assert cancel.url_name == "generation-run-cancel"
     assert cancel.kwargs["pk"] == run_id
+
+
+def test_legacy_query_url_is_not_part_of_v1_contract():
+    with pytest.raises(Resolver404):
+        resolve("/api/v1/chats/00000000-0000-0000-0000-000000000001/query/")
 
 
 @pytest.mark.django_db
@@ -179,7 +185,7 @@ def test_generation_run_falls_back_before_delta(create_user):
         stream_key=f"generation:{chat.id}:fallback",
     )
 
-    emitted_events = []
+    emitted_events: list[str] = []
 
     def fake_publish(_stream_key, event_type, _payload):
         emitted_events.append(event_type)
@@ -256,7 +262,7 @@ def test_generation_run_replaces_invented_source_claim(create_user):
             "RAG",
         )
 
-    emitted_events = []
+    emitted_events: list[tuple[str, dict[str, Any]]] = []
 
     def fake_publish(_stream_key, event_type, payload):
         emitted_events.append((event_type, payload))
@@ -363,7 +369,7 @@ def test_generation_run_openai_profile_persists_usage(create_user):
         stream_key=f"generation:{chat.id}:remote",
     )
 
-    emitted_events = []
+    emitted_events: list[tuple[str, str, dict[str, Any]]] = []
 
     def fake_publish(_stream_key, event_type, payload):
         event_id = f"{len(emitted_events) + 1}-0"
@@ -484,7 +490,7 @@ def test_generation_run_persists_sanitized_provider_error_before_fallback(create
             raise ProviderRequestFailed(429)
         return "Fallback answer.", [], "GENERAL"
 
-    emitted_events = []
+    emitted_events: list[tuple[str, dict[str, Any]]] = []
 
     def fake_publish(_stream_key, event_type, payload):
         emitted_events.append((event_type, payload))
@@ -539,7 +545,7 @@ def test_generation_run_emits_sanitized_provider_error(create_user):
         model_profile=str(profile.pk),
         stream_key=f"generation:{chat.id}:remote-quota-error",
     )
-    emitted_events = []
+    emitted_events: list[tuple[str, dict[str, Any]]] = []
 
     def fake_publish(_stream_key, event_type, payload):
         emitted_events.append((event_type, payload))

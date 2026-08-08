@@ -260,23 +260,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/chats/{id}/query/": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** @description Reject the old synchronous path; clients must use durable runs. */
-    post: operations["postApiV1ChatsByIdQuery"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/v1/chats/{id}/rename/": {
     parameters: {
       query?: never;
@@ -1232,33 +1215,6 @@ export interface operations {
     requestBody?: never;
     responses: {
       200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-    };
-  };
-  postApiV1ChatsByIdQuery: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        "application/json": unknown;
-        "application/x-www-form-urlencoded": unknown;
-        "multipart/form-data": unknown;
-      };
-    };
-    responses: {
-      201: {
         headers: {
           [name: string]: unknown;
         };

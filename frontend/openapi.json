@@ -947,47 +947,6 @@
         "tags": ["api"]
       }
     },
-    "/api/v1/chats/{id}/query/": {
-      "post": {
-        "description": "Reject the old synchronous path; clients must use durable runs.",
-        "operationId": "postApiV1ChatsByIdQuery",
-        "parameters": [
-          {
-            "description": "",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {}
-            },
-            "application/x-www-form-urlencoded": {
-              "schema": {}
-            },
-            "multipart/form-data": {
-              "schema": {}
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": ""
-          }
-        },
-        "tags": ["api"]
-      }
-    },
     "/api/v1/chats/{id}/rename/": {
       "patch": {
         "description": "Rename a chat session.",
