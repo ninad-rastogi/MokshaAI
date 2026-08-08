@@ -17,6 +17,9 @@ Add architecture decisions, API lifecycle notes, threat models, and evaluated
 operational procedures here. Keep product intent in `PRODUCT.md`, visual rules
 in `DESIGN.md`, and service commands in boundary READMEs.
 
+- `project-graph.md`: compact current architecture graph for handoff and
+  token-efficient navigation.
+
 ## Interfaces
 
 OpenAPI is generated from Django/DRF and consumed by the frontend type
@@ -59,5 +62,5 @@ information, or decrypted provider keys in documentation or examples.
 
 ## Related Docs
 
-See `../README.md`, `../PRODUCT.md`, `../DESIGN.md`, `../operations/README.md`,
-and `../scripts/README.md`.
+See `project-graph.md`, `../README.md`, `../PRODUCT.md`, `../DESIGN.md`,
+`../operations/README.md`, and `../scripts/README.md`.
