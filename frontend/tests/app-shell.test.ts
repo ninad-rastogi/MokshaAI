@@ -90,6 +90,8 @@ describe("app shell", () => {
 
   it("keeps model connection health separate from response stream recovery", () => {
     expect(appPage).toContain("return activeModelStatusText.value");
+    expect(appPage).toContain('connectionState.value === "offline"');
+    expect(appPage).toContain('return "Offline"');
     expect(appPage).not.toMatch(
       /streamDisconnected\.value[\s\S]{0,160}return "Offline"/,
     );
