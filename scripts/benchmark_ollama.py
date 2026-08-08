@@ -41,6 +41,7 @@ def build_cases(collection_names: list[str]) -> list[Case]:
     """Build corpus-neutral routing, grounding, safety, and language contracts."""
     collection = collection_names[0] if collection_names else "the indexed library"
     citation = f"[{collection}, benchmark_excerpt.txt, p. 1]"
+    verse_citation = f"[{collection}, verse.txt, v. 1]"
     available = ", ".join(collection_names) or "none"
     long_context_prefix = (
         "Background note: patience, humility, discernment, breath, duty, "
@@ -160,7 +161,7 @@ def build_cases(collection_names: list[str]) -> list[Case]:
         ),
         Case(
             name="sanskrit_context_grounding",
-            required_text="[Wisdom Collection, verse.txt, v. 1]",
+            required_text=verse_citation,
             messages=[
                 {
                     "role": "system",
@@ -173,7 +174,7 @@ def build_cases(collection_names: list[str]) -> list[Case]:
                     "role": "user",
                     "content": (
                         "Context: सत्यं वद। Speak truth. "
-                        "[Wisdom Collection, verse.txt, v. 1]\n"
+                        f"{verse_citation}\n"
                         "Question: What conduct does the line request?"
                     ),
                 },

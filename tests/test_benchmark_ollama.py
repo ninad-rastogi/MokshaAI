@@ -27,6 +27,7 @@ def test_benchmark_cases_use_discovered_collection_without_fixed_text():
 
     assert "New Collection" in rendered
     assert "benchmark_excerpt.txt" in rendered
+    assert "Wisdom Collection" not in rendered
     assert "Mahabharata" not in rendered
     assert "Krishna" not in rendered
     assert {case.name for case in cases} == {
@@ -49,6 +50,16 @@ def test_benchmark_long_context_case_keeps_evidence_near_end():
     assert len(prompt) > 8000
     assert prompt.rfind("[New Collection, benchmark_excerpt.txt, p. 1]") > 8000
     assert long_case.required_text == "[New Collection, benchmark_excerpt.txt, p. 1]"
+
+
+def test_benchmark_sanskrit_case_uses_discovered_collection():
+    cases = build_cases(["New Collection"])
+    sanskrit_case = next(
+        case for case in cases if case.name == "sanskrit_context_grounding"
+    )
+
+    assert sanskrit_case.required_text == "[New Collection, verse.txt, v. 1]"
+    assert "[New Collection, verse.txt, v. 1]" in sanskrit_case.messages[-1]["content"]
 
 
 def test_qualification_summary_reports_measured_throughput_gap():
