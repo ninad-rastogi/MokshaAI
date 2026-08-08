@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,52 @@ def geometry(page: Page) -> dict[str, object]:
             messages: box(".message-viewport"),
           };
         }""")
+
+
+def _bool_result(result: dict[str, object], key: str) -> bool:
+    return result.get(key) is True
+
+
+def _geometry_flag(result: dict[str, object], group: str, key: str) -> bool:
+    value = result.get(group)
+    return isinstance(value, dict) and value.get(key) is True
+
+
+def validate_result(result: dict[str, object], *, mock_api: bool) -> list[str]:
+    """Return browser-critical UX contract failures."""
+    failures: list[str] = []
+    if "/app" not in str(result.get("auth_after_refresh", "")):
+        failures.append("auth_refresh_did_not_stay_in_app")
+    if not _bool_result(result, "composer_cleared"):
+        failures.append("composer_did_not_clear_after_send")
+    if result.get("run_state_text") != "idle":
+        failures.append("run_status_not_idle_after_completion")
+    if _geometry_flag(result, "desktop_geometry", "bodyScroll"):
+        failures.append("desktop_body_scrolls")
+    if _geometry_flag(result, "mobile_geometry", "bodyScroll"):
+        failures.append("mobile_body_scrolls")
+    settings_geometry = result.get("settings_geometry")
+    if isinstance(settings_geometry, dict) and (
+        settings_geometry.get("scroll", 0) > settings_geometry.get("client", 0) + 2
+    ):
+        failures.append("settings_dialog_scrolls_in_general_view")
+    if result.get("console_errors"):
+        failures.append("browser_console_errors")
+    if result.get("request_failures"):
+        failures.append("browser_request_failures")
+    if mock_api:
+        if result.get("connection_removed") is not True:
+            failures.append("connection_remove_flow_failed")
+        if result.get("primary_model_after_refresh") != "Moksha local":
+            failures.append("model_preference_not_persisted_after_refresh")
+        connection_status = str(result.get("connection_status_aria", ""))
+        if "Online" not in connection_status or "qwen3:4b" not in connection_status:
+            failures.append("model_connection_status_missing_online_model")
+        if "उत्तिष्ठत जाग्रत" not in str(result.get("exact_verse_text", "")):
+            failures.append("exact_verse_not_visible")
+        if "Arise, awake" not in str(result.get("translation_text", "")):
+            failures.append("translation_not_visible")
+    return failures
 
 
 def install_mock_api(page: Page) -> None:
@@ -456,6 +503,14 @@ def run(
             run_status.inner_text() if run_status.count() else "idle"
         )
         result["messages"] = page.locator(".message").count()
+        exact_verse = page.locator(".verse-panel").last
+        translation = page.locator(".translation-panel").last
+        result["exact_verse_text"] = (
+            exact_verse.inner_text() if exact_verse.count() else ""
+        )
+        result["translation_text"] = (
+            translation.inner_text() if translation.count() else ""
+        )
 
         page.get_by_label("Open settings").last.click()
         settings = page.locator(".settings-dialog")
@@ -554,20 +609,21 @@ def main() -> None:
     parser.add_argument("--email")
     parser.add_argument("--password", default="MokshaWalk!2026")
     args = parser.parse_args()
-    print(
-        json.dumps(
-            run(
-                args.base_url,
-                args.output_dir,
-                headless=not args.headed,
-                browser_channel=args.browser_channel,
-                mock_api=args.mock_api,
-                email=args.email,
-                password=args.password,
-            ),
-            indent=2,
-        )
+    result = run(
+        args.base_url,
+        args.output_dir,
+        headless=not args.headed,
+        browser_channel=args.browser_channel,
+        mock_api=args.mock_api,
+        email=args.email,
+        password=args.password,
     )
+    failures = validate_result(result, mock_api=args.mock_api)
+    if failures:
+        result["failures"] = failures
+    print(json.dumps(result, indent=2))
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
