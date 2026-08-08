@@ -94,6 +94,11 @@ DATABASES = {
 # ─── Auth ──────────────────────────────────────────────────────────────────────
 
 AUTH_USER_MODEL = "users.User"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+SESSION_COOKIE_AGE = int(os.getenv("DJANGO_SESSION_COOKIE_AGE", str(60 * 60 * 24 * 14)))
+SESSION_SAVE_EVERY_REQUEST = True
+CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
