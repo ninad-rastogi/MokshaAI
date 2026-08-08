@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +38,9 @@ REQUIRED_ENTRY_FIELDS = {
     "sha256",
     "size",
 }
+CATALOG_FILE_RE = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
+CATALOG_REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
+CATALOG_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 class CatalogValidationError(ValueError):
@@ -87,16 +91,21 @@ def _validate_entry(entry: object, revoked: set[str]) -> dict[str, Any]:
         raise CatalogValidationError("catalog_entry_context_invalid")
     if not all(
         isinstance(entry[field], str) and entry[field]
-        for field in (
-            "architecture",
-            "file",
-            "license",
-            "quantization",
-            "repo",
-            "revision",
-        )
+        for field in ("architecture", "license", "quantization")
     ):
         raise CatalogValidationError("catalog_entry_metadata_invalid")
+    if not isinstance(entry["file"], str) or not CATALOG_FILE_RE.fullmatch(
+        entry["file"]
+    ):
+        raise CatalogValidationError("catalog_entry_file_invalid")
+    if not isinstance(entry["repo"], str) or not CATALOG_REPO_RE.fullmatch(
+        entry["repo"]
+    ):
+        raise CatalogValidationError("catalog_entry_repo_invalid")
+    if not isinstance(entry["revision"], str) or not CATALOG_REVISION_RE.fullmatch(
+        entry["revision"]
+    ):
+        raise CatalogValidationError("catalog_entry_revision_invalid")
     parsed = urlparse(entry["download_url"])
     expected_path = f"/{entry['repo']}/resolve/{entry['revision']}/{entry['file']}"
     if (

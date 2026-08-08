@@ -26,3 +26,22 @@ def test_catalog_rejects_modified_signed_payload():
 
     with pytest.raises(CatalogValidationError, match="catalog_signature_invalid"):
         verify_catalog(payload, signature)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "code"),
+    [
+        ("file", "../escape.gguf", "catalog_entry_file_invalid"),
+        ("file", "nested/model.gguf", "catalog_entry_file_invalid"),
+        ("file", "model.bin", "catalog_entry_file_invalid"),
+        ("repo", "owner/repo/extra", "catalog_entry_repo_invalid"),
+        ("revision", "main", "catalog_entry_revision_invalid"),
+    ],
+)
+def test_catalog_rejects_unpinned_or_unsafe_entry_paths(field, value, code):
+    payload = json.loads(Path(settings.MODEL_CATALOG_FILE).read_text(encoding="utf-8"))
+    signature = Path(settings.MODEL_CATALOG_SIGNATURE_FILE).read_text(encoding="ascii")
+    payload["entries"][0][field] = value
+
+    with pytest.raises(CatalogValidationError, match=code):
+        verify_catalog(payload, signature)
