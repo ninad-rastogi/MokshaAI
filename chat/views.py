@@ -60,7 +60,7 @@ class ChatViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_throttles(self):
-        if getattr(self, "action", None) == "query":
+        if getattr(self, "action", None) in {"query", "runs"}:
             self.throttle_scope = "chat_query"
             return [ScopedRateThrottle()]
         return super().get_throttles()
