@@ -100,6 +100,33 @@ def test_public_endpoint_validation_rejects_bad_dns_pins_and_ports() -> None:
     assert invalid_port.value.messages == ["endpoint_port_forbidden"]
 
 
+def test_public_endpoint_validation_rejects_credentials_and_ipv6_localhost() -> None:
+    with pytest.raises(ValidationError) as credentials:
+        validate_public_https_endpoint(
+            "https://user:secret@api.example.com/v1",
+            resolved_ips=["93.184.216.34"],
+        )
+    assert credentials.value.messages == ["endpoint_credentials_forbidden"]
+
+    with pytest.raises(ValidationError) as ipv6_loopback:
+        validate_public_https_endpoint(
+            "https://[::1]/api",
+            resolved_ips=["::1"],
+        )
+    assert ipv6_loopback.value.messages == ["endpoint_private_network_forbidden"]
+
+
+def test_public_endpoint_validation_allows_private_only_for_admin_paths() -> None:
+    result = validate_public_https_endpoint(
+        "https://localhost:8443/v1",
+        allow_private=True,
+        resolved_ips=["127.0.0.1"],
+    )
+
+    assert result.normalized_url == "https://localhost:8443/v1"
+    assert result.resolved_ips == ("127.0.0.1",)
+
+
 def test_public_endpoint_validation_allows_public_https() -> None:
     result = validate_public_https_endpoint(
         "https://api.example.com/v1/?token=secret#fragment",
