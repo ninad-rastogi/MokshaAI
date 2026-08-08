@@ -29,6 +29,7 @@ from llm.services import ModelSelection, resolve_model_selection
 from scriptures.models import Scripture
 
 logger = logging.getLogger("chat.tasks")
+FINAL_DELTA_CHARS = 180
 
 
 class GenerationCancelled(RuntimeError):
@@ -83,6 +84,19 @@ def _error_code_from_exception(exc: Exception) -> str:
     if isinstance(exc, ProviderRequestFailed):
         return exc.code
     return "generation_failed"
+
+
+def _emit_sanitized_deltas(
+    text: str,
+    on_delta: Callable[[str], None],
+    *,
+    chunk_size: int = FINAL_DELTA_CHARS,
+) -> None:
+    """Emit already-validated final text in bounded chunks."""
+    if chunk_size < 1:
+        raise ValueError("chunk_size_invalid")
+    for start in range(0, len(text), chunk_size):
+        on_delta(text[start : start + chunk_size])
 
 
 def _spec_from_profile(profile: ModelProfile) -> GenerationAttemptSpec:
@@ -456,7 +470,7 @@ def generate_chat_response(self, run_id: str) -> None:
             sources = cast(list[dict[str, Any]], validate_citations(sources))
             response_text = enforce_grounded_response(response_text, sources)
             if not emitted_any and response_text:
-                on_delta(response_text)
+                _emit_sanitized_deltas(response_text, on_delta)
             run.refresh_from_db(fields=["state"])
             if run.state == GenerationRun.State.CANCELLED:
                 _finish_cancelled(run, attempt, "".join(streamed_parts))

@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from chat.tasks import (
     GenerationAttemptSpec,
+    _emit_sanitized_deltas,
     _generate_remote_provider_response,
     _generate_response,
 )
@@ -87,3 +88,14 @@ def test_remote_general_generation_buffers_before_grounding() -> None:
     assert "The Book of Life" not in response
     assert "no indexed source evidence was used" in response
     assert deltas == []
+
+
+def test_sanitized_final_text_emits_in_bounded_chunks() -> None:
+    deltas: list[str] = []
+    text = "Validated guidance. " * 25
+
+    _emit_sanitized_deltas(text, deltas.append, chunk_size=80)
+
+    assert len(deltas) > 1
+    assert "".join(deltas) == text
+    assert all(len(delta) <= 80 for delta in deltas)
