@@ -40,6 +40,10 @@ _PAREN_CITATION_RE = re.compile(
 _SOURCE_LIKE_RE = re.compile(
     r"\b(?:File:\s*[^,\n)]+|Page\s+\d+|From\s+(?:The\s+)?[A-Z][A-Za-z0-9 ':-]{2,80})",
 )
+_SOURCE_COLON_RE = re.compile(
+    r"\(?(?:Source:\s*)(?P<claim>[^)\n]{3,220})\)?",
+    re.IGNORECASE,
+)
 _DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
 _LABEL_RE = re.compile(
     r"^(?P<label>sanskrit(?:\s+verse)?|shloka|śloka|verse|translation|meaning)\s*:\s*(?P<text>.*)$",
@@ -57,6 +61,21 @@ def _source_key(source: dict[str, Any]) -> tuple[str, str, str]:
         _norm(source.get("file_name", "")),
         _norm(source.get("page", "")),
     )
+
+
+def _claim_mentions_allowed_source(claim: str, sources: list[dict[str, Any]]) -> bool:
+    normalized_claim = _norm(claim).replace("page ", "p. ")
+    for source in sources:
+        scripture, file_name, page = _source_key(source)
+        if (
+            scripture
+            and scripture in normalized_claim
+            and file_name
+            and file_name in normalized_claim
+            and (f"p. {page}" in normalized_claim or f"p.{page}" in normalized_claim)
+        ):
+            return True
+    return False
 
 
 def _clip_text(value: str, limit: int) -> str:
@@ -171,6 +190,11 @@ def unsupported_citation_claims(
     """Return citation-like claims not backed by retrieved source metadata."""
     allowed = {_source_key(source) for source in sources}
     unsupported: list[str] = []
+
+    def append_unique(claim: str) -> None:
+        if claim not in unsupported:
+            unsupported.append(claim)
+
     for pattern in (_BRACKET_CITATION_RE, _PAREN_CITATION_RE):
         for match in pattern.finditer(text):
             key = (
@@ -179,10 +203,15 @@ def unsupported_citation_claims(
                 _norm(match.group("page")),
             )
             if key not in allowed:
-                unsupported.append(match.group(0))
+                append_unique(match.group(0))
+
+    for match in _SOURCE_COLON_RE.finditer(text):
+        if not _claim_mentions_allowed_source(match.group("claim"), sources):
+            append_unique(match.group(0))
 
     if not sources:
-        unsupported.extend(match.group(0) for match in _SOURCE_LIKE_RE.finditer(text))
+        for match in _SOURCE_LIKE_RE.finditer(text):
+            append_unique(match.group(0))
     return unsupported
 
 

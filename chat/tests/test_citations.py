@@ -148,6 +148,47 @@ def test_unsupported_citation_claims_detects_invented_source():
     assert claims == ["(From The Book of Life, File: Wisdom, Page 34)"]
 
 
+def test_unsupported_citation_claims_detects_source_colon_book_claim():
+    sources = [
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "excerpt": "A bounded source excerpt.",
+        }
+    ]
+
+    claims = unsupported_citation_claims(
+        (
+            'The sacred text says, "He who is mindful will find peace." '
+            "(Source: The Book of Life, File: Wisdom for the Way, Page 34)"
+        ),
+        sources,
+    )
+
+    assert claims == ["(Source: The Book of Life, File: Wisdom for the Way, Page 34)"]
+
+
+def test_unsupported_citation_claims_allows_source_colon_for_retrieved_source():
+    sources = [
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "excerpt": "A bounded source excerpt.",
+        }
+    ]
+
+    claims = unsupported_citation_claims(
+        "Source: Collection, volume.pdf, p. 4",
+        sources,
+    )
+
+    assert claims == []
+
+
 def test_enforce_grounded_response_replaces_invented_source_claim():
     sources = [
         {
@@ -167,6 +208,32 @@ def test_enforce_grounded_response_replaces_invented_source_claim():
     assert "The Book of Life" not in response
     assert "## Source verse" in response
     assert "Exact source passage." in response
+
+
+def test_enforce_grounded_response_replaces_source_colon_invented_book():
+    sources = [
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 4,
+            "score": 0.82,
+            "excerpt": "Exact source passage.",
+            "sanskrit_text": "योगस्थः कुरु कर्माणि।",
+            "translation": "Established in steadiness, perform action.",
+        }
+    ]
+
+    response = enforce_grounded_response(
+        (
+            'The sacred text says, "He who is mindful will find peace." '
+            "(Source: The Book of Life, File: Wisdom for the Way, Page 34)"
+        ),
+        sources,
+    )
+
+    assert "The Book of Life" not in response
+    assert "> योगस्थः कुरु कर्माणि।" in response
+    assert "Established in steadiness, perform action." in response
 
 
 def test_enforce_grounded_response_uses_structured_verse_and_translation():
