@@ -138,7 +138,9 @@ Core gates:
 uv run black --check .
 uv run ruff check .
 uv run mypy moksha users chat scriptures llm embedding_service scripts
-uv run python manage.py check --deploy
+uv run python -m pip check
+uv run python manage.py check
+uv run python manage.py check --deploy --fail-level WARNING
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest
 

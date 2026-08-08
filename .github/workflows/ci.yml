@@ -37,7 +37,7 @@ jobs:
 
     env:
       DJANGO_SETTINGS_MODULE: moksha.settings_test
-      DJANGO_SECRET_KEY: ci-only-secret
+      DJANGO_SECRET_KEY: ci-check-only-long-random-secret-with-enough-entropy-2026-08-08
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: "5432"
       POSTGRES_DB: moksha
@@ -86,8 +86,14 @@ jobs:
       - name: Python types
         run: uv run mypy .
 
+      - name: Python dependency check
+        run: uv run python -m pip check
+
       - name: Django checks
         run: uv run python manage.py check
+
+      - name: Django deploy security checks
+        run: uv run python manage.py check --deploy --fail-level WARNING
 
       - name: Django migration drift
         run: uv run python manage.py makemigrations --check --dry-run
