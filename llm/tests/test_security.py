@@ -77,11 +77,32 @@ def test_public_endpoint_validation_blocks_private_hosts() -> None:
             "http://api.example.com",
             resolved_ips=["93.184.216.34"],
         )
+    with pytest.raises(ValidationError):
+        validate_public_https_endpoint(
+            "https://169.254.169.254/latest/meta-data",
+            resolved_ips=["169.254.169.254"],
+        )
+
+
+def test_public_endpoint_validation_rejects_bad_dns_pins_and_ports() -> None:
+    with pytest.raises(ValidationError) as invalid_pin:
+        validate_public_https_endpoint(
+            "https://api.example.com",
+            resolved_ips=["not-an-ip"],
+        )
+    assert invalid_pin.value.messages == ["endpoint_dns_invalid"]
+
+    with pytest.raises(ValidationError) as invalid_port:
+        validate_public_https_endpoint(
+            "https://api.example.com:11434",
+            resolved_ips=["93.184.216.34"],
+        )
+    assert invalid_port.value.messages == ["endpoint_port_forbidden"]
 
 
 def test_public_endpoint_validation_allows_public_https() -> None:
     result = validate_public_https_endpoint(
-        "https://api.example.com/v1/",
+        "https://api.example.com/v1/?token=secret#fragment",
         resolved_ips=["93.184.216.34"],
     )
     assert result.normalized_url == "https://api.example.com/v1"

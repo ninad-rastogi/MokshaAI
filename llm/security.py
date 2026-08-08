@@ -184,7 +184,11 @@ def validate_public_https_endpoint(
     )
     if not pins:
         raise ValidationError("endpoint_dns_required")
-    if not allow_private and any(_ip_is_forbidden(address) for address in pins):
+    try:
+        has_forbidden_pin = any(_ip_is_forbidden(address) for address in pins)
+    except ValueError as exc:
+        raise ValidationError("endpoint_dns_invalid") from exc
+    if not allow_private and has_forbidden_pin:
         raise ValidationError("endpoint_private_network_forbidden")
 
     normalized = parsed._replace(fragment="", query="").geturl().rstrip("/")
