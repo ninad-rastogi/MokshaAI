@@ -1,10 +1,8 @@
 """Regression tests for exception handling syntax."""
 
-import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PY2_EXCEPT_RE = re.compile(r"^\s*except\s+[^(#\n]+,\s*[A-Za-z_]", re.MULTILINE)
 EXCLUDED_PARTS = {
     ".git",
     ".mypy_cache",
@@ -17,7 +15,7 @@ EXCLUDED_PARTS = {
 }
 
 
-def test_python_code_uses_tuple_except_for_multiple_exceptions():
+def test_project_python_files_compile_under_target_runtime():
     offenders = []
     for path in PROJECT_ROOT.rglob("*.py"):
         if any(
@@ -25,7 +23,11 @@ def test_python_code_uses_tuple_except_for_multiple_exceptions():
         ):
             continue
         text = path.read_text(encoding="utf-8")
-        if PY2_EXCEPT_RE.search(text):
-            offenders.append(path.relative_to(PROJECT_ROOT).as_posix())
+        try:
+            compile(text, str(path), "exec")
+        except SyntaxError as error:
+            offenders.append(
+                f"{path.relative_to(PROJECT_ROOT).as_posix()}:{error.lineno}"
+            )
 
     assert offenders == []
