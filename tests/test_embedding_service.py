@@ -14,7 +14,7 @@ class _Vector:
 
 
 class _FakeModel:
-    def get_sentence_embedding_dimension(self) -> int:
+    def get_embedding_dimension(self) -> int:
         return 3
 
     def encode(
@@ -41,10 +41,10 @@ def test_embedding_service_reuses_single_loaded_model(monkeypatch):
     monkeypatch.setenv("EMBEDDING_DIMENSIONS", "3")
     monkeypatch.setattr(main, "SentenceTransformer", fake_transformer)
     main.model.cache_clear()
-    client = TestClient(main.app)
-
-    ready = client.get("/ready")
-    embedded = client.post("/embed", json={"texts": ["steadiness", "clarity"]})
+    with TestClient(main.app) as client:
+        assert created == [("BAAI/bge-m3", "cpu")]
+        ready = client.get("/ready")
+        embedded = client.post("/embed", json={"texts": ["steadiness", "clarity"]})
 
     assert ready.status_code == 200
     assert embedded.status_code == 200

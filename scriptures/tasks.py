@@ -88,6 +88,7 @@ def index_scripture(self, job_id: int) -> None:
         "progress": progress_floor,
         "celery_task_id": self.request.id or "",
         "index_version": version,
+        "error_message": "",
     }
     if job.started_at is None:
         job_updates["started_at"] = timezone.now()

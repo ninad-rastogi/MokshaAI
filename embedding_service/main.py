@@ -1,13 +1,13 @@
 """Private embedding sidecar for Moksha AI."""
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sentence_transformers import SentenceTransformer
-
-app = FastAPI(title="Moksha Embedding Service", version="0.1.0")
 
 
 class EmbedRequest(BaseModel):
@@ -34,6 +34,20 @@ def model() -> SentenceTransformer:
     )
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Warm the process-owned model before accepting concurrent requests."""
+    model()
+    yield
+
+
+app = FastAPI(
+    title="Moksha Embedding Service",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -48,7 +62,7 @@ def ready() -> dict[str, str]:
             status_code=503,
             detail="embedding_model_unavailable",
         ) from error
-    dimensions = loaded.get_sentence_embedding_dimension()
+    dimensions = loaded.get_embedding_dimension()
     if dimensions != int(os.getenv("EMBEDDING_DIMENSIONS", "1024")):
         raise HTTPException(
             status_code=503,

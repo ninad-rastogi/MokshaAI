@@ -11,6 +11,7 @@ Usage:
 
 import logging
 
+from celery.exceptions import Retry
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -20,6 +21,23 @@ from scriptures.models import IndexingJob, Scripture, ScriptureIndexVersion
 from scriptures.tasks import INDEX_FAILURE_BUILD, index_scripture
 
 logger = logging.getLogger("chat.management.discover")
+
+
+def run_index_task(job_id: int) -> None:
+    """Run the task eagerly while honoring its bounded retry contract."""
+    retries = 0
+    max_retries = index_scripture.max_retries or 0
+    while True:
+        try:
+            apply_kwargs = {"args": [job_id], "throw": True}
+            if retries:
+                apply_kwargs["retries"] = retries
+            index_scripture.apply(**apply_kwargs)
+            return
+        except Retry:
+            retries += 1
+            if retries > max_retries:
+                raise
 
 
 class Command(BaseCommand):
@@ -140,7 +158,7 @@ class Command(BaseCommand):
                     scripture=scripture,
                     requested_by=operator,
                 )
-            index_scripture.apply(args=[job.pk], throw=True)
+            run_index_task(job.pk)
             job.refresh_from_db()
             if job.status != IndexingJob.Status.SUCCEEDED:
                 raise CommandError(
