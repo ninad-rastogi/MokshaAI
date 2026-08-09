@@ -17,6 +17,7 @@ one operator-selected directory and writes only that directory's `README.md`.
 - `validate_readmes.py`: read-only boundary and documentation validator.
 - `scaffold_readme.py`: opt-in generator for one canonical boundary README.
 - `run_frontend_gate.py`: adapter for frontend quality commands.
+- `run_python_gate.py`: resolves the active or shared ancestor Python environment.
 - `benchmark_ollama.py`: local Ollama qualification benchmark.
 - `live_ui_walkthrough.py`: browser walkthrough evidence command.
 - `export_openapi.py`: canonical v1 schema and stable operation IDs.
@@ -34,6 +35,8 @@ findings, and `2` for invalid command input. The validator also exposes typed `v
 
 Tools use Python 3.14 and the standard library. `--root` overrides repository discovery. The
 validator accepts `--warnings-as-errors` for strict legacy-document migration checks.
+Python hooks prefer `VIRTUAL_ENV`, then the nearest ancestor `.env`, and never
+create a project `.venv`.
 
 ## Commands
 

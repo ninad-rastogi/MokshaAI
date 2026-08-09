@@ -126,6 +126,12 @@ const scriptureSchema = z.object({
       volumes_processed: z.number().int().nonnegative(),
     })
     .nullable(),
+  latest_indexing_failure: z
+    .object({
+      failure_code: z.string(),
+      finished_at: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 const readinessSchema = z.object({

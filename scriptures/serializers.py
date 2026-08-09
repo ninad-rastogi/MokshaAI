@@ -39,6 +39,17 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class IndexingFailureSerializer(serializers.ModelSerializer):
+    """Bounded failure state without internal exception details."""
+
+    failure_code = serializers.CharField(source="error_message", read_only=True)
+
+    class Meta:
+        model = IndexingJob
+        fields = ("failure_code", "finished_at")
+        read_only_fields = fields
+
+
 class ScriptureSerializer(serializers.ModelSerializer):
     """Serializer for Scripture model with nested volumes."""
 
@@ -47,6 +58,7 @@ class ScriptureSerializer(serializers.ModelSerializer):
         serializers.PrimaryKeyRelatedField(read_only=True)
     )
     current_indexing_job = IndexingProgressSerializer(read_only=True)
+    latest_indexing_failure = IndexingFailureSerializer(read_only=True)
 
     class Meta:
         model = Scripture
@@ -61,6 +73,7 @@ class ScriptureSerializer(serializers.ModelSerializer):
             "last_indexed_at",
             "active_index_version",
             "current_indexing_job",
+            "latest_indexing_failure",
             "created_at",
             "volumes",
         )

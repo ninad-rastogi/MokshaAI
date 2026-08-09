@@ -38,6 +38,14 @@ const runStreamComposable = readFileSync(
 const mainCss = readFileSync(resolve(root, "assets/css/main.css"), "utf8");
 
 describe("app shell", () => {
+  it("shows a bounded source quality failure instead of pending", () => {
+    expect(settingsComponent).toContain('"index_source_text_corrupt"');
+    expect(settingsComponent).toContain('"Source needs OCR"');
+    expect(settingsComponent).toContain(
+      '"Source text failed exact-verse quality checks"',
+    );
+  });
+
   it("keeps theme and model controls inside a settings dialog", () => {
     expect(settingsComponent).toContain('aria-label="Theme"');
     expect(settingsComponent).toContain('aria-label="Primary response model"');

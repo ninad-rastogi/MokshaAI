@@ -8,10 +8,12 @@ from chat.models import DocumentChunk
 from chat.rag.embeddings import EmbeddingServiceError
 from scriptures.models import IndexingJob, Scripture
 from scriptures.tasks import (
+    MAX_SUSPICIOUS_SOURCE_RATIO,
     candidate_can_retry,
     candidate_checkpoint,
     index_progress_floor,
     record_embedding_progress,
+    source_text_quality,
 )
 from users.models import User
 
@@ -86,3 +88,55 @@ def test_resumed_index_progress_never_moves_backward() -> None:
     assert index_progress_floor(current=82, resuming=True) == 82
     assert index_progress_floor(current=59, resuming=True) == 70
     assert index_progress_floor(current=100, resuming=False) == 5
+
+
+def test_source_text_quality_accepts_clean_devanagari_verse() -> None:
+    report = source_text_quality(
+        [
+            {
+                "chunk_type": "verse_with_translation",
+                "text": "Sanskrit verse:\nकर्मण्येवाधिकारस्ते मा फलेषु कदाचन।",
+            },
+            {"chunk_type": "narration", "text": "A plain English note."},
+        ]
+    )
+
+    assert report == {
+        "devanagari_chunks": 1,
+        "suspicious_source_chunks": 0,
+        "suspicious_source_ratio": 0.0,
+        "max_suspicious_source_ratio": MAX_SUSPICIOUS_SOURCE_RATIO,
+        "source_text_qualified": True,
+    }
+
+
+def test_source_text_quality_rejects_pdf_font_mojibake() -> None:
+    report = source_text_quality(
+        [
+            {"chunk_type": "shloka", "text": "Æवमेव माता च ȵपता Æवमेव"},
+            {"chunk_type": "shloka", "text": "ĜीमÊमहɍषɢ वेदȉासĒणीत"},
+            {"chunk_type": "shloka", "text": "सत्यं वद।"},
+        ]
+    )
+
+    assert report["suspicious_source_chunks"] == 2
+    assert report["suspicious_source_ratio"] == 0.6667
+    assert report["source_text_qualified"] is False
+
+
+def test_source_text_quality_does_not_require_verses_for_prose_collection() -> None:
+    report = source_text_quality(
+        [{"chunk_type": "narration", "text": "A prose spiritual collection."}]
+    )
+
+    assert report["devanagari_chunks"] == 0
+    assert report["source_text_qualified"] is True
+
+
+def test_source_text_quality_checks_devanagari_prose_chunks() -> None:
+    report = source_text_quality(
+        [{"chunk_type": "translation", "text": "यह ĜीमÊ दूषित पाठ है।"}]
+    )
+
+    assert report["suspicious_source_chunks"] == 1
+    assert report["source_text_qualified"] is False

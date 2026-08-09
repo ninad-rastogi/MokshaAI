@@ -33,6 +33,7 @@ def test_citation_from_chunk_extracts_sanskrit_and_translation():
             "file_name": "volume.pdf",
             "page": 4,
             "score": 0.82,
+            "chunk_type": "shloka",
             "text": (
                 "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन\n"
                 "You have a right to action, not to its fruits."
@@ -44,6 +45,23 @@ def test_citation_from_chunk_extracts_sanskrit_and_translation():
     assert citation["verse_text"] == "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन"
     assert citation["translation"] == "You have a right to action, not to its fruits."
     assert citation["source_text"].startswith("कर्मण्येवाधिकारस्ते")
+
+
+def test_citation_from_chunk_does_not_present_hindi_prose_as_sanskrit():
+    citation = citation_from_chunk(
+        {
+            "scripture": "Collection",
+            "file_name": "volume.pdf",
+            "page": 5,
+            "score": 0.82,
+            "chunk_type": "translation",
+            "text": "मन को शांत रखने के लिए नियमित अभ्यास आवश्यक है।",
+        }
+    )
+
+    assert "verse_text" not in citation
+    assert "sanskrit_text" not in citation
+    assert citation["source_text"].startswith("मन को शांत")
 
 
 def test_citation_from_chunk_extracts_labelled_verse_and_translation():

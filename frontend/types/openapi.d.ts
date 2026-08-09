@@ -803,6 +803,11 @@ export interface components {
       is_indexed?: boolean;
       /** Format: date-time */
       last_indexed_at?: string | null;
+      readonly latest_indexing_failure?: {
+        readonly failure_code?: string;
+        /** Format: date-time */
+        readonly finished_at?: string | null;
+      };
       name: string;
       total_pages?: number;
       total_volumes?: number;

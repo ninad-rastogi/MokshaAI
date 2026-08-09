@@ -29,7 +29,14 @@ class ScriptureViewSet(viewsets.ReadOnlyModelViewSet):
                 status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING]
             ),
             to_attr="active_indexing_jobs",
-        )
+        ),
+        Prefetch(
+            "indexing_jobs",
+            queryset=IndexingJob.objects.filter(
+                status=IndexingJob.Status.FAILED
+            ).order_by("-finished_at", "-created_at"),
+            to_attr="failed_indexing_jobs",
+        ),
     )
     serializer_class = ScriptureSerializer
     permission_classes = [permissions.IsAuthenticated]

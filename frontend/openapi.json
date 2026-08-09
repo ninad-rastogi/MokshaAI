@@ -382,6 +382,22 @@
             "nullable": true,
             "type": "string"
           },
+          "latest_indexing_failure": {
+            "properties": {
+              "failure_code": {
+                "readOnly": true,
+                "type": "string"
+              },
+              "finished_at": {
+                "format": "date-time",
+                "nullable": true,
+                "readOnly": true,
+                "type": "string"
+              }
+            },
+            "readOnly": true,
+            "type": "object"
+          },
           "name": {
             "maxLength": 200,
             "type": "string"

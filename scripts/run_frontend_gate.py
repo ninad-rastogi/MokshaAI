@@ -1,7 +1,7 @@
 """Run frontend package gates from the repository root.
 
-Pre-commit invokes this through `uv run --active` so Python stays on the
-project venv while npm uses the checked-in frontend lockfile and node_modules.
+Pre-commit invokes this with system Python; npm uses the checked-in frontend
+lockfile and node_modules.
 """
 
 from __future__ import annotations

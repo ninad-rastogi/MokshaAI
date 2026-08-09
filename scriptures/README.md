@@ -70,6 +70,10 @@ Activation requires a complete qualified candidate and uses a DB transaction.
 
 - No collections: verify document root and PDF folder layout.
 - Candidate rejected: inspect bounded qualification codes and retrieval smoke.
+- `index_source_text_corrupt`: PDF font mapping produced mojibake in more than
+  5% of Devanagari verse chunks. Replace the source with a clean Unicode PDF or
+  OCR-derived text, then start a new immutable build. Corrupt candidates never
+  become active and their partial vectors are removed.
 - Activation conflict: retry after active indexing job finishes.
 - Embedding errors: check private sidecar health and queue logs.
 

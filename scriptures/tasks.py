@@ -2,7 +2,9 @@
 
 import hashlib
 import logging
+import re
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import fitz
@@ -24,6 +26,31 @@ logger = logging.getLogger("scriptures.tasks")
 
 INDEX_FAILURE_BUILD = "index_build_failed"
 INDEX_FAILURE_QUALIFICATION = "index_qualification_failed"
+INDEX_FAILURE_SOURCE_TEXT = "index_source_text_corrupt"
+
+DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
+SUSPICIOUS_LATIN_RE = re.compile(r"[\u0080-\u024F]")
+MAX_SUSPICIOUS_SOURCE_RATIO = 0.05
+
+
+def source_text_quality(chunks: list[dict[str, Any]]) -> dict[str, int | float | bool]:
+    """Measure extraction corruption in Devanagari-bearing source chunks."""
+    source_chunks = [
+        str(chunk.get("text", ""))
+        for chunk in chunks
+        if DEVANAGARI_RE.search(str(chunk.get("text", "")))
+    ]
+    suspicious_chunks = sum(
+        bool(SUSPICIOUS_LATIN_RE.search(text)) for text in source_chunks
+    )
+    suspicious_ratio = suspicious_chunks / len(source_chunks) if source_chunks else 0.0
+    return {
+        "devanagari_chunks": len(source_chunks),
+        "suspicious_source_chunks": suspicious_chunks,
+        "suspicious_source_ratio": round(suspicious_ratio, 4),
+        "max_suspicious_source_ratio": MAX_SUSPICIOUS_SOURCE_RATIO,
+        "source_text_qualified": suspicious_ratio <= MAX_SUSPICIOUS_SOURCE_RATIO,
+    }
 
 
 def record_embedding_progress(job_id: int, completed: int, total: int) -> None:
@@ -133,11 +160,22 @@ def index_scripture(self, job_id: int) -> None:
         version.source_manifest = source_manifest
         version.volume_count = len(volumes)
         version.page_count = sum(volume[2] for volume in volumes)
-        version.save(update_fields=["source_manifest", "volume_count", "page_count"])
+        text_quality = source_text_quality(chunks)
+        version.qualification = {"source_text": text_quality}
+        version.save(
+            update_fields=[
+                "source_manifest",
+                "volume_count",
+                "page_count",
+                "qualification",
+            ]
+        )
         IndexingJob.objects.filter(pk=job.pk).update(
             volumes_processed=len(volumes),
             chunks_indexed=0,
         )
+        if not text_quality["source_text_qualified"]:
+            raise RuntimeError(INDEX_FAILURE_SOURCE_TEXT)
 
         # Write candidate first. Existing active retrieval remains available.
         vector_store = PgVectorStore()
@@ -169,6 +207,7 @@ def index_scripture(self, job_id: int) -> None:
             and smoke_results[0]["score"] >= settings.RAG_MIN_SIMILARITY
         )
         qualification = {
+            "source_text": text_quality,
             "expected_chunks": len(chunks),
             "stored_chunks": added,
             "volume_count": len(source_manifest),
@@ -266,11 +305,10 @@ def index_scripture(self, job_id: int) -> None:
                 error_message="index_retry_pending",
             )
             raise
-        failure_code = (
-            INDEX_FAILURE_QUALIFICATION
-            if str(exc) == INDEX_FAILURE_QUALIFICATION
-            else INDEX_FAILURE_BUILD
-        )
+        failure_code = {
+            INDEX_FAILURE_QUALIFICATION: INDEX_FAILURE_QUALIFICATION,
+            INDEX_FAILURE_SOURCE_TEXT: INDEX_FAILURE_SOURCE_TEXT,
+        }.get(str(exc), INDEX_FAILURE_BUILD)
         ScriptureIndexVersion.objects.filter(
             pk=version.pk,
             status__in=[
@@ -286,4 +324,5 @@ def index_scripture(self, job_id: int) -> None:
             error_message=failure_code,
             finished_at=timezone.now(),
         )
+        DocumentChunk.objects.filter(index_version=version.pk).delete()
         raise

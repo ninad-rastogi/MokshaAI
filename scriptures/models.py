@@ -42,6 +42,13 @@ class Scripture(models.Model):
             status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING]
         ).first()
 
+    @property
+    def latest_indexing_failure(self):
+        jobs = getattr(self, "failed_indexing_jobs", None)
+        if jobs is not None:
+            return jobs[0] if jobs else None
+        return self.indexing_jobs.filter(status=IndexingJob.Status.FAILED).first()
+
 
 class Volume(models.Model):
     """Represents a single PDF volume within a scripture."""

@@ -61,7 +61,7 @@ class ScriptureChunker:
             sub_chunks = self._split_long_text(section_text)
 
             for sub_text in sub_chunks:
-                language = self._detect_language(sub_text)
+                language = self._detect_language(sub_text, section_type)
                 chunks.append(
                     {
                         "scripture": scripture_name,
@@ -154,15 +154,14 @@ class ScriptureChunker:
 
         devanagari_ratio = devanagari_chars / total_chars
 
-        # If >60% Devanagari, it's likely a shloka
+        # Devanagari is shared by Sanskrit and Hindi. Only explicit verse
+        # punctuation/numbering is strong enough to label source text a shloka.
         if devanagari_ratio > 0.6:
-            # Check for verse markers (। ॥) which indicate shloka
-            if "।" in line or "॥" in line:
+            if "॥" in line:
                 return "shloka"
-            # Check for numbered verses
-            if re.search(r"\d+", line):
+            if re.search(r"[।॥]\s*[0-9०-९]+\s*[।॥]?\s*$", line):
                 return "shloka"
-            return "shloka"
+            return "translation"
 
         # If some Devanagari but mixed, likely translation
         if devanagari_ratio > 0.1:
@@ -170,7 +169,7 @@ class ScriptureChunker:
 
         return "narration"
 
-    def _detect_language(self, text: str) -> str:
+    def _detect_language(self, text: str, chunk_type: str) -> str:
         """Detect the primary language of a text chunk."""
         devanagari_chars = _devanagari_char_count(text)
         total_chars = len(text.strip())
@@ -179,8 +178,10 @@ class ScriptureChunker:
             return "unknown"
 
         ratio = devanagari_chars / total_chars
+        if chunk_type in {"shloka", "verse_with_translation"}:
+            return "sa"
         if ratio > 0.5:
-            return "sa"  # Sanskrit (Devanagari)
+            return "hi"
         if ratio > 0.1:
             return "hi"  # Hindi (mixed Devanagari)
         return "en"  # English or other

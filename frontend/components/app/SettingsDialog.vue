@@ -113,13 +113,26 @@ function scriptureDetail(scripture: Scripture) {
   if (job) {
     return `${job.volumes_processed} volumes, ${job.chunks_indexed.toLocaleString()} passages committed`;
   }
+  if (
+    scripture.latest_indexing_failure?.failure_code ===
+    "index_source_text_corrupt"
+  ) {
+    return "Source text failed exact-verse quality checks";
+  }
   return `${scripture.total_volumes} volumes, ${scripture.total_pages.toLocaleString()} pages`;
 }
 
 function scriptureStatus(scripture: Scripture) {
   if (scripture.is_indexed) return "Indexed";
   const job = scripture.current_indexing_job;
-  if (!job) return "Pending";
+  if (!job) {
+    return scripture.latest_indexing_failure?.failure_code ===
+      "index_source_text_corrupt"
+      ? "Source needs OCR"
+      : scripture.latest_indexing_failure
+        ? "Index failed"
+        : "Pending";
+  }
   return job.status === "PENDING" ? "Queued" : `Indexing ${job.progress}%`;
 }
 
@@ -602,6 +615,10 @@ watch(
                     {
                       'index-state--ready': scripture.is_indexed,
                       'index-state--running': scripture.current_indexing_job,
+                      'index-state--failed':
+                        !scripture.is_indexed &&
+                        !scripture.current_indexing_job &&
+                        scripture.latest_indexing_failure,
                     },
                   ]"
                 >
@@ -611,7 +628,9 @@ watch(
                         ? 'i-lucide-circle-check'
                         : scripture.current_indexing_job
                           ? 'i-lucide-loader-circle'
-                          : 'i-lucide-clock-3'
+                          : scripture.latest_indexing_failure
+                            ? 'i-lucide-triangle-alert'
+                            : 'i-lucide-clock-3'
                     "
                     aria-hidden="true"
                   />
@@ -1027,6 +1046,10 @@ watch(
 
 .index-state--running {
   color: var(--moksha-accent);
+}
+
+.index-state--failed {
+  color: var(--moksha-error);
 }
 
 .connection-state--degraded,

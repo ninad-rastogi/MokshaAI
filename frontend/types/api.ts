@@ -104,4 +104,8 @@ export type Scripture = {
     chunks_indexed: number;
     volumes_processed: number;
   } | null;
+  latest_indexing_failure: {
+    failure_code: string;
+    finished_at: string | null;
+  } | null;
 };

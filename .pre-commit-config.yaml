@@ -3,28 +3,28 @@ repos:
     hooks:
       - id: python-format-check
         name: Python format check
-        entry: uv run --active --no-cache python -m black --check .
+        entry: python scripts/run_python_gate.py -m black --check .
         language: system
         pass_filenames: false
         types_or: [python]
 
       - id: django-system-check
         name: Django system check
-        entry: uv run --active --no-cache python manage.py check
+        entry: python scripts/run_python_gate.py manage.py check
         language: system
         pass_filenames: false
         types_or: [python]
 
       - id: frontend-format-check
         name: Frontend format check
-        entry: uv run --active --no-cache python scripts/run_frontend_gate.py format
+        entry: python scripts/run_frontend_gate.py format
         language: system
         pass_filenames: false
         files: ^frontend/
 
       - id: frontend-tests
         name: Frontend tests
-        entry: uv run --active --no-cache python scripts/run_frontend_gate.py test
+        entry: python scripts/run_frontend_gate.py test
         language: system
         pass_filenames: false
         files: ^frontend/

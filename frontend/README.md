@@ -30,6 +30,8 @@ fixed while only message history scrolls. Archived chats have no composer.
 Set `NUXT_PUBLIC_API_BASE` only when API is not same-origin. Theme, primary
 profile, optional fallback, and provider connections persist through account
 APIs, not local storage. System/light/dark theme follows account preference.
+`NUXT_API_PROXY` defaults to `http://127.0.0.1:8000` for direct local Nuxt
+access. Caddy routes `/api/v1/*` directly to Django in deployed environments.
 
 ## Commands
 

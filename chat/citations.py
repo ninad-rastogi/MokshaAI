@@ -125,7 +125,11 @@ def _labelled_text_parts(lines: list[str]) -> dict[str, str]:
     }
 
 
-def _citation_text_parts(text: str) -> dict[str, str]:
+def _citation_text_parts(
+    text: str,
+    *,
+    allow_unlabelled_verse: bool = False,
+) -> dict[str, str]:
     lines = _clean_lines(text)
     labelled = _labelled_text_parts(lines)
     devanagari_lines = [line for line in lines if _DEVANAGARI_RE.search(line)]
@@ -141,7 +145,7 @@ def _citation_text_parts(text: str) -> dict[str, str]:
                 parts["sanskrit_text"] = parts["verse_text"]
         if translation:
             parts["translation"] = _clip_text(translation, MAX_TRANSLATION_CHARS)
-    elif devanagari_lines:
+    elif devanagari_lines and allow_unlabelled_verse:
         sanskrit = "\n".join(devanagari_lines[:8])
         parts["sanskrit_text"] = _clip_text(sanskrit, MAX_VERSE_CHARS)
         parts["verse_text"] = parts["sanskrit_text"]
@@ -151,7 +155,7 @@ def _citation_text_parts(text: str) -> dict[str, str]:
                 "\n".join(translation_lines),
                 MAX_TRANSLATION_CHARS,
             )
-    else:
+    elif allow_unlabelled_verse:
         first_block = text.strip().split("\n\n", 1)[0].strip()
         parts["verse_text"] = _clip_text(first_block or text, MAX_VERSE_CHARS)
     return parts
@@ -170,7 +174,13 @@ def citation_from_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
         "score": float(chunk.get("score", 0.0) or 0.0),
         "excerpt": _clip_text(text, MAX_EXCERPT_CHARS),
     }
-    citation.update(_citation_text_parts(text))
+    chunk_type = _metadata_text(chunk, "chunk_type")
+    citation.update(
+        _citation_text_parts(
+            text,
+            allow_unlabelled_verse=chunk_type in {"shloka", "verse_with_translation"},
+        )
+    )
     verse_text = _metadata_text(chunk, "verse_text", "sanskrit_text", "shloka")
     sanskrit_text = _metadata_text(chunk, "sanskrit_text", "shloka")
     translation = _metadata_text(chunk, "translation", "meaning")

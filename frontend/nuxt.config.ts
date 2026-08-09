@@ -32,10 +32,11 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    devProxy: {
-      "/api/v1": {
-        target: "http://localhost:8000/api/v1",
-        changeOrigin: true,
+    routeRules: {
+      "/api/v1/**": {
+        proxy: {
+          to: `${process.env.NUXT_API_PROXY || "http://127.0.0.1:8000"}/api/v1/**`,
+        },
       },
     },
   },
