@@ -107,6 +107,21 @@ const fallbackOptions = computed(() =>
   ),
 );
 
+function scriptureDetail(scripture: Scripture) {
+  const job = scripture.current_indexing_job;
+  if (job) {
+    return `${job.volumes_processed} volumes, ${job.chunks_indexed.toLocaleString()} passages committed`;
+  }
+  return `${scripture.total_volumes} volumes, ${scripture.total_pages.toLocaleString()} pages`;
+}
+
+function scriptureStatus(scripture: Scripture) {
+  if (scripture.is_indexed) return "Indexed";
+  const job = scripture.current_indexing_job;
+  if (!job) return "Pending";
+  return job.status === "PENDING" ? "Queued" : `Indexing ${job.progress}%`;
+}
+
 function formatContextWindow(tokens: number) {
   if (tokens >= 1000 && tokens % 1000 === 0) return `${tokens / 1000}K context`;
   if (tokens >= 1024 && tokens % 1024 === 0) return `${tokens / 1024}K context`;
@@ -443,7 +458,11 @@ watch(
               </li>
             </ul>
 
-            <form class="provider-form" @submit.prevent="submitProvider">
+            <form
+              class="provider-form"
+              autocomplete="off"
+              @submit.prevent="submitProvider"
+            >
               <div class="provider-form__heading">
                 <strong>Add connection</strong>
                 <span>
@@ -458,6 +477,7 @@ watch(
                   v-model="providerName"
                   required
                   autocomplete="organization"
+                  name="provider-name"
                   placeholder="Example: OpenAI"
                 />
               </label>
@@ -490,7 +510,9 @@ watch(
                   <input
                     v-model="providerEndpoint"
                     required
+                    autocomplete="url"
                     inputmode="url"
+                    name="provider-endpoint"
                     placeholder="https://api.provider.com/v1"
                   />
                 </label>
@@ -499,7 +521,11 @@ watch(
                   <input
                     v-model="providerModel"
                     required
+                    autocomplete="off"
+                    autocapitalize="none"
+                    name="provider-model-id"
                     placeholder="Provider model identifier"
+                    spellcheck="false"
                   />
                 </label>
               </div>
@@ -509,7 +535,8 @@ watch(
                 <input
                   v-model="providerKey"
                   :required="providerDialect === 'openai_compatible'"
-                  autocomplete="off"
+                  autocomplete="new-password"
+                  name="provider-api-key"
                   type="password"
                   :placeholder="
                     providerDialect === 'openai_compatible'
@@ -560,25 +587,29 @@ watch(
                 <span>
                   <strong>{{ scripture.name }}</strong>
                   <small>
-                    {{ scripture.total_volumes }} volumes,
-                    {{ scripture.total_pages }} pages
+                    {{ scriptureDetail(scripture) }}
                   </small>
                 </span>
                 <span
                   :class="[
                     'index-state',
-                    { 'index-state--ready': scripture.is_indexed },
+                    {
+                      'index-state--ready': scripture.is_indexed,
+                      'index-state--running': scripture.current_indexing_job,
+                    },
                   ]"
                 >
                   <UIcon
                     :name="
                       scripture.is_indexed
                         ? 'i-lucide-circle-check'
-                        : 'i-lucide-clock-3'
+                        : scripture.current_indexing_job
+                          ? 'i-lucide-loader-circle'
+                          : 'i-lucide-clock-3'
                     "
                     aria-hidden="true"
                   />
-                  {{ scripture.is_indexed ? "Indexed" : "Pending" }}
+                  {{ scriptureStatus(scripture) }}
                 </span>
               </li>
             </ul>
@@ -985,6 +1016,10 @@ watch(
 }
 
 .connection-state--configured {
+  color: var(--moksha-accent);
+}
+
+.index-state--running {
   color: var(--moksha-accent);
 }
 

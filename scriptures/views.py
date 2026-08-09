@@ -1,6 +1,7 @@
 """Views for the scriptures app."""
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -21,7 +22,15 @@ from scriptures.tasks import index_scripture
 class ScriptureViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for listing and retrieving scriptures."""
 
-    queryset = Scripture.objects.all()
+    queryset = Scripture.objects.prefetch_related(
+        Prefetch(
+            "indexing_jobs",
+            queryset=IndexingJob.objects.filter(
+                status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING]
+            ),
+            to_attr="active_indexing_jobs",
+        )
+    )
     serializer_class = ScriptureSerializer
     permission_classes = [permissions.IsAuthenticated]
 

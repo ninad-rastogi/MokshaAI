@@ -25,6 +25,20 @@ class VolumeSerializer(serializers.ModelSerializer):
         )
 
 
+class IndexingProgressSerializer(serializers.ModelSerializer):
+    """Bounded active indexing progress safe for authenticated users."""
+
+    class Meta:
+        model = IndexingJob
+        fields = (
+            "status",
+            "progress",
+            "chunks_indexed",
+            "volumes_processed",
+        )
+        read_only_fields = fields
+
+
 class ScriptureSerializer(serializers.ModelSerializer):
     """Serializer for Scripture model with nested volumes."""
 
@@ -32,6 +46,7 @@ class ScriptureSerializer(serializers.ModelSerializer):
     active_index_version: serializers.PrimaryKeyRelatedField = (
         serializers.PrimaryKeyRelatedField(read_only=True)
     )
+    current_indexing_job = IndexingProgressSerializer(read_only=True)
 
     class Meta:
         model = Scripture
@@ -45,6 +60,7 @@ class ScriptureSerializer(serializers.ModelSerializer):
             "is_indexed",
             "last_indexed_at",
             "active_index_version",
+            "current_indexing_job",
             "created_at",
             "volumes",
         )

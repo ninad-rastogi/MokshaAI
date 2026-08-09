@@ -98,4 +98,10 @@ export type Scripture = {
   total_volumes: number;
   total_pages: number;
   last_indexed_at: string | null;
+  current_indexing_job: {
+    status: "PENDING" | "RUNNING";
+    progress: number;
+    chunks_indexed: number;
+    volumes_processed: number;
+  } | null;
 };

@@ -33,6 +33,15 @@ class Scripture(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    @property
+    def current_indexing_job(self):
+        jobs = getattr(self, "active_indexing_jobs", None)
+        if jobs is not None:
+            return jobs[0] if jobs else None
+        return self.indexing_jobs.filter(
+            status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING]
+        ).first()
+
 
 class Volume(models.Model):
     """Represents a single PDF volume within a scripture."""

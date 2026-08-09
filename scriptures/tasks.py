@@ -12,7 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from chat.models import DocumentChunk
-from chat.rag.embeddings import PgVectorStore
+from chat.rag.embeddings import EmbeddingServiceError, PgVectorStore
 from chat.rag.loader import ScriptureDocumentLoader
 from scriptures.models import (
     IndexingJob,
@@ -45,8 +45,8 @@ def candidate_checkpoint(version_id: UUID, total_chunks: int) -> int:
 
 
 def candidate_can_retry(error: Exception, retries: int, max_retries: int) -> bool:
-    """Return whether transient filesystem failure keeps candidate resumable."""
-    return isinstance(error, OSError) and retries < max_retries
+    """Return whether a transient dependency failure keeps the candidate resumable."""
+    return isinstance(error, OSError | EmbeddingServiceError) and retries < max_retries
 
 
 def index_progress_floor(current: int, resuming: bool) -> int:
@@ -62,7 +62,12 @@ def compute_file_hash(file_path: Path) -> str:
     return hasher.hexdigest()
 
 
-@shared_task(bind=True, autoretry_for=(OSError,), retry_backoff=True, max_retries=3)
+@shared_task(
+    bind=True,
+    autoretry_for=(OSError, EmbeddingServiceError),
+    retry_backoff=True,
+    max_retries=3,
+)
 def index_scripture(self, job_id: int) -> None:
     """Build a new scripture index before atomically removing stale chunks."""
     job = IndexingJob.objects.select_related("scripture").get(pk=job_id)

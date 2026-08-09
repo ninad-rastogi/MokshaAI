@@ -5,6 +5,7 @@ from uuid import UUID
 import pytest
 
 from chat.models import DocumentChunk
+from chat.rag.embeddings import EmbeddingServiceError
 from scriptures.models import IndexingJob, Scripture
 from scriptures.tasks import (
     candidate_can_retry,
@@ -13,6 +14,15 @@ from scriptures.tasks import (
     record_embedding_progress,
 )
 from users.models import User
+
+
+@pytest.mark.parametrize(
+    "error",
+    [OSError("filesystem unavailable"), EmbeddingServiceError("sidecar unavailable")],
+)
+def test_candidate_retries_transient_dependencies(error: Exception) -> None:
+    assert candidate_can_retry(error, retries=0, max_retries=3)
+    assert not candidate_can_retry(error, retries=3, max_retries=3)
 
 
 @pytest.mark.django_db

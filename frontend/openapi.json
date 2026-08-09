@@ -340,6 +340,29 @@
             "readOnly": true,
             "type": "string"
           },
+          "current_indexing_job": {
+            "properties": {
+              "chunks_indexed": {
+                "readOnly": true,
+                "type": "integer"
+              },
+              "progress": {
+                "readOnly": true,
+                "type": "integer"
+              },
+              "status": {
+                "enum": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"],
+                "readOnly": true,
+                "type": "string"
+              },
+              "volumes_processed": {
+                "readOnly": true,
+                "type": "integer"
+              }
+            },
+            "readOnly": true,
+            "type": "object"
+          },
           "description": {
             "type": "string"
           },

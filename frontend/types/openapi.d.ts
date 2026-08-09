@@ -790,6 +790,13 @@ export interface components {
       readonly active_index_version?: string;
       /** Format: date-time */
       readonly created_at?: string;
+      readonly current_indexing_job?: {
+        readonly chunks_indexed?: number;
+        readonly progress?: number;
+        /** @enum {string} */
+        readonly status?: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+        readonly volumes_processed?: number;
+      };
       description?: string;
       folder_path: string;
       readonly id?: number;

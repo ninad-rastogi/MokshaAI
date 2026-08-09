@@ -167,6 +167,14 @@ describe("app shell", () => {
     expect(browserSources).not.toContain("refresh_token");
   });
 
+  it("prevents saved login credentials from autofilling provider fields", () => {
+    expect(settingsComponent).toContain('class="provider-form"');
+    expect(settingsComponent).toContain('autocomplete="off"');
+    expect(settingsComponent).toContain('name="provider-model-id"');
+    expect(settingsComponent).toContain('name="provider-api-key"');
+    expect(settingsComponent).toContain('autocomplete="new-password"');
+  });
+
   it("frames Moksha AI as scripture-guided support for difficult moments", () => {
     expect(indexPage).toContain("Bring what feels difficult to carry.");
     expect(indexPage).toContain("scripture library");

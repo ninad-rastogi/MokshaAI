@@ -6,6 +6,7 @@ Usage:
     python manage.py discover_scriptures --scripture "Collection Name"
     python manage.py discover_scriptures --force
     python manage.py discover_scriptures --resume-running
+    python manage.py discover_scriptures --resume-failed
 """
 
 import logging
@@ -13,9 +14,10 @@ import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 
-from scriptures.models import IndexingJob, Scripture
-from scriptures.tasks import index_scripture
+from scriptures.models import IndexingJob, Scripture, ScriptureIndexVersion
+from scriptures.tasks import INDEX_FAILURE_BUILD, index_scripture
 
 logger = logging.getLogger("chat.management.discover")
 
@@ -38,6 +40,11 @@ class Command(BaseCommand):
             "--resume-running",
             action="store_true",
             help="Resume a RUNNING checkpoint after confirming its worker is stopped",
+        )
+        parser.add_argument(
+            "--resume-failed",
+            action="store_true",
+            help="Resume the latest failed build candidate from its committed checkpoint",
         )
 
     def handle(self, *args, **options):
@@ -102,10 +109,37 @@ class Command(BaseCommand):
                     )
                 )
                 continue
-            job = active_job or IndexingJob.objects.create(
-                scripture=scripture,
-                requested_by=operator,
-            )
+            job = active_job
+            if job is None and options["resume_failed"]:
+                job = (
+                    IndexingJob.objects.select_related("index_version")
+                    .filter(
+                        scripture=scripture,
+                        status=IndexingJob.Status.FAILED,
+                        error_message=INDEX_FAILURE_BUILD,
+                        index_version__status=ScriptureIndexVersion.Status.FAILED,
+                        index_version__failure_code=INDEX_FAILURE_BUILD,
+                    )
+                    .first()
+                )
+                if job is not None:
+                    with transaction.atomic():
+                        version = job.index_version
+                        assert version is not None
+                        version.status = ScriptureIndexVersion.Status.BUILDING
+                        version.failure_code = ""
+                        version.save(update_fields=["status", "failure_code"])
+                        job.status = IndexingJob.Status.PENDING
+                        job.error_message = ""
+                        job.finished_at = None
+                        job.save(
+                            update_fields=["status", "error_message", "finished_at"]
+                        )
+            if job is None:
+                job = IndexingJob.objects.create(
+                    scripture=scripture,
+                    requested_by=operator,
+                )
             index_scripture.apply(args=[job.pk], throw=True)
             job.refresh_from_db()
             if job.status != IndexingJob.Status.SUCCEEDED:

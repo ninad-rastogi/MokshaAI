@@ -118,6 +118,14 @@ const scriptureSchema = z.object({
   total_volumes: z.number(),
   total_pages: z.number(),
   last_indexed_at: z.string().nullable(),
+  current_indexing_job: z
+    .object({
+      status: z.enum(["PENDING", "RUNNING"]),
+      progress: z.number().int().min(0).max(100),
+      chunks_indexed: z.number().int().nonnegative(),
+      volumes_processed: z.number().int().nonnegative(),
+    })
+    .nullable(),
 });
 
 export class ApiRequestError extends Error {
