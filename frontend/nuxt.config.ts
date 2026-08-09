@@ -1,5 +1,10 @@
 import { defineNuxtConfig } from "nuxt/config";
 
+const defaultApiBase =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8000/api/v1"
+    : "/api/v1";
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-25",
   devtools: { enabled: false },
@@ -28,7 +33,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api/v1",
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || defaultApiBase,
     },
   },
   colorMode: {

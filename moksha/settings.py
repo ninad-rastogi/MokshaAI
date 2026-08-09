@@ -151,6 +151,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8501",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3057",
+    "http://127.0.0.1:3057",
     "https://localhost:8443",
     "https://127.0.0.1:8443",
 ]
@@ -158,6 +160,8 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3057",
+    "http://127.0.0.1:3057",
     "https://localhost:8443",
     "https://127.0.0.1:8443",
 ]
