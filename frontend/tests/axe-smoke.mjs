@@ -50,6 +50,15 @@ async function installMockApi(page) {
 
     if (path.endsWith("/auth/csrf/")) {
       await fulfill(route, { csrfToken: "mock-csrf" });
+    } else if (path.endsWith("/auth/ready/")) {
+      await fulfill(route, {
+        status: "ready",
+        database: true,
+        redis: true,
+        ollama: true,
+        embedding: true,
+        disk: true,
+      });
     } else if (path.endsWith("/auth/me/")) {
       await fulfill(route, user);
     } else if (path.endsWith("/chats/") && method === "GET") {

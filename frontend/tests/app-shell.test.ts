@@ -53,6 +53,13 @@ describe("app shell", () => {
     expect(appPage).not.toContain("Admin default");
   });
 
+  it("refreshes active scripture indexing progress while that section is visible", () => {
+    expect(settingsComponent).toContain('emit("section", section)');
+    expect(appPage).toContain("shouldRefreshScriptures");
+    expect(appPage).toContain("scheduleScriptureRefresh");
+    expect(appPage).toContain('@section="settingsSection = $event"');
+  });
+
   it("exposes production chat history actions", () => {
     expect(sidebarComponent).toContain("Search conversations");
     expect(sidebarComponent).toContain("Rename");
@@ -109,9 +116,19 @@ describe("app shell", () => {
     );
   });
 
+  it("uses live runtime readiness for the selected local model", () => {
+    expect(apiComposable).toContain("readinessSchema");
+    expect(appPage).toContain("ollamaAvailable");
+    expect(appPage).toContain("loadRuntimeHealth");
+    expect(appPage).toContain("scheduleRuntimeHealthRefresh");
+  });
+
   it("keeps the closed mobile drawer inert and exposes its shortcut", () => {
     expect(sidebarComponent).toContain("mobileSemantics");
-    expect(sidebarComponent).toContain(':inert="mobileSemantics && !open"');
+    expect(sidebarComponent).toContain(':inert="!open"');
+    expect(sidebarComponent).toContain(
+      `:aria-hidden="!open ? 'true' : undefined"`,
+    );
     expect(sidebarComponent).toContain("function closeHistory()");
     expect(sidebarComponent).toContain('@click.stop="closeHistory"');
     expect(appPage).toContain("workspace--history-collapsed");
@@ -123,6 +140,8 @@ describe("app shell", () => {
     expect(sidebarComponent).toContain('aria-label="Start new conversation"');
     expect(sidebarComponent).toContain("white-space: nowrap");
     expect(appPage).toContain('event.key.toLowerCase() !== "k"');
+    expect(appPage).toContain("closeHistoryOnCompactViewport");
+    expect(appPage).toContain('matchMedia("(min-width: 861px)")');
   });
 
   it("uses top-level v1 run endpoints for durable run follow-up", () => {

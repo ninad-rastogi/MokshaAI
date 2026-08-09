@@ -22,6 +22,7 @@ const chats = ref<ChatSummary[]>([]);
 const messages = ref<Message[]>([]);
 const scriptures = ref<Scripture[]>([]);
 const profiles = ref<ModelProfile[]>([]);
+const ollamaAvailable = ref<boolean | null>(null);
 const activeChatId = ref("");
 const prompt = ref("");
 const lastPrompt = ref("");
@@ -38,6 +39,9 @@ const error = ref("");
 const search = ref("");
 const showArchived = ref(false);
 const settingsOpen = ref(false);
+const settingsSection = ref<
+  "general" | "models" | "connections" | "scriptures" | "account"
+>("general");
 const historyOpen = ref(false);
 const shellReady = ref(false);
 const workspaceLoading = ref(true);
@@ -52,6 +56,8 @@ const settingsMessageSection = ref<
 const settingsSaving = ref(false);
 const probingConnectionId = ref("");
 let pointerFrame = 0;
+let scriptureRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let runtimeHealthTimer: ReturnType<typeof setTimeout> | undefined;
 
 const starterPrompts = [
   "I feel pulled in too many directions.",
@@ -73,24 +79,30 @@ const activeChat = computed(
 const isArchivedChat = computed(() => activeChat.value?.is_archived === true);
 
 const modelOptions = computed(() =>
-  profiles.value.map((profile) => ({
-    label: profile.name.replace(/\s\([0-9a-f]{8}\)$/, ""),
-    value: profile.id,
-    modelId: profile.model_id,
-    category:
-      profile.connection_dialect === "builtin_ollama"
-        ? ("local" as const)
-        : ("api" as const),
-    provider:
-      profile.connection_dialect === "builtin_ollama"
+  profiles.value.map((profile) => {
+    const isLocal = profile.connection_dialect === "builtin_ollama";
+    const status = isLocal
+      ? ollamaAvailable.value === true
+        ? "connected"
+        : ollamaAvailable.value === false
+          ? "unreachable"
+          : profile.connection_status
+      : profile.connection_status;
+    return {
+      label: profile.name.replace(/\s\([0-9a-f]{8}\)$/, ""),
+      value: profile.id,
+      modelId: profile.model_id,
+      category: isLocal ? ("local" as const) : ("api" as const),
+      provider: isLocal
         ? "Ollama"
         : profile.connection_dialect === "openai_compatible"
           ? "OpenAI-compatible API"
           : "Ollama-compatible API",
-    contextWindow: profile.context_window,
-    selectable: ["connected", "degraded"].includes(profile.connection_status),
-    status: profile.connection_status || "disconnected",
-  })),
+      contextWindow: profile.context_window,
+      selectable: ["connected", "degraded"].includes(status),
+      status: status || "disconnected",
+    };
+  }),
 );
 
 const activeModelOption = computed(() =>
@@ -178,6 +190,13 @@ const streamingMessage = computed<Message>(() => ({
   created_at: new Date().toISOString(),
 }));
 
+const shouldRefreshScriptures = computed(
+  () =>
+    settingsOpen.value &&
+    settingsSection.value === "scriptures" &&
+    scriptures.value.some((scripture) => scripture.current_indexing_job),
+);
+
 onMounted(async () => {
   historyOpen.value = window.matchMedia("(min-width: 861px)").matches;
   shellReady.value = true;
@@ -194,6 +213,7 @@ onMounted(async () => {
     loadChats(),
     loadScriptures(),
     loadProfiles(),
+    loadRuntimeHealth(),
   ]);
   if (results.some((result) => result.status === "rejected")) {
     error.value =
@@ -218,12 +238,15 @@ onMounted(async () => {
       "Your conversations could not load. Refresh the page to try again.";
   } finally {
     workspaceLoading.value = false;
+    scheduleRuntimeHealthRefresh();
     await scrollToLatest("auto");
   }
 });
 
 onBeforeUnmount(() => {
   stream.close();
+  clearTimeout(scriptureRefreshTimer);
+  clearTimeout(runtimeHealthTimer);
   cancelAnimationFrame(pointerFrame);
   window.removeEventListener("keydown", handleWorkspaceShortcut);
 });
@@ -240,9 +263,31 @@ watch(
   },
 );
 
+watch(shouldRefreshScriptures, (shouldRefresh) => {
+  clearTimeout(scriptureRefreshTimer);
+  if (shouldRefresh) scheduleScriptureRefresh();
+});
+
 async function loadProfiles() {
   const page = await api.modelProfiles();
   profiles.value = page.results;
+}
+
+async function loadRuntimeHealth() {
+  try {
+    const readiness = await api.readiness();
+    ollamaAvailable.value = readiness.ollama;
+  } catch {
+    ollamaAvailable.value = false;
+  }
+}
+
+function scheduleRuntimeHealthRefresh() {
+  clearTimeout(runtimeHealthTimer);
+  runtimeHealthTimer = setTimeout(async () => {
+    await loadRuntimeHealth();
+    scheduleRuntimeHealthRefresh();
+  }, 15000);
 }
 
 async function loadModelPreference() {
@@ -294,9 +339,21 @@ async function loadScriptures() {
   scriptures.value = page.results;
 }
 
+function scheduleScriptureRefresh() {
+  scriptureRefreshTimer = setTimeout(async () => {
+    try {
+      await loadScriptures();
+    } catch {
+      // Keep last known progress visible while a transient refresh fails.
+    } finally {
+      if (shouldRefreshScriptures.value) scheduleScriptureRefresh();
+    }
+  }, 5000);
+}
+
 async function selectChat(chatId: string) {
   activeChatId.value = chatId;
-  historyOpen.value = false;
+  closeHistoryOnCompactViewport();
   error.value = "";
   streamingText.value = "";
   streamingSources.value = [];
@@ -320,9 +377,15 @@ async function createOrSelectDraft() {
 async function newChat() {
   showArchived.value = false;
   search.value = "";
-  historyOpen.value = false;
+  closeHistoryOnCompactViewport();
   error.value = "";
   await createOrSelectDraft();
+}
+
+function closeHistoryOnCompactViewport() {
+  if (!window.matchMedia("(min-width: 861px)").matches) {
+    historyOpen.value = false;
+  }
 }
 
 async function toggleArchived(nextValue: boolean) {
@@ -964,6 +1027,7 @@ async function scrollToLatest(behavior: ScrollBehavior) {
       @provider="addProviderConnection"
       @probe="probeProviderConnection"
       @remove-connection="removeProviderConnection"
+      @section="settingsSection = $event"
       @signout="signOut"
     />
 

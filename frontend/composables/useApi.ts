@@ -128,6 +128,15 @@ const scriptureSchema = z.object({
     .nullable(),
 });
 
+const readinessSchema = z.object({
+  status: z.enum(["ready", "unavailable"]),
+  database: z.boolean(),
+  redis: z.boolean(),
+  ollama: z.boolean(),
+  embedding: z.boolean(),
+  disk: z.boolean(),
+});
+
 export class ApiRequestError extends Error {
   constructor(
     readonly status: number,
@@ -190,8 +199,17 @@ export function useApi() {
     return schema.parse(await response.json());
   }
 
+  async function readiness() {
+    const response = await fetch(`${base}/auth/ready/`, {
+      credentials: "include",
+    });
+    const payload = await responsePayload(response);
+    return readinessSchema.parse(payload);
+  }
+
   return {
     me: () => request<UserProfile>("/auth/me/", userSchema),
+    readiness,
     updateMe: (data: Partial<Pick<UserProfile, "preferred_theme">>) =>
       request<UserProfile>("/auth/me/", userSchema, {
         method: "PUT",

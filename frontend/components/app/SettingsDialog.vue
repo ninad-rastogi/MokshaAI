@@ -47,6 +47,7 @@ const emit = defineEmits<{
   ];
   probe: [connectionId: string];
   "remove-connection": [connectionId: string];
+  section: [value: SettingsSection];
   signout: [];
 }>();
 
@@ -145,6 +146,11 @@ function statusLabel(status: string) {
   return labels[status] || status.replaceAll("_", " ");
 }
 
+function selectSection(section: SettingsSection) {
+  activeSection.value = section;
+  emit("section", section);
+}
+
 function submitProvider() {
   emit("provider", {
     name: providerName.value.trim(),
@@ -190,7 +196,7 @@ watch(
             :key="section.id"
             type="button"
             :aria-current="activeSection === section.id ? 'page' : undefined"
-            @click="activeSection = section.id"
+            @click="selectSection(section.id)"
           >
             <UIcon :name="section.icon" aria-hidden="true" />
             {{ section.label }}

@@ -196,6 +196,18 @@ def install_mock_api() -> Callable[[Page, bool], None]:
             method = request.method
             if path.endswith("/auth/csrf/"):
                 fulfill(route, {"csrfToken": "mock-csrf"})
+            elif path.endswith("/auth/ready/"):
+                fulfill(
+                    route,
+                    {
+                        "status": "ready",
+                        "database": True,
+                        "redis": True,
+                        "ollama": True,
+                        "embedding": True,
+                        "disk": True,
+                    },
+                )
             elif path.endswith("/auth/me/") and state["authenticated"]:
                 fulfill(route, payloads["user"])
             elif path.endswith("/auth/me/"):

@@ -84,8 +84,8 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
 
   <aside
     :class="['history', { 'history--open': open }]"
-    :aria-hidden="mobileSemantics && !open ? 'true' : undefined"
-    :inert="mobileSemantics && !open"
+    :aria-hidden="!open ? 'true' : undefined"
+    :inert="!open"
     :role="mobileSemantics ? 'dialog' : undefined"
     :aria-modal="mobileSemantics && open ? 'true' : undefined"
     aria-label="Conversation history"
