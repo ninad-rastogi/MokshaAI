@@ -44,6 +44,9 @@ describe("app shell", () => {
     expect(settingsComponent).toContain('id="fallback-model"');
     expect(settingsComponent).toContain("<UModal");
     expect(appPage).toContain("settingsOpen");
+    expect(appPage).toContain("settingsMessageSection");
+    expect(settingsComponent).toContain("messageSection: SettingsSection");
+    expect(settingsComponent).toContain("visibleMessage");
     expect(appPage).toContain("saveModelPreference");
     expect(apiComposable).toContain("updateModelPreference");
     expect(appPage).not.toContain('aria-label="Model profile"');
@@ -111,6 +114,8 @@ describe("app shell", () => {
     expect(sidebarComponent).toContain(':inert="mobileSemantics && !open"');
     expect(sidebarComponent).toContain("function closeHistory()");
     expect(sidebarComponent).toContain('@click.stop="closeHistory"');
+    expect(appPage).toContain("workspace--history-collapsed");
+    expect(appPage).toContain("shellReady && !historyOpen");
     expect(sidebarComponent).toContain("@keydown.esc.stop");
     expect(sidebarComponent).toContain("Ctrl K");
     expect(sidebarComponent).toContain(">New chat<");
@@ -130,6 +135,8 @@ describe("app shell", () => {
 
   it("keeps refresh auth separate from workspace loading failures", () => {
     expect(appPage).toContain("await api.me()");
+    expect(indexPage).toContain("checkingSession.value = false");
+    expect(indexPage).toContain('useRoute().path === "/"');
     expect(appPage).toContain("Promise.allSettled");
     expect(indexPage).toContain(
       "An account with this email already exists. Sign in instead.",
@@ -202,5 +209,11 @@ describe("app shell", () => {
     expect(conversationMessage).toContain(
       "message--assistant .message__content",
     );
+  });
+
+  it("keeps response error icon aligned instead of growing as message text", () => {
+    expect(appPage).toContain('class="response-error__message"');
+    expect(appPage).toContain(".response-error__message");
+    expect(appPage).not.toContain(".response-error span");
   });
 });

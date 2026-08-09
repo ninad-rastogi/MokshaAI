@@ -25,6 +25,7 @@ const props = defineProps<{
   profiles: ModelProfile[];
   scriptures: Scripture[];
   message: string;
+  messageSection: SettingsSection;
   saving?: boolean;
   probingConnectionId?: string;
 }>();
@@ -86,6 +87,10 @@ const connectionPendingRemoval = computed(() =>
   connectedProfiles.value.find(
     (profile) => profile.connection === removeConnectionId.value,
   ),
+);
+
+const visibleMessage = computed(() =>
+  props.messageSection === activeSection.value ? props.message : "",
 );
 
 const localModelOptions = computed(() =>
@@ -622,16 +627,16 @@ watch(
             </button>
           </section>
 
-          <p v-if="message" class="settings-message" role="status">
+          <p v-if="visibleMessage" class="settings-message" role="status">
             <UIcon
               :name="
-                message.toLowerCase().includes('could not')
+                visibleMessage.toLowerCase().includes('could not')
                   ? 'i-lucide-circle-alert'
                   : 'i-lucide-circle-check'
               "
               aria-hidden="true"
             />
-            {{ message }}
+            {{ visibleMessage }}
           </p>
         </div>
       </div>

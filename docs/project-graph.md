@@ -1,17 +1,19 @@
 # Moksha AI Project Graph
 
-Generated from source inspection through commit `684340f`, with stale
-`graphify-out/` hub data used only as navigation hints. The `graphify` CLI was
-not available in this shell, so this file is the current compact graph for
-handoff and token-saving.
+Generated from source inspection of the current checkout, with stale
+`graphify-out/` hub data used only as navigation hints. The `graphify` CLI is
+not available in this shell, so this file remains the compact graph for handoff
+and token-saving.
 
 ## Service Topology
 
 ```mermaid
 graph LR
     Browser["Browser\nsession cookie + CSRF"] --> Caddy["Caddy\nonly published HTTPS edge"]
+    Browser -->|local dev "/api/v1" same-origin proxy| NuxtDev["Nuxt dev server\nlocalhost:3057 HTTP"]
     Caddy -->|"/api/v1/* /admin/* /static/*"| Django["Django 6 + DRF\nASGI via Uvicorn"]
     Caddy -->|"all other routes"| Nuxt["Nuxt 4 + Vue 3\nSSR product UI"]
+    NuxtDev --> Django
 
     Django --> Postgres["PostgreSQL + PgVector\nproduct + retrieval state"]
     Django --> Redis["Redis\nbroker + typed stream replay"]
@@ -35,7 +37,7 @@ graph LR
 
 ```mermaid
 graph TD
-    UI["frontend/pages/app.vue"] --> API["frontend/composables/useApi.ts"]
+    UI["frontend/pages/app.vue\nfixed shell + scoped settings status"] --> API["frontend/composables/useApi.ts"]
     UI --> Stream["frontend/composables/useRunStream.ts"]
     API --> CreateRun["POST /api/v1/chats/{chat_id}/runs/\nIdempotency-Key"]
     CreateRun --> ViewSet["chat.views.ChatViewSet.start_run"]

@@ -21,6 +21,10 @@ onMounted(async () => {
     await navigateTo("/app");
   } catch {
     checkingSession.value = false;
+  } finally {
+    if (useRoute().path === "/") {
+      checkingSession.value = false;
+    }
   }
 });
 

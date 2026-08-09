@@ -279,7 +279,7 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
 }
 
 .mobile-close {
-  display: none;
+  display: inline-flex;
 }
 
 .new-chat {

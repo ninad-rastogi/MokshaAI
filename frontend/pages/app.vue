@@ -39,12 +39,16 @@ const search = ref("");
 const showArchived = ref(false);
 const settingsOpen = ref(false);
 const historyOpen = ref(false);
+const shellReady = ref(false);
 const workspaceLoading = ref(true);
 const historyLoading = ref(false);
 const renameChatId = ref("");
 const renameName = ref("");
 const deleteChatId = ref("");
 const settingsMessage = ref("");
+const settingsMessageSection = ref<
+  "general" | "models" | "connections" | "scriptures" | "account"
+>("general");
 const settingsSaving = ref(false);
 const probingConnectionId = ref("");
 let pointerFrame = 0;
@@ -175,6 +179,9 @@ const streamingMessage = computed<Message>(() => ({
 }));
 
 onMounted(async () => {
+  historyOpen.value = window.matchMedia("(min-width: 861px)").matches;
+  shellReady.value = true;
+
   try {
     userProfile.value = await api.me();
     colorMode.preference = userProfile.value.preferred_theme;
@@ -259,6 +266,7 @@ async function ensureModelPreference() {
   try {
     await api.updateModelPreference(preferred.id, []);
   } catch {
+    settingsMessageSection.value = "models";
     settingsMessage.value =
       "A model is available, but the account preference could not be saved.";
   }
@@ -401,6 +409,7 @@ async function confirmDelete() {
 async function saveThemePreference(value: "system" | "light" | "dark") {
   colorMode.preference = value;
   settingsMessage.value = "";
+  settingsMessageSection.value = "general";
   try {
     userProfile.value = await api.updateMe({ preferred_theme: value });
     settingsMessage.value = "Theme saved to your account.";
@@ -415,6 +424,7 @@ async function toggleTheme() {
 }
 
 async function saveModelPreference(profileId: string) {
+  settingsMessageSection.value = "models";
   const previous = modelProfile.value;
   const previousFallback = fallbackModelProfile.value;
   modelProfile.value = profileId;
@@ -436,6 +446,7 @@ async function saveModelPreference(profileId: string) {
 }
 
 async function saveFallbackModelPreference(profileId: string) {
+  settingsMessageSection.value = "models";
   const previous = fallbackModelProfile.value;
   fallbackModelProfile.value =
     profileId && profileId !== modelProfile.value ? profileId : "";
@@ -456,6 +467,7 @@ async function saveFallbackModelPreference(profileId: string) {
 }
 
 async function removeProviderConnection(connectionId: string) {
+  settingsMessageSection.value = "connections";
   settingsMessage.value = "";
   settingsSaving.value = true;
   try {
@@ -480,6 +492,7 @@ async function addProviderConnection(payload: {
   api_key: string;
   remote_data_consent: boolean;
 }) {
+  settingsMessageSection.value = "connections";
   settingsMessage.value = "";
   settingsSaving.value = true;
   try {
@@ -509,6 +522,7 @@ async function addProviderConnection(payload: {
 }
 
 async function probeProviderConnection(connectionId: string) {
+  settingsMessageSection.value = "connections";
   probingConnectionId.value = connectionId;
   settingsMessage.value = "";
   try {
@@ -556,6 +570,7 @@ async function send() {
     !activeModelReady.value
   ) {
     if (!activeModelReady.value) {
+      settingsMessageSection.value = "models";
       settingsMessage.value =
         "Select a connected model before sending a message.";
       settingsOpen.value = true;
@@ -720,7 +735,14 @@ async function scrollToLatest(behavior: ScrollBehavior) {
     FORM: Operate mode; conservation reading-room workspace, chosen from seven
     grounded systems; fixed shell with local glass refraction.
   -->
-  <main ref="workspace" class="workspace" @pointermove.passive="trackPointer">
+  <main
+    ref="workspace"
+    :class="[
+      'workspace',
+      { 'workspace--history-collapsed': shellReady && !historyOpen },
+    ]"
+    @pointermove.passive="trackPointer"
+  >
     <AppChatSidebar
       :open="historyOpen"
       :chats="chats"
@@ -900,7 +922,7 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 
         <div v-if="error && !workspaceLoading" class="response-error">
           <UIcon name="i-lucide-circle-alert" aria-hidden="true" />
-          <span>{{ error }}</span>
+          <span class="response-error__message">{{ error }}</span>
           <button v-if="lastPrompt && !busy" type="button" @click="retryLast">
             Try again
           </button>
@@ -932,6 +954,7 @@ async function scrollToLatest(behavior: ScrollBehavior) {
       :profiles="profiles"
       :scriptures="scriptures"
       :message="settingsMessage"
+      :message-section="settingsMessageSection"
       :saving="settingsSaving"
       :probing-connection-id="probingConnectionId"
       @update:open="settingsOpen = $event"
@@ -1032,6 +1055,20 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   position: fixed;
   transition: opacity 180ms ease;
   z-index: 0;
+}
+
+.workspace--history-collapsed {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.workspace--history-collapsed :deep(.history) {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-105%);
+}
+
+.workspace--history-collapsed .mobile-menu {
+  display: inline-flex;
 }
 
 .chat-shell {
@@ -1394,8 +1431,9 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   margin-top: 1rem;
 }
 
-.response-error span {
+.response-error__message {
   flex: 1;
+  min-width: 0;
 }
 
 .response-error button:last-child {
