@@ -1,6 +1,6 @@
 # Moksha AI Project Graph
 
-Generated from source inspection through commit `c8c52fc`, with stale
+Generated from source inspection through commit `684340f`, with stale
 `graphify-out/` hub data used only as navigation hints. The `graphify` CLI was
 not available in this shell, so this file is the current compact graph for
 handoff and token-saving.
