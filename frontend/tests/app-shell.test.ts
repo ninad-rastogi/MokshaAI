@@ -167,7 +167,10 @@ describe("app shell", () => {
   });
 
   it("uses enter-to-send chat prompt semantics and keeps stop beside input", () => {
-    expect(composerComponent).toContain(':submit-on-enter="true"');
+    expect(composerComponent).toContain("function handleKeydown");
+    expect(composerComponent).toContain('event.key !== "Enter"');
+    expect(composerComponent).toContain("event.shiftKey");
+    expect(composerComponent).toContain('@keydown="handleKeydown"');
     expect(composerComponent).toContain('aria-label="Stop response"');
     expect(composerComponent).not.toContain("Reconnect");
     expect(appPage).not.toContain(

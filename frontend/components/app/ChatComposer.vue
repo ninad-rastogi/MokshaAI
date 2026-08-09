@@ -16,30 +16,49 @@ function submit() {
   if (!props.modelValue.trim() || props.busy || props.disabled) return;
   emit("submit");
 }
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  submit();
+}
 </script>
 
 <template>
   <div class="composer-wrap">
-    <UChatPrompt
-      :model-value="modelValue"
+    <form
       class="moksha-prompt"
-      :disabled="disabled"
-      :loading="busy"
-      :maxrows="5"
-      :rows="1"
-      :submit-on-enter="true"
-      variant="naked"
-      placeholder="Share what is on your mind..."
-      aria-label="Message Moksha AI"
-      :ui="{
-        root: 'moksha-prompt__root',
-        base: 'moksha-prompt__textarea',
-      }"
-      @update:model-value="emit('update:modelValue', $event)"
-      @submit="submit"
+      aria-label="Message composer"
+      @submit.prevent="submit"
     >
-      <template #footer>
+      <textarea
+        :value="modelValue"
+        class="moksha-prompt__textarea"
+        :disabled="disabled"
+        rows="1"
+        placeholder="Share what is on your mind..."
+        aria-label="Message Moksha AI"
+        @input="
+          emit(
+            'update:modelValue',
+            ($event.target as HTMLTextAreaElement).value,
+          )
+        "
+        @keydown="handleKeydown"
+      />
+      <div class="moksha-prompt__footer">
         <div class="composer-meta">
+          <span
+            v-if="busy"
+            class="thinking-chip"
+            role="status"
+            aria-label="Moksha AI is thinking"
+          >
+            <i />
+            <i />
+            <i />
+            Thinking
+          </span>
           <span class="composer-hint">Shift + Enter for a new line</span>
         </div>
 
@@ -63,8 +82,8 @@ function submit() {
             <UIcon name="i-lucide-arrow-up" aria-hidden="true" />
           </button>
         </UTooltip>
-      </template>
-    </UChatPrompt>
+      </div>
+    </form>
 
     <p v-if="error" class="composer-error" role="alert">
       <UIcon name="i-lucide-circle-alert" aria-hidden="true" />
@@ -84,39 +103,50 @@ function submit() {
 }
 
 :deep(.moksha-prompt) {
-  background: var(--moksha-composer) !important;
-  backdrop-filter: blur(24px) saturate(1.08);
-  border: 1px solid var(--moksha-assistant-line) !important;
-  border-radius: 0.72rem;
-  box-shadow: var(--moksha-shadow-composer) !important;
-  overflow: hidden;
+  background: transparent;
 }
 
-:deep(.moksha-prompt:focus-within) {
+.moksha-prompt {
+  background: var(--moksha-composer);
+  backdrop-filter: blur(24px) saturate(1.08);
+  border: 1px solid var(--moksha-assistant-line);
+  border-radius: 0.72rem;
+  box-shadow: var(--moksha-shadow-composer);
+  display: grid;
+  gap: 0.25rem;
+  overflow: hidden;
+  padding: 0.45rem;
+}
+
+.moksha-prompt:focus-within {
   border-color: var(--moksha-focus);
   box-shadow:
     0 0 0 3px var(--moksha-focus-ring),
-    var(--moksha-shadow-composer) !important;
+    var(--moksha-shadow-composer);
 }
 
-:deep(.moksha-prompt__root) {
+.moksha-prompt__textarea {
   background: transparent;
   border: 0;
-  box-shadow: none;
-  min-height: 3.2rem;
-  padding: 0.38rem 0.46rem 0.34rem;
-}
-
-:deep(.moksha-prompt__textarea) {
   color: var(--moksha-ink);
   font-size: 0.86rem;
   line-height: 1.5;
-  min-height: 1.6rem;
-  padding: 0.15rem 0.2rem;
+  max-height: 8rem;
+  min-height: 1.65rem;
+  outline: 0;
+  padding: 0.1rem 0.2rem;
+  resize: none;
 }
 
-:deep(.moksha-prompt__textarea::placeholder) {
+.moksha-prompt__textarea::placeholder {
   color: var(--moksha-placeholder);
+}
+
+.moksha-prompt__footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 2rem;
 }
 
 .composer-meta {
@@ -129,6 +159,30 @@ function submit() {
 .composer-hint {
   color: var(--moksha-muted);
   font-size: 0.68rem;
+}
+
+.thinking-chip {
+  align-items: center;
+  color: var(--moksha-muted);
+  display: inline-flex;
+  font-size: 0.68rem;
+  gap: 0.25rem;
+}
+
+.thinking-chip > i {
+  animation: dot-bounce 1.05s ease-in-out infinite;
+  background: var(--moksha-accent);
+  border-radius: 50%;
+  height: 0.28rem;
+  width: 0.28rem;
+}
+
+.thinking-chip > i:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.thinking-chip > i:nth-child(3) {
+  animation-delay: 240ms;
 }
 
 .composer-action {
@@ -183,13 +237,28 @@ function submit() {
   color: var(--moksha-error);
 }
 
+@keyframes dot-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.42;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-0.22rem);
+  }
+}
+
 @media (max-width: 600px) {
   .composer-hint {
     display: none;
   }
 
-  :deep(.moksha-prompt__root) {
-    min-height: 3.15rem;
+  .moksha-prompt {
+    border-radius: 0.7rem;
+    padding: 0.42rem;
   }
 
   .composer-note,
