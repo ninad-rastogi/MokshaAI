@@ -119,6 +119,8 @@ explicit = true
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "moksha.settings_test"
+addopts = "--basetemp=.tmp/pytest-temp"
+cache_dir = ".tmp/pytest-cache"
 testpaths = ["users/tests", "chat/tests", "scriptures/tests", "tests/"]
 markers = [
     "e2e: end-to-end browser tests (require running servers)",

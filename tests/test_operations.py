@@ -99,6 +99,14 @@ def test_compose_keeps_embedding_sidecar_private():
     )
 
 
+def test_product_service_images_use_non_root_users():
+    django_dockerfile = (PROJECT_ROOT / "Dockerfile").read_text()
+    nuxt_dockerfile = (PROJECT_ROOT / "frontend" / "Dockerfile").read_text()
+
+    assert "USER moksha" in django_dockerfile
+    assert "USER node" in nuxt_dockerfile
+
+
 def test_compose_uses_dedicated_generation_and_installation_queues():
     compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text())
     services = compose["services"]

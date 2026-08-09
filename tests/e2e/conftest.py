@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import time
 from collections.abc import Callable
@@ -20,17 +21,28 @@ NUXT_URL = os.environ.get("NUXT_E2E_URL", "http://127.0.0.1:3057")
 NOW = "2026-08-08T00:00:00Z"
 
 
+def executable(name: str) -> str:
+    """Resolve platform launchers before passing them to subprocess."""
+    launcher = f"{name}.cmd" if os.name == "nt" and name == "npm" else name
+    resolved = shutil.which(launcher)
+    if resolved is None:
+        raise RuntimeError(f"Required executable is unavailable: {name}")
+    return resolved
+
+
 def wait_for_server(url: str, timeout: int = 90) -> bool:
     """Wait for Nuxt to accept browser traffic."""
     start = time.time()
-    while time.time() - start < timeout:
-        try:
-            if requests.get(url, timeout=2).status_code == 200:
-                return True
-        except requests.RequestException:
+    with requests.Session() as session:
+        session.trust_env = False
+        while time.time() - start < timeout:
+            try:
+                if session.get(url, timeout=2).status_code == 200:
+                    return True
+            except requests.RequestException:
+                time.sleep(1)
+                continue
             time.sleep(1)
-            continue
-        time.sleep(1)
     return False
 
 
@@ -50,7 +62,7 @@ def nuxt_server():
 
     if not NUXT_OUTPUT.exists():
         subprocess.run(
-            ["npm", "run", "build"],
+            [executable("npm"), "run", "build"],
             cwd=FRONTEND_ROOT,
             check=True,
             stdout=stdout_path.open("w", encoding="utf-8"),
@@ -70,7 +82,7 @@ def nuxt_server():
     stdout_file = stdout_path.open("a", encoding="utf-8")
     stderr_file = stderr_path.open("a", encoding="utf-8")
     proc = subprocess.Popen(
-        ["node", str(NUXT_OUTPUT)],
+        [executable("node"), str(NUXT_OUTPUT)],
         cwd=FRONTEND_ROOT,
         env=env,
         stdout=stdout_file,

@@ -1,7 +1,7 @@
 """PgVector storage backed by the private embedding sidecar."""
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 from uuid import UUID
 
@@ -81,6 +81,7 @@ class PgVectorStore:
         chunks: list[dict],
         batch_size: int = 32,
         index_version: UUID | None = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> int:
         """
         Add document chunks to the vector store.
@@ -120,6 +121,8 @@ class PgVectorStore:
 
             DocumentChunk.objects.bulk_create(objects, batch_size=batch_size)
             total_added += len(objects)
+            if progress_callback is not None:
+                progress_callback(total_added, len(chunks))
 
         logger.info(f"Added {total_added} chunks to document_chunks")
         return total_added

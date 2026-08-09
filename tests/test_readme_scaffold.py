@@ -19,6 +19,27 @@ def _make_boundary(root: Path) -> Path:
     return boundary
 
 
+def _write_valid_root_readme(root: Path) -> None:
+    sections = (
+        "Purpose",
+        "Architecture And Data Flow",
+        "Files And Entrypoints",
+        "Interfaces",
+        "Configuration",
+        "Commands",
+        "Tests",
+        "Dependencies",
+        "Security",
+        "Failure Modes And Troubleshooting",
+        "Related Docs",
+    )
+    body = "\n\n".join(f"## {section}\n\nTest documentation." for section in sections)
+    (root / "README.md").write_text(
+        f"<!-- moksha-readme-boundary:v1 -->\n# Test Project\n\n{body}\n",
+        encoding="utf-8",
+    )
+
+
 def test_scaffold_creates_one_opt_in_boundary_readme(tmp_path: Path) -> None:
     boundary = _make_boundary(tmp_path)
 
@@ -79,3 +100,20 @@ def test_scaffold_placeholders_fail_strict_validation(tmp_path: Path) -> None:
     assert scaffold.returncode == 0
     assert validation.returncode == 1
     assert "placeholder text found" in validation.stdout
+
+
+def test_validator_ignores_collected_staticfiles(tmp_path: Path) -> None:
+    _write_valid_root_readme(tmp_path)
+    generated = tmp_path / "staticfiles" / "admin" / "img"
+    generated.mkdir(parents=True)
+    (generated / "README.md").write_text("Generated asset notes.\n", encoding="utf-8")
+
+    validation = subprocess.run(
+        [sys.executable, str(VALIDATOR), "--root", str(tmp_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert validation.returncode == 0
+    assert "staticfiles" not in validation.stdout

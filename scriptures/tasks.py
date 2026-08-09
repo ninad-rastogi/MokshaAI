@@ -3,6 +3,7 @@
 import hashlib
 import logging
 from pathlib import Path
+from uuid import UUID
 
 import fitz
 from celery import shared_task
@@ -25,6 +26,34 @@ INDEX_FAILURE_BUILD = "index_build_failed"
 INDEX_FAILURE_QUALIFICATION = "index_qualification_failed"
 
 
+def record_embedding_progress(job_id: int, completed: int, total: int) -> None:
+    """Persist bounded candidate-build progress after each committed batch."""
+    fraction = completed / total if total else 0
+    progress = 70 + min(14, int(fraction * 14))
+    IndexingJob.objects.filter(pk=job_id).update(
+        progress=progress,
+        chunks_indexed=completed,
+    )
+
+
+def candidate_checkpoint(version_id: UUID, total_chunks: int) -> int:
+    """Return resumable committed count, rejecting an impossible checkpoint."""
+    persisted = DocumentChunk.objects.filter(index_version=version_id).count()
+    if persisted > total_chunks:
+        raise RuntimeError("index_checkpoint_invalid")
+    return persisted
+
+
+def candidate_can_retry(error: Exception, retries: int, max_retries: int) -> bool:
+    """Return whether transient filesystem failure keeps candidate resumable."""
+    return isinstance(error, OSError) and retries < max_retries
+
+
+def index_progress_floor(current: int, resuming: bool) -> int:
+    """Keep resumed candidate progress monotonic while sources are revalidated."""
+    return max(current, 70) if resuming else 5
+
+
 def compute_file_hash(file_path: Path) -> str:
     hasher = hashlib.sha256()
     with file_path.open("rb") as file_handle:
@@ -38,16 +67,27 @@ def index_scripture(self, job_id: int) -> None:
     """Build a new scripture index before atomically removing stale chunks."""
     job = IndexingJob.objects.select_related("scripture").get(pk=job_id)
     scripture = job.scripture
-    version = ScriptureIndexVersion.objects.create(
-        scripture=scripture,
-        embedding_model=settings.EMBEDDING_MODEL,
+    version = job.index_version
+    resuming = (
+        version is not None and version.status == ScriptureIndexVersion.Status.BUILDING
     )
+    if not resuming:
+        version = ScriptureIndexVersion.objects.create(
+            scripture=scripture,
+            embedding_model=settings.EMBEDDING_MODEL,
+        )
+    assert version is not None
+    progress_floor = index_progress_floor(job.progress, resuming)
+    job_updates: dict[str, object] = {
+        "status": IndexingJob.Status.RUNNING,
+        "progress": progress_floor,
+        "celery_task_id": self.request.id or "",
+        "index_version": version,
+    }
+    if job.started_at is None:
+        job_updates["started_at"] = timezone.now()
     IndexingJob.objects.filter(pk=job.pk).update(
-        status=IndexingJob.Status.RUNNING,
-        started_at=timezone.now(),
-        progress=5,
-        celery_task_id=self.request.id or "",
-        index_version=version,
+        **job_updates,
     )
     try:
         scripture_path = Path(scripture.folder_path)
@@ -65,7 +105,10 @@ def index_scripture(self, job_id: int) -> None:
             volumes.append((pdf_path, stat, page_count, compute_file_hash(pdf_path)))
             chunks.extend(loader._load_pdf(pdf_path, scripture.name, scripture_path))
             IndexingJob.objects.filter(pk=job.pk).update(
-                progress=min(70, 5 + int(number / len(pdf_files) * 65))
+                progress=max(
+                    progress_floor,
+                    min(70, 5 + int(number / len(pdf_files) * 65)),
+                )
             )
         if not chunks:
             raise ValueError("No extractable text was found in the PDFs.")
@@ -79,14 +122,31 @@ def index_scripture(self, job_id: int) -> None:
             }
             for pdf_path, stat, page_count, content_hash in volumes
         ]
+        if version.source_manifest and version.source_manifest != source_manifest:
+            raise RuntimeError("index_source_changed_during_resume")
         version.source_manifest = source_manifest
         version.volume_count = len(volumes)
         version.page_count = sum(volume[2] for volume in volumes)
         version.save(update_fields=["source_manifest", "volume_count", "page_count"])
+        IndexingJob.objects.filter(pk=job.pk).update(
+            volumes_processed=len(volumes),
+            chunks_indexed=0,
+        )
 
         # Write candidate first. Existing active retrieval remains available.
         vector_store = PgVectorStore()
-        added = vector_store.add_chunks(chunks, index_version=version.pk)
+        persisted = candidate_checkpoint(version.pk, len(chunks))
+        if persisted:
+            record_embedding_progress(job.pk, persisted, len(chunks))
+        added = persisted + vector_store.add_chunks(
+            chunks[persisted:],
+            index_version=version.pk,
+            progress_callback=lambda completed, _remaining: record_embedding_progress(
+                job.pk,
+                persisted + completed,
+                len(chunks),
+            ),
+        )
         IndexingJob.objects.filter(pk=job.pk).update(progress=85)
         smoke_query = str(chunks[0]["text"])[:500]
         smoke_results = vector_store.search(
@@ -191,6 +251,15 @@ def index_scripture(self, job_id: int) -> None:
             stale_versions.delete()
     except Exception as exc:
         logger.exception("Scripture indexing failed for job %s", job_id)
+        if candidate_can_retry(
+            exc,
+            self.request.retries,
+            self.max_retries or 0,
+        ):
+            IndexingJob.objects.filter(pk=job.pk).update(
+                error_message="index_retry_pending",
+            )
+            raise
         failure_code = (
             INDEX_FAILURE_QUALIFICATION
             if str(exc) == INDEX_FAILURE_QUALIFICATION

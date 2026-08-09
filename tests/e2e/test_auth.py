@@ -6,7 +6,13 @@ from playwright.sync_api import Page, expect
 
 @pytest.mark.e2e
 class TestAuthFlow:
-    def test_auth_page_loads_with_product_copy(self, page: Page, base_url: str):
+    def test_auth_page_loads_with_product_copy(
+        self,
+        page: Page,
+        base_url: str,
+        install_mock_api,
+    ):
+        install_mock_api(page, False)
         page.goto(base_url, wait_until="load")
 
         expect(
@@ -17,7 +23,13 @@ class TestAuthFlow:
         expect(page.get_by_label("Email")).to_be_visible()
         expect(page.locator("#password")).to_be_visible()
 
-    def test_register_validation_stays_client_side(self, page: Page, base_url: str):
+    def test_register_validation_stays_client_side(
+        self,
+        page: Page,
+        base_url: str,
+        install_mock_api,
+    ):
+        install_mock_api(page, False)
         page.goto(base_url, wait_until="load")
         page.get_by_role("tab", name="Create account").click()
         page.get_by_label("Email").fill("new@example.com")

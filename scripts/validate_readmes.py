@@ -39,6 +39,7 @@ EXCLUDED_NAMES = frozenset(
         "node_modules",
         "public",
         "static",
+        "staticfiles",
         "test-results",
         "venv",
     }

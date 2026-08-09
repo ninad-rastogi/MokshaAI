@@ -5,6 +5,7 @@ Usage:
     python manage.py discover_scriptures
     python manage.py discover_scriptures --scripture "Collection Name"
     python manage.py discover_scriptures --force
+    python manage.py discover_scriptures --resume-running
 """
 
 import logging
@@ -32,6 +33,11 @@ class Command(BaseCommand):
             "--force",
             action="store_true",
             help="Force re-indexing even if already indexed",
+        )
+        parser.add_argument(
+            "--resume-running",
+            action="store_true",
+            help="Resume a RUNNING checkpoint after confirming its worker is stopped",
         )
 
     def handle(self, *args, **options):
@@ -73,7 +79,33 @@ class Command(BaseCommand):
             if scripture.folder_path != str(scripture_path):
                 scripture.folder_path = str(scripture_path)
                 scripture.save(update_fields=["folder_path"])
-            job = IndexingJob.objects.create(scripture=scripture, requested_by=operator)
+            if scripture.is_indexed and not options["force"]:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipped {scripture_name}: already indexed (use --force to rebuild)"
+                    )
+                )
+                continue
+            active_job = IndexingJob.objects.filter(
+                scripture=scripture,
+                status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING],
+            ).first()
+            if (
+                active_job
+                and active_job.status == IndexingJob.Status.RUNNING
+                and not options["resume_running"]
+            ):
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipped {scripture_name}: indexing job {active_job.pk} "
+                        "is already running"
+                    )
+                )
+                continue
+            job = active_job or IndexingJob.objects.create(
+                scripture=scripture,
+                requested_by=operator,
+            )
             index_scripture.apply(args=[job.pk], throw=True)
             job.refresh_from_db()
             if job.status != IndexingJob.Status.SUCCEEDED:

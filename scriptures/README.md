@@ -12,7 +12,10 @@ Folders under the configured document root are discovered dynamically. Each PDF
 becomes a volume record. Celery builds a candidate index version, records
 counts and qualification results, runs retrieval smoke checks, then activates
 the candidate transactionally. The previous complete version remains available
-for rollback.
+for rollback. Candidate embedding commits update durable chunk counts and
+progress after every batch, so long first-time builds remain observable. Task
+retries resume a source-identical candidate from its committed chunk count;
+changed source manifests fail closed instead of mixing versions.
 
 ## Files And Entrypoints
 
@@ -38,8 +41,14 @@ index queue. Adding a folder with PDFs is enough for discovery.
 ```powershell
 $env:UV_PROJECT_ENVIRONMENT = 'D:\Ninad\Python\.env'
 uv run --no-cache python manage.py discover_scriptures
+uv run --no-cache python manage.py discover_scriptures --resume-running
 uv run --no-cache celery -A moksha worker -Q indexing --loglevel=INFO
 ```
+
+Discovery skips completed collections unless `--force` is supplied, resumes a
+pending job, and leaves an already running job untouched. Use
+`--resume-running` only after confirming the original worker or synchronous
+command has stopped; it resumes source-identical committed candidate chunks.
 
 ## Tests
 

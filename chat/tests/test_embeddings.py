@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 from django.test import override_settings
@@ -56,3 +56,33 @@ def test_embedding_client_rejects_dimension_mismatch():
         pytest.raises(EmbeddingServiceError, match="embedding_dimensions_invalid"),
     ):
         PgVectorStore()._embed(["hello"])
+
+
+def test_add_chunks_reports_committed_batch_progress():
+    chunks = [
+        {
+            "scripture": "Test collection",
+            "file_name": "volume.pdf",
+            "page": index + 1,
+            "text": f"passage {index}",
+        }
+        for index in range(5)
+    ]
+    progress = Mock()
+
+    with (
+        patch.object(
+            PgVectorStore,
+            "_embed",
+            side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ),
+        patch("chat.rag.embeddings.DocumentChunk.objects.bulk_create"),
+    ):
+        added = PgVectorStore().add_chunks(
+            chunks,
+            batch_size=2,
+            progress_callback=progress,
+        )
+
+    assert added == 5
+    assert progress.call_args_list == [call(2, 5), call(4, 5), call(5, 5)]
