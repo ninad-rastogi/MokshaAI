@@ -19,47 +19,31 @@ from chat.rag.safety import safety_response
 logger = logging.getLogger("chat.rag.engine")
 
 
-def indexing_progress_notice() -> str:
-    """Return bounded user-safe index progress, if any collection is still building."""
+def scripture_indexing_active() -> bool:
+    """Return whether any collection is still indexing."""
     try:
         from scriptures.models import IndexingJob
 
-        job = (
+        return (
             IndexingJob.objects.filter(
                 status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING]
             )
-            .order_by("-created_at")
-            .first()
+            .only("id")
+            .exists()
         )
     except Exception:
         logger.exception("Could not inspect scripture indexing state")
-        return ""
-    if job is None:
-        return ""
-    if job.status == IndexingJob.Status.PENDING:
-        return (
-            "Scripture indexing is queued. Exact source quotations and citations "
-            "will become available after the index activates."
-        )
-    if job.error_message == "ocr_fallback_running" and job.chunks_indexed:
-        return (
-            f"Scripture OCR is still running ({job.chunks_indexed:,} pages scanned, "
-            f"{job.progress}% complete). Exact source quotations and citations "
-            "will become available after the index activates."
-        )
-    return (
-        f"Scripture indexing is still running ({job.progress}% complete). Exact "
-        "source quotations and citations will become available after activation."
-    )
+        return False
 
 
 def no_grounded_evidence_message() -> str:
-    """Return honest no-evidence message with indexing context when relevant."""
-    notice = indexing_progress_notice()
-    if notice:
+    """Return honest no-evidence message without operational progress text."""
+    if scripture_indexing_active():
         return (
-            f"{notice} I do not want to invent a verse or source. For now, please "
-            "ask for general spiritual guidance, or wait for indexing to finish."
+            "I do not have an activated scripture index for exact quotations yet, "
+            "so I will not invent a verse, book, page, or source. Please ask for "
+            "general spiritual guidance for now, or try scripture-grounded "
+            "citations after the library status shows ready."
         )
     return (
         "I could not find a sufficiently relevant passage in the indexed "

@@ -103,7 +103,7 @@ def test_no_evidence_message_without_active_indexing_is_plain() -> None:
     )
 
 
-def test_no_evidence_message_includes_ocr_progress_when_indexing(db) -> None:
+def test_no_evidence_message_keeps_indexing_progress_out_of_chat(db) -> None:
     operator = User.objects.create_user(
         email="indexing@example.test",
         password="StrongPass123!",
@@ -123,5 +123,8 @@ def test_no_evidence_message_includes_ocr_progress_when_indexing(db) -> None:
 
     message = no_grounded_evidence_message()
 
-    assert "Scripture OCR is still running (640 pages scanned, 10% complete)" in message
-    assert "I do not want to invent a verse or source" in message
+    assert "640" not in message
+    assert "10%" not in message
+    assert "progress" not in message.lower()
+    assert "will not invent a verse, book, page, or source" in message
+    assert "library status shows ready" in message
