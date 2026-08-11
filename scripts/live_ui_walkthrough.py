@@ -514,6 +514,10 @@ def run(
 
         page.reload(wait_until="networkidle")
         result["auth_after_refresh"] = page.url
+        library_status = page.locator(".library-status")
+        result["library_status_text"] = (
+            library_status.inner_text() if library_status.count() else ""
+        )
 
         composer = page.get_by_label("Message Moksha AI")
         composer.fill(
@@ -538,6 +542,19 @@ def run(
         result["translation_text"] = (
             translation.inner_text() if translation.count() else ""
         )
+        latest_assistant = page.locator(".message--assistant").last.inner_text()
+        result["assistant_progress_leak"] = any(
+            marker.lower() in latest_assistant.lower()
+            for marker in (
+                "ocr",
+                "pages scanned",
+                "% complete",
+                "progress",
+                "embedding",
+            )
+        )
+        if result["assistant_progress_leak"]:
+            raise AssertionError("Assistant response leaked indexing progress")
 
         page.get_by_label("Open settings").last.click()
         settings = page.locator(".settings-dialog")
