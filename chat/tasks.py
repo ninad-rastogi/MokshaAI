@@ -18,7 +18,7 @@ from chat.citations import (
 from chat.events import publish_run_event
 from chat.models import GenerationAttempt, GenerationRun, Message
 from chat.rag.embeddings import PgVectorStore
-from chat.rag.engine import RAGEngine
+from chat.rag.engine import RAGEngine, no_grounded_evidence_message
 from llm.models import ModelConnection, ModelProfile
 from llm.providers import (
     ProviderRequestFailed,
@@ -292,11 +292,7 @@ def _generate_remote_provider_response(
             chunk for chunk in chunks if chunk["score"] >= settings.RAG_MIN_SIMILARITY
         ]
         if not chunks:
-            no_evidence = (
-                "I could not find a sufficiently relevant passage in the indexed "
-                "scriptures to answer that reliably. Please try a more specific "
-                "question or ask for general spiritual guidance."
-            )
+            no_evidence = no_grounded_evidence_message()
             on_delta(no_evidence)
             return no_evidence, [], "RAG"
         context_parts = []

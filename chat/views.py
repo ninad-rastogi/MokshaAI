@@ -196,12 +196,13 @@ class ChatViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"])
     def discover(self, request: Request) -> Response:
         """Trigger scripture auto-discovery."""
+        from moksha.tasks import auto_discover_scripture_indexes
+
+        result = auto_discover_scripture_indexes.delay()
         return Response(
             {
-                "status": "discovery triggered",
-                "message": (
-                    "Run 'python manage.py discover_scriptures' " "to index scriptures."
-                ),
+                "status": "discovery_queued",
+                "task_id": result.id,
             }
         )
 

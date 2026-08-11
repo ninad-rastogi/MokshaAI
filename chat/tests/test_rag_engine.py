@@ -2,7 +2,9 @@
 
 from langchain_core.messages import HumanMessage
 
-from chat.rag.engine import RAGEngine
+from chat.rag.engine import RAGEngine, no_grounded_evidence_message
+from scriptures.models import IndexingJob, Scripture
+from users.models import User
 
 
 class _FakeResponse:
@@ -93,3 +95,33 @@ def test_general_prompt_forbids_invented_scripture_citations(monkeypatch) -> Non
     prompt = captured[-1].content
     assert "Do NOT quote, cite, name, or invent scriptures" in prompt
     assert "unless they were explicitly provided in this message" in prompt
+
+
+def test_no_evidence_message_without_active_indexing_is_plain() -> None:
+    assert "could not find a sufficiently relevant passage" in (
+        no_grounded_evidence_message()
+    )
+
+
+def test_no_evidence_message_includes_ocr_progress_when_indexing(db) -> None:
+    operator = User.objects.create_user(
+        email="indexing@example.test",
+        password="StrongPass123!",
+    )
+    scripture = Scripture.objects.create(
+        name="Library",
+        folder_path="Library",
+    )
+    IndexingJob.objects.create(
+        scripture=scripture,
+        requested_by=operator,
+        status=IndexingJob.Status.RUNNING,
+        progress=10,
+        chunks_indexed=640,
+        error_message="ocr_fallback_running",
+    )
+
+    message = no_grounded_evidence_message()
+
+    assert "Scripture OCR is still running (640 pages scanned, 10% complete)" in message
+    assert "I do not want to invent a verse or source" in message
