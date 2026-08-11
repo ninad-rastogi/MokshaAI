@@ -211,6 +211,18 @@ def install_mock_api(page: Page) -> None:
 
         if path.endswith("/auth/csrf/"):
             response(route, {"csrfToken": "mock-csrf"})
+        elif path.endswith("/auth/ready/"):
+            response(
+                route,
+                {
+                    "status": "ready",
+                    "database": True,
+                    "redis": True,
+                    "ollama": True,
+                    "embedding": True,
+                    "disk": True,
+                },
+            )
         elif path.endswith("/auth/me/"):
             if method == "PUT":
                 user.update(payload)
