@@ -178,7 +178,12 @@ export function useApi() {
     const response = await fetch(`${base}/auth/csrf/`, {
       credentials: "include",
     });
-    if (!response.ok) throw new Error("csrf_failed");
+    if (!response.ok) {
+      throw new ApiRequestError(
+        response.status,
+        await responsePayload(response),
+      );
+    }
     const data = z
       .object({ csrfToken: z.string() })
       .parse(await response.json());

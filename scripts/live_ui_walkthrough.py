@@ -55,6 +55,25 @@ def auth_error_text(page: Page) -> str:
     return error.inner_text() if error.count() else ""
 
 
+def composer_diagnostic(page: Page) -> dict[str, object]:
+    """Capture composer/header state when the workspace is not ready."""
+    composer = page.get_by_label("Message Moksha AI")
+    header_status = page.locator(".connection-status")
+    return {
+        "url": page.url,
+        "body_text": page.locator("body").inner_text(timeout=2_000)[:2_000],
+        "composer_count": composer.count(),
+        "composer_disabled": (
+            composer.first.get_attribute("disabled", timeout=1_000)
+            if composer.count()
+            else None
+        ),
+        "connection_status": (
+            header_status.inner_text(timeout=1_000) if header_status.count() else ""
+        ),
+    }
+
+
 def _bool_result(result: dict[str, object], key: str) -> bool:
     return result.get(key) is True
 
@@ -533,7 +552,6 @@ def run(
                     browser.close()
                     return result
                 page.wait_for_load_state("networkidle")
-                page.get_by_label("Message Moksha AI").wait_for(timeout=20_000)
                 console_errors.clear()
                 request_failures.clear()
                 page.screenshot(path=output_dir / "app-empty.png", full_page=True)
@@ -552,6 +570,42 @@ def run(
         )
 
         composer = page.get_by_label("Message Moksha AI")
+        try:
+            page.locator(".conversation-loading").wait_for(
+                state="detached",
+                timeout=45_000,
+            )
+            composer.wait_for(state="visible", timeout=15_000)
+            if composer.is_disabled(timeout=1_000):
+                result["composer_not_ready"] = composer_diagnostic(page)
+                page.screenshot(
+                    path=output_dir / "composer-not-ready.png",
+                    full_page=True,
+                )
+                result["console_errors"] = console_errors
+                result["request_failures"] = [
+                    failure
+                    for failure in request_failures
+                    if "kaspersky-labs.com" not in str(failure["url"])
+                    and not is_benign_abort(failure)
+                ]
+                browser.close()
+                return result
+        except PlaywrightTimeoutError:
+            result["composer_not_ready"] = composer_diagnostic(page)
+            page.screenshot(
+                path=output_dir / "composer-timeout.png",
+                full_page=True,
+            )
+            result["console_errors"] = console_errors
+            result["request_failures"] = [
+                failure
+                for failure in request_failures
+                if "kaspersky-labs.com" not in str(failure["url"])
+                and not is_benign_abort(failure)
+            ]
+            browser.close()
+            return result
         composer.fill(
             "I feel overwhelmed by expectations. "
             "How should I act without losing myself?"

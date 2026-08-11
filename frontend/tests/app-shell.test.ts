@@ -185,6 +185,7 @@ describe("app shell", () => {
     expect(indexPage).toContain(
       "Too many authentication attempts. Wait a moment, then try again.",
     );
+    expect(apiComposable).not.toContain('throw new Error("csrf_failed")');
     expect(apiComposable).toContain("class ApiRequestError");
   });
 
