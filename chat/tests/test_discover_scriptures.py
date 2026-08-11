@@ -3,7 +3,7 @@ from unittest.mock import call, patch
 
 import pytest
 from celery.exceptions import Retry
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 
 from scriptures.models import IndexingJob, Scripture, ScriptureIndexVersion
 from scriptures.tasks import INDEX_FAILURE_BUILD
@@ -97,9 +97,43 @@ def test_discovery_resumes_running_job_only_when_requested(
         apply.side_effect = lambda **_kwargs: IndexingJob.objects.filter(
             pk=job.pk
         ).update(status=IndexingJob.Status.SUCCEEDED)
-        call_command("discover_scriptures", resume_running=True)
+        call_command(
+            "discover_scriptures",
+            resume_running=True,
+            confirm_worker_stopped=True,
+        )
 
     apply.assert_called_once_with(args=[job.pk], throw=True)
+
+
+@pytest.mark.django_db
+def test_discovery_resume_running_requires_stopped_confirmation(
+    scripture_folder, django_user_model
+):
+    operator = django_user_model.objects.create_user(
+        email="operator@example.com",
+        password="test-password",
+        is_staff=True,
+    )
+    scripture = Scripture.objects.create(
+        name=scripture_folder.name,
+        folder_path=str(scripture_folder),
+    )
+    IndexingJob.objects.create(
+        scripture=scripture,
+        requested_by=operator,
+        status=IndexingJob.Status.RUNNING,
+    )
+
+    with (
+        patch(
+            "chat.management.commands.discover_scriptures.index_scripture.apply"
+        ) as apply,
+        pytest.raises(CommandError, match="confirm-worker-stopped"),
+    ):
+        call_command("discover_scriptures", resume_running=True)
+
+    apply.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -134,7 +168,11 @@ def test_discovery_replays_eager_task_retry(scripture_folder, django_user_model)
         "chat.management.commands.discover_scriptures.index_scripture.apply"
     ) as apply:
         apply.side_effect = retry_then_complete
-        call_command("discover_scriptures", resume_running=True)
+        call_command(
+            "discover_scriptures",
+            resume_running=True,
+            confirm_worker_stopped=True,
+        )
 
     assert apply.call_args_list == [
         call(args=[job.pk], throw=True),

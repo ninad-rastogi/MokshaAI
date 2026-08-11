@@ -152,6 +152,10 @@ class ScriptureDocumentLoader:
 
             pdf_doc.close()
 
+        except OcrUnavailableError:
+            if force_ocr:
+                raise
+            logger.exception("Could not load PDF %s", pdf_path.name)
         except Exception:
             logger.exception("Could not load PDF %s", pdf_path.name)
 

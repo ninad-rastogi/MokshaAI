@@ -46,6 +46,26 @@ def test_loader_uses_configured_ocr_engine_when_forced(tmp_path: Path) -> None:
     assert "कर्मण्येवाधिकारस्ते" in chunks[0]["text"]
 
 
+def test_loader_fails_closed_when_forced_ocr_page_fails(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "volume.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_document = FakeDocument([Mock()])
+    fake_engine = Mock()
+    fake_engine.cached_ocr_page.side_effect = PermissionError("locked")
+
+    with (
+        patch("chat.rag.loader.fitz.open", return_value=fake_document),
+        patch("chat.rag.loader.configured_ocr_engine", return_value=fake_engine),
+        pytest.raises(OcrUnavailableError, match="ocr_page_failed"),
+    ):
+        ScriptureDocumentLoader(docs_dir=tmp_path)._load_pdf(
+            pdf_path,
+            "Open Wisdom",
+            tmp_path,
+            force_ocr=True,
+        )
+
+
 def test_tesseract_ocr_uses_resumable_page_cache(settings, tmp_path: Path) -> None:
     settings.OCR_CACHE_DIR = tmp_path / "ocr-cache"
     pdf_path = tmp_path / "volume.pdf"
@@ -58,3 +78,32 @@ def test_tesseract_ocr_uses_resumable_page_cache(settings, tmp_path: Path) -> No
         assert engine.cached_ocr_page(page, pdf_path, 1) == "cached text"
 
     ocr_page.assert_called_once_with(page)
+
+
+def test_tesseract_ocr_retries_locked_cache_read(
+    settings,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings.OCR_CACHE_DIR = tmp_path / "ocr-cache"
+    pdf_path = tmp_path / "volume.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    engine = TesseractOcrEngine(command=str(tmp_path / "missing.exe"))
+    cache_file = engine._page_cache_file(pdf_path, 1)
+    cache_file.parent.mkdir(parents=True)
+    cache_file.write_text("cached text", encoding="utf-8")
+    original_read_text = Path.read_text
+    attempts = 0
+
+    def locked_once(path: Path, *args, **kwargs) -> str:
+        nonlocal attempts
+        if path == cache_file and attempts == 0:
+            attempts += 1
+            raise PermissionError("locked")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", locked_once)
+    monkeypatch.setattr("chat.rag.ocr.time.sleep", lambda _seconds: None)
+
+    assert engine.cached_ocr_page(Mock(), pdf_path, 1) == "cached text"
+    assert attempts == 1

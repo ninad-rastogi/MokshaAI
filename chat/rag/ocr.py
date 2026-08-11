@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import time
 from contextlib import suppress
 from pathlib import Path
 
@@ -79,13 +80,27 @@ class TesseractOcrEngine:
     def cached_ocr_page(self, page: fitz.Page, pdf_path: Path, page_number: int) -> str:
         """OCR one page with a resumable local text cache."""
         cache_file = self._page_cache_file(pdf_path, page_number)
-        if cache_file.exists():
-            return cache_file.read_text(encoding="utf-8")
+        for attempt in range(3):
+            try:
+                if cache_file.exists():
+                    return cache_file.read_text(encoding="utf-8")
+                break
+            except PermissionError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.2 * (attempt + 1))
         text = self.ocr_page(page)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        temp_file = cache_file.with_suffix(".tmp")
-        temp_file.write_text(text, encoding="utf-8")
-        temp_file.replace(cache_file)
+        temp_file = cache_file.with_name(f"{cache_file.name}.{os.getpid()}.tmp")
+        for attempt in range(3):
+            try:
+                temp_file.write_text(text, encoding="utf-8")
+                temp_file.replace(cache_file)
+                break
+            except PermissionError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.2 * (attempt + 1))
         return text
 
     def _installed_languages(self) -> set[str]:

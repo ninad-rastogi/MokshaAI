@@ -60,6 +60,11 @@ class Command(BaseCommand):
             help="Resume a RUNNING checkpoint after confirming its worker is stopped",
         )
         parser.add_argument(
+            "--confirm-worker-stopped",
+            action="store_true",
+            help="Required with --resume-running after the previous runner is stopped",
+        )
+        parser.add_argument(
             "--resume-failed",
             action="store_true",
             help="Resume the latest failed build candidate from its committed checkpoint",
@@ -91,6 +96,11 @@ class Command(BaseCommand):
         if not requested_names:
             self.stdout.write(self.style.WARNING("No scriptures found in data/docs/"))
             return
+        if options["resume_running"] and not options["confirm_worker_stopped"]:
+            raise CommandError(
+                "--resume-running requires --confirm-worker-stopped after stopping "
+                "the previous indexing process"
+            )
         operator = get_user_model().objects.filter(is_staff=True).first()
         if not operator:
             raise CommandError("Create a staff user before running scripture indexing.")
