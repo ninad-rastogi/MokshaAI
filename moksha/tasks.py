@@ -9,6 +9,8 @@ from pathlib import Path
 
 from celery import shared_task
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 logger = logging.getLogger("moksha.operations")
@@ -54,6 +56,61 @@ def monitor_disk_space() -> list[dict[str, object]]:
     if not all(bool(item["healthy"]) for item in report):
         logger.error("Disk free space below configured minimum")
     return report
+
+
+@shared_task(queue="operations")
+def auto_discover_scripture_indexes() -> dict[str, int]:
+    """Discover scripture folders and queue missing index builds."""
+    from chat.rag.loader import ScriptureDocumentLoader
+    from scriptures.models import IndexingJob, Scripture
+    from scriptures.tasks import index_scripture
+
+    operator = get_user_model().objects.filter(is_staff=True).first()
+    if operator is None:
+        return {"discovered": 0, "queued": 0, "skipped": 0, "no_staff": 1}
+
+    loader = ScriptureDocumentLoader()
+    discovered = 0
+    queued = 0
+    skipped = 0
+    for scripture_name in loader.available_scriptures:
+        discovered += 1
+        scripture_path = loader.docs_dir / scripture_name
+        scripture, _created = Scripture.objects.get_or_create(
+            name=scripture_name,
+            defaults={"folder_path": str(scripture_path)},
+        )
+        updates: list[str] = []
+        if scripture.folder_path != str(scripture_path):
+            scripture.folder_path = str(scripture_path)
+            updates.append("folder_path")
+        if updates:
+            scripture.save(update_fields=updates)
+        if scripture.is_indexed:
+            skipped += 1
+            continue
+        try:
+            with transaction.atomic():
+                active = IndexingJob.objects.select_for_update().filter(
+                    scripture=scripture,
+                    status__in=[
+                        IndexingJob.Status.PENDING,
+                        IndexingJob.Status.RUNNING,
+                    ],
+                )
+                if active.exists():
+                    skipped += 1
+                    continue
+                job = IndexingJob.objects.create(
+                    scripture=scripture,
+                    requested_by=operator,
+                )
+        except IntegrityError:
+            skipped += 1
+            continue
+        transaction.on_commit(lambda job_id=job.pk: index_scripture.delay(job_id))
+        queued += 1
+    return {"discovered": discovered, "queued": queued, "skipped": skipped}
 
 
 @shared_task(queue="operations")

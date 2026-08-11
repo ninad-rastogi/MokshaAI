@@ -8,14 +8,16 @@ Collection names are data, never product-code constants.
 
 ## Architecture And Data Flow
 
-Folders under the configured document root are discovered dynamically. Each PDF
-becomes a volume record. Celery builds a candidate index version, records
-counts and qualification results, runs retrieval smoke checks, then activates
-the candidate transactionally. The previous complete version remains available
-for rollback. Candidate embedding commits update durable chunk counts and
-progress after every batch, so long first-time builds remain observable. Task
-retries resume a source-identical candidate from its committed chunk count;
-changed source manifests fail closed instead of mixing versions.
+Folders under the configured document root are discovered dynamically. The
+operations scheduler periodically scans `data/docs/<Collection Name>/*.pdf`,
+creates missing scripture records, and queues one indexing job per unindexed
+collection. Each PDF becomes a volume record. Celery builds a candidate index
+version, records counts and qualification results, runs retrieval smoke checks,
+then activates the candidate transactionally. The previous complete version
+remains available for rollback. Candidate embedding commits update durable
+chunk counts and progress after every batch, so long first-time builds remain
+observable. Task retries resume a source-identical candidate from its committed
+chunk count; changed source manifests fail closed instead of mixing versions.
 If the PDF text layer is corrupt, indexing falls back to local OCR before
 rejecting the candidate. OCR output must pass the same source-quality and
 retrieval-smoke gates before activation.
@@ -37,7 +39,8 @@ requests.
 ## Configuration
 
 Set the document root, embedding service URL, retrieval thresholds, OCR engine,
-and Celery index queue. Adding a folder with PDFs is enough for discovery.
+Celery index queue, and `SCRIPTURE_AUTO_DISCOVER_SECONDS` schedule. Adding a
+folder with PDFs is enough for scheduled discovery and automatic indexing.
 
 OCR defaults to Tesseract 5 LSTM through
 `SCRIPTURE_OCR_TESSERACT_CMD=D:\Softwares\Tesseract\tesseract.exe` with

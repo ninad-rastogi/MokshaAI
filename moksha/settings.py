@@ -259,6 +259,10 @@ CELERY_TASK_ROUTES = {
 }
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_BEAT_SCHEDULE = {
+    "auto-discover-scripture-indexes": {
+        "task": "moksha.tasks.auto_discover_scripture_indexes",
+        "schedule": float(os.getenv("SCRIPTURE_AUTO_DISCOVER_SECONDS", "300")),
+    },
     "recover-stale-jobs": {
         "task": "moksha.tasks.recover_stale_jobs",
         "schedule": 300.0,
