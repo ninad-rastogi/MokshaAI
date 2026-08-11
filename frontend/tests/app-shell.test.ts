@@ -72,6 +72,9 @@ describe("app shell", () => {
     expect(appPage).toContain("scriptureProgressCompactLabel");
     expect(appPage).toContain("library-status");
     expect(appPage).toContain("library-status__compact");
+    expect(appPage).toContain("library-progress-panel");
+    expect(appPage).toContain("Preparing scripture library");
+    expect(appPage).toContain("Open scripture indexing progress");
     expect(appPage).toContain("scheduleScriptureRefresh");
     expect(appPage).toContain("scriptureRefreshDelay");
     expect(appPage).toContain('@section="settingsSection = $event"');
@@ -80,6 +83,12 @@ describe("app shell", () => {
     expect(settingsComponent).toContain("OCR pages scanned");
     expect(settingsComponent).toContain("Running local OCR");
     expect(settingsComponent).toContain("Embedding passages");
+    const messageThreadStart = appPage.indexOf('class="message-thread"');
+    const responseErrorStart = appPage.indexOf('class="response-error"');
+    const messageThread = appPage.slice(messageThreadStart, responseErrorStart);
+    expect(messageThread).not.toContain("OCR");
+    expect(messageThread).not.toContain("Embedding passages");
+    expect(messageThread).not.toContain("indexing progress");
   });
 
   it("exposes production chat history actions", () => {
