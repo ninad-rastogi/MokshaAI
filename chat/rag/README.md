@@ -26,11 +26,14 @@ honest no-evidence response instead of unsupported scripture claims.
 `RAGEngine` exposes routing and response methods to the chat application worker.
 `PgVectorStore` exposes bounded search and indexing operations. Returned sources
 contain collection, file, page, score, and excerpt fields.
+`ScriptureDocumentLoader` uses the PDF text layer first, then local OCR when
+index qualification detects corrupt Devanagari text.
 
 ## Configuration
 
 Set embedding service URL, active index version, similarity threshold, maximum
-retrieval count, context character/token limits, and document root.
+retrieval count, context character/token limits, document root, and local OCR
+settings for corrupt PDF text layers.
 
 ## Commands
 
@@ -48,8 +51,9 @@ require PgVector and the private BGE-M3 service.
 
 ## Dependencies
 
-PostgreSQL/PgVector, PyMuPDF, LangChain message types, Django settings, Ollama
-or a selected provider, and the embedding sidecar.
+PostgreSQL/PgVector, PyMuPDF, local Tesseract OCR traineddata for Sanskrit,
+Hindi, and English, LangChain message types, Django settings, Ollama or a
+selected provider, and the embedding sidecar.
 
 ## Security
 
@@ -62,7 +66,8 @@ history, evidence, and user input, and provider exceptions remain private.
 - Empty search: verify active complete index and collection annotations.
 - Low scores: inspect embedding model/version parity and retrieval threshold.
 - Invalid citation: reject response data rather than coercing untrusted fields.
-- PDF parse failure: inspect sanitized loader logs and source integrity.
+- PDF parse failure: inspect sanitized loader logs, source integrity, and local
+  OCR engine/language-data installation.
 
 ## Related Docs
 

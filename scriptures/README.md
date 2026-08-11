@@ -16,6 +16,9 @@ for rollback. Candidate embedding commits update durable chunk counts and
 progress after every batch, so long first-time builds remain observable. Task
 retries resume a source-identical candidate from its committed chunk count;
 changed source manifests fail closed instead of mixing versions.
+If the PDF text layer is corrupt, indexing falls back to local OCR before
+rejecting the candidate. OCR output must pass the same source-quality and
+retrieval-smoke gates before activation.
 
 ## Files And Entrypoints
 
@@ -33,8 +36,18 @@ requests.
 
 ## Configuration
 
-Set the document root, embedding service URL, retrieval thresholds, and Celery
-index queue. Adding a folder with PDFs is enough for discovery.
+Set the document root, embedding service URL, retrieval thresholds, OCR engine,
+and Celery index queue. Adding a folder with PDFs is enough for discovery.
+
+OCR defaults to Tesseract 5 LSTM through
+`SCRIPTURE_OCR_TESSERACT_CMD=D:\Softwares\Tesseract\tesseract.exe` with
+`SCRIPTURE_OCR_LANGUAGES=Devanagari+eng`, `SCRIPTURE_OCR_DPI=250`, and
+`SCRIPTURE_OCR_PSM=4`. Keep Devanagari script and English traineddata under the
+configured tessdata directory. This runs on CPU and fits the local laptop
+profile; no scripture text is sent to a remote OCR service. OCR output is
+cached per source file, page, model, DPI, and page-segmentation mode under
+`data/ocr-cache`, so interrupted large-corpus builds can resume without
+reprocessing completed pages.
 
 ## Commands
 
@@ -70,10 +83,12 @@ Activation requires a complete qualified candidate and uses a DB transaction.
 
 - No collections: verify document root and PDF folder layout.
 - Candidate rejected: inspect bounded qualification codes and retrieval smoke.
-- `index_source_text_corrupt`: PDF font mapping produced mojibake in more than
-  5% of Devanagari verse chunks. Replace the source with a clean Unicode PDF or
-  OCR-derived text, then start a new immutable build. Corrupt candidates never
-  become active and their partial vectors are removed.
+- `index_source_text_corrupt`: PDF font mapping produced mojibake and local OCR
+  is disabled.
+- `index_ocr_unavailable`: local OCR executable or requested language model is
+  missing. Install Tesseract and `Devanagari`, `eng` traineddata, then retry.
+- `index_ocr_quality_failed`: OCR ran, but the output still failed exact-verse
+  quality checks. Inspect the source scan quality before forcing any index.
 - Activation conflict: retry after active indexing job finishes.
 - Embedding errors: check private sidecar health and queue logs.
 

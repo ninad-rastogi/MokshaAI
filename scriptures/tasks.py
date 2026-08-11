@@ -16,6 +16,7 @@ from django.utils import timezone
 from chat.models import DocumentChunk
 from chat.rag.embeddings import EmbeddingServiceError, PgVectorStore
 from chat.rag.loader import ScriptureDocumentLoader
+from chat.rag.ocr import OcrUnavailableError, configured_ocr_engine
 from scriptures.models import (
     IndexingJob,
     ScriptureIndexVersion,
@@ -27,6 +28,8 @@ logger = logging.getLogger("scriptures.tasks")
 INDEX_FAILURE_BUILD = "index_build_failed"
 INDEX_FAILURE_QUALIFICATION = "index_qualification_failed"
 INDEX_FAILURE_SOURCE_TEXT = "index_source_text_corrupt"
+INDEX_FAILURE_OCR_UNAVAILABLE = "index_ocr_unavailable"
+INDEX_FAILURE_OCR_QUALITY = "index_ocr_quality_failed"
 
 DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
 SUSPICIOUS_LATIN_RE = re.compile(r"[\u0080-\u024F]")
@@ -109,7 +112,11 @@ def index_scripture(self, job_id: int) -> None:
             embedding_model=settings.EMBEDDING_MODEL,
         )
     assert version is not None
-    progress_floor = index_progress_floor(job.progress, resuming)
+    progress_floor = (
+        max(job.progress, 8)
+        if resuming and job.error_message == "ocr_fallback_running"
+        else index_progress_floor(job.progress, resuming)
+    )
     job_updates: dict[str, object] = {
         "status": IndexingJob.Status.RUNNING,
         "progress": progress_floor,
@@ -161,7 +168,79 @@ def index_scripture(self, job_id: int) -> None:
         version.volume_count = len(volumes)
         version.page_count = sum(volume[2] for volume in volumes)
         text_quality = source_text_quality(chunks)
-        version.qualification = {"source_text": text_quality}
+        qualification_context: dict[str, Any] = {"source_text": text_quality}
+        if not text_quality["source_text_qualified"]:
+            if not settings.SCRIPTURE_OCR_ENABLED:
+                raise RuntimeError(INDEX_FAILURE_SOURCE_TEXT)
+            try:
+                ocr_engine = configured_ocr_engine()
+                if ocr_engine is None:
+                    raise OcrUnavailableError("ocr_disabled")
+                ocr_engine.assert_available()
+                IndexingJob.objects.filter(pk=job.pk).update(
+                    progress=max(progress_floor, 8),
+                    error_message="ocr_fallback_running",
+                )
+                ocr_chunks = []
+                total_ocr_pages = sum(volume[2] for volume in volumes)
+                pages_before_volume = 0
+                for number, pdf_path in enumerate(pdf_files, start=1):
+
+                    def record_ocr_progress(
+                        page_number: int,
+                        _pages: int,
+                        *,
+                        pages_before: int = pages_before_volume,
+                        volume_number: int = number,
+                    ) -> None:
+                        completed_pages = pages_before + page_number
+                        progress = max(
+                            progress_floor,
+                            min(
+                                70,
+                                8 + int(completed_pages / max(total_ocr_pages, 1) * 62),
+                            ),
+                        )
+                        IndexingJob.objects.filter(pk=job.pk).update(
+                            progress=progress,
+                            chunks_indexed=completed_pages,
+                            volumes_processed=volume_number - 1,
+                            error_message="ocr_fallback_running",
+                        )
+
+                    ocr_chunks.extend(
+                        loader._load_pdf(
+                            pdf_path,
+                            scripture.name,
+                            scripture_path,
+                            force_ocr=True,
+                            progress_callback=record_ocr_progress,
+                        )
+                    )
+                    pages_before_volume += volumes[number - 1][2]
+                    IndexingJob.objects.filter(pk=job.pk).update(
+                        progress=max(
+                            progress_floor,
+                            min(70, 8 + int(number / len(pdf_files) * 62)),
+                        )
+                    )
+            except OcrUnavailableError as exc:
+                raise RuntimeError(INDEX_FAILURE_OCR_UNAVAILABLE) from exc
+            chunks = ocr_chunks
+            if not chunks:
+                raise RuntimeError(INDEX_FAILURE_OCR_QUALITY)
+            text_quality = source_text_quality(chunks)
+            qualification_context = {
+                "source_text": text_quality,
+                "ocr": {
+                    "engine": ocr_engine.name,
+                    "languages": ocr_engine.languages,
+                    "dpi": settings.SCRIPTURE_OCR_DPI,
+                },
+            }
+            if not text_quality["source_text_qualified"]:
+                raise RuntimeError(INDEX_FAILURE_OCR_QUALITY)
+        version.qualification = qualification_context
         version.save(
             update_fields=[
                 "source_manifest",
@@ -173,9 +252,8 @@ def index_scripture(self, job_id: int) -> None:
         IndexingJob.objects.filter(pk=job.pk).update(
             volumes_processed=len(volumes),
             chunks_indexed=0,
+            error_message="",
         )
-        if not text_quality["source_text_qualified"]:
-            raise RuntimeError(INDEX_FAILURE_SOURCE_TEXT)
 
         # Write candidate first. Existing active retrieval remains available.
         vector_store = PgVectorStore()
@@ -207,7 +285,7 @@ def index_scripture(self, job_id: int) -> None:
             and smoke_results[0]["score"] >= settings.RAG_MIN_SIMILARITY
         )
         qualification = {
-            "source_text": text_quality,
+            **qualification_context,
             "expected_chunks": len(chunks),
             "stored_chunks": added,
             "volume_count": len(source_manifest),
@@ -308,6 +386,8 @@ def index_scripture(self, job_id: int) -> None:
         failure_code = {
             INDEX_FAILURE_QUALIFICATION: INDEX_FAILURE_QUALIFICATION,
             INDEX_FAILURE_SOURCE_TEXT: INDEX_FAILURE_SOURCE_TEXT,
+            INDEX_FAILURE_OCR_UNAVAILABLE: INDEX_FAILURE_OCR_UNAVAILABLE,
+            INDEX_FAILURE_OCR_QUALITY: INDEX_FAILURE_OCR_QUALITY,
         }.get(str(exc), INDEX_FAILURE_BUILD)
         ScriptureIndexVersion.objects.filter(
             pk=version.pk,

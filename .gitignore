@@ -27,6 +27,7 @@ frontend/test-results/
 
 # Data
 data/embeddings/
+data/ocr-cache/
 data/chats/
 data/docs_metadata.json
 

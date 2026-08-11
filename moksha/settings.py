@@ -15,9 +15,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 DOCS_DIR = DATA_DIR / "docs"
 EMBEDDINGS_DIR = DATA_DIR / "embeddings"
+OCR_CACHE_DIR = DATA_DIR / "ocr-cache"
 
 # Create data directories
-for dir_path in [DATA_DIR, DOCS_DIR, EMBEDDINGS_DIR]:
+for dir_path in [DATA_DIR, DOCS_DIR, EMBEDDINGS_DIR, OCR_CACHE_DIR]:
     dir_path.mkdir(parents=True, exist_ok=True)
 
 # ─── Django Core ───────────────────────────────────────────────────────────────
@@ -205,6 +206,29 @@ EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1024"))
 EMBEDDING_SERVICE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://127.0.0.1:8010")
 EMBEDDING_SERVICE_TIMEOUT_SECONDS = int(
     os.getenv("EMBEDDING_SERVICE_TIMEOUT_SECONDS", "90")
+)
+SCRIPTURE_OCR_ENABLED = os.getenv("SCRIPTURE_OCR_ENABLED", "True").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+SCRIPTURE_OCR_ENGINE = os.getenv("SCRIPTURE_OCR_ENGINE", "tesseract")
+_default_tesseract_cmd = Path(r"D:\Softwares\Tesseract\tesseract.exe")
+if not _default_tesseract_cmd.exists():
+    _default_tesseract_cmd = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+SCRIPTURE_OCR_TESSERACT_CMD = os.getenv(
+    "SCRIPTURE_OCR_TESSERACT_CMD",
+    str(_default_tesseract_cmd),
+)
+SCRIPTURE_OCR_TESSDATA_PREFIX = os.getenv(
+    "SCRIPTURE_OCR_TESSDATA_PREFIX",
+    r"D:\Softwares\Tesseract\tessdata",
+)
+SCRIPTURE_OCR_LANGUAGES = os.getenv("SCRIPTURE_OCR_LANGUAGES", "Devanagari+eng")
+SCRIPTURE_OCR_DPI = int(os.getenv("SCRIPTURE_OCR_DPI", "250"))
+SCRIPTURE_OCR_PSM = int(os.getenv("SCRIPTURE_OCR_PSM", "4"))
+SCRIPTURE_OCR_PAGE_TIMEOUT_SECONDS = int(
+    os.getenv("SCRIPTURE_OCR_PAGE_TIMEOUT_SECONDS", "120")
 )
 RAG_MIN_SIMILARITY = float(os.getenv("RAG_MIN_SIMILARITY", "0.35"))
 OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))

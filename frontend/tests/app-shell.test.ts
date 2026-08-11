@@ -41,6 +41,10 @@ describe("app shell", () => {
   it("shows a bounded source quality failure instead of pending", () => {
     expect(settingsComponent).toContain('"index_source_text_corrupt"');
     expect(settingsComponent).toContain('"Source needs OCR"');
+    expect(settingsComponent).toContain('"index_ocr_unavailable"');
+    expect(settingsComponent).toContain('"Install OCR model"');
+    expect(settingsComponent).toContain('"index_ocr_quality_failed"');
+    expect(settingsComponent).toContain('"OCR needs review"');
     expect(settingsComponent).toContain(
       '"Source text failed exact-verse quality checks"',
     );
@@ -61,11 +65,19 @@ describe("app shell", () => {
     expect(appPage).not.toContain("Admin default");
   });
 
-  it("refreshes active scripture indexing progress while that section is visible", () => {
+  it("keeps scripture indexing progress visible across workspace and settings", () => {
     expect(settingsComponent).toContain('emit("section", section)');
-    expect(appPage).toContain("shouldRefreshScriptures");
+    expect(appPage).toContain("activeIndexingJobs");
+    expect(appPage).toContain("scriptureProgressLabel");
+    expect(appPage).toContain("library-status");
     expect(appPage).toContain("scheduleScriptureRefresh");
+    expect(appPage).toContain("scriptureRefreshDelay");
     expect(appPage).toContain('@section="settingsSection = $event"');
+    expect(settingsComponent).toContain("indexingPhase");
+    expect(settingsComponent).toContain("index-progress");
+    expect(settingsComponent).toContain("OCR pages scanned");
+    expect(settingsComponent).toContain("Running local OCR");
+    expect(settingsComponent).toContain("Embedding passages");
   });
 
   it("exposes production chat history actions", () => {

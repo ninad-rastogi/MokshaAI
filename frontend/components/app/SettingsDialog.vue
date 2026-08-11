@@ -111,7 +111,24 @@ const fallbackOptions = computed(() =>
 function scriptureDetail(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (job) {
+    if (job.progress < 70 && job.chunks_indexed > 0) {
+      return `${job.chunks_indexed.toLocaleString()} OCR pages scanned`;
+    }
+    if (job.progress < 70) {
+      return `${scripture.total_pages.toLocaleString()} pages queued for OCR/text extraction`;
+    }
     return `${job.volumes_processed} volumes, ${job.chunks_indexed.toLocaleString()} passages committed`;
+  }
+  if (
+    scripture.latest_indexing_failure?.failure_code === "index_ocr_unavailable"
+  ) {
+    return "Local OCR engine or language model is not installed";
+  }
+  if (
+    scripture.latest_indexing_failure?.failure_code ===
+    "index_ocr_quality_failed"
+  ) {
+    return "OCR output failed exact-verse quality checks";
   }
   if (
     scripture.latest_indexing_failure?.failure_code ===
@@ -126,14 +143,24 @@ function scriptureStatus(scripture: Scripture) {
   if (scripture.is_indexed) return "Indexed";
   const job = scripture.current_indexing_job;
   if (!job) {
-    return scripture.latest_indexing_failure?.failure_code ===
-      "index_source_text_corrupt"
-      ? "Source needs OCR"
-      : scripture.latest_indexing_failure
-        ? "Index failed"
-        : "Pending";
+    const failureCode = scripture.latest_indexing_failure?.failure_code;
+    if (failureCode === "index_source_text_corrupt") return "Source needs OCR";
+    if (failureCode === "index_ocr_unavailable") return "Install OCR model";
+    if (failureCode === "index_ocr_quality_failed") return "OCR needs review";
+    return scripture.latest_indexing_failure ? "Index failed" : "Pending";
   }
   return job.status === "PENDING" ? "Queued" : `Indexing ${job.progress}%`;
+}
+
+function indexingPhase(scripture: Scripture) {
+  const job = scripture.current_indexing_job;
+  if (!job) return "";
+  if (job.status === "PENDING") return "Waiting for worker";
+  if (job.progress < 70 && job.chunks_indexed > 0) return "Running local OCR";
+  if (job.progress < 70) return "Reading source volumes";
+  if (job.progress < 85) return "Embedding passages";
+  if (job.progress < 100) return "Qualifying retrieval";
+  return "Activating index";
 }
 
 function formatContextWindow(tokens: number) {
@@ -608,6 +635,20 @@ watch(
                   <small>
                     {{ scriptureDetail(scripture) }}
                   </small>
+                  <span
+                    v-if="scripture.current_indexing_job"
+                    class="index-progress"
+                    :aria-label="`${scripture.name} indexing ${scripture.current_indexing_job.progress}%`"
+                  >
+                    <span>
+                      <b
+                        :style="{
+                          width: `${scripture.current_indexing_job.progress}%`,
+                        }"
+                      />
+                    </span>
+                    <em>{{ indexingPhase(scripture) }}</em>
+                  </span>
                 </span>
                 <span
                   :class="[
@@ -997,6 +1038,7 @@ watch(
 .connected-profiles li > span:nth-child(2),
 .scripture-list li > span:nth-child(2) {
   display: grid;
+  gap: 0.12rem;
   min-width: 0;
 }
 
@@ -1271,6 +1313,38 @@ watch(
   gap: 0.3rem;
 }
 
+.index-progress {
+  display: grid;
+  gap: 0.22rem;
+  margin-top: 0.2rem;
+}
+
+.index-progress > span {
+  background: var(--moksha-glass-raised);
+  border: 1px solid var(--moksha-glass-line);
+  border-radius: 999px;
+  height: 0.42rem;
+  overflow: hidden;
+}
+
+.index-progress b {
+  background: linear-gradient(
+    90deg,
+    var(--moksha-accent),
+    var(--moksha-success)
+  );
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 220ms ease;
+}
+
+.index-progress em {
+  color: var(--moksha-muted);
+  font-size: 0.64rem;
+  font-style: normal;
+}
+
 .settings-empty {
   align-items: center;
   color: var(--moksha-muted);
@@ -1449,6 +1523,15 @@ watch(
   .selected-check {
     grid-column: 3;
     grid-row: 1 / span 2;
+  }
+
+  .scripture-list li {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .scripture-list .index-state {
+    grid-column: 2;
   }
 }
 </style>

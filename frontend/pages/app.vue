@@ -190,11 +190,63 @@ const streamingMessage = computed<Message>(() => ({
   created_at: new Date().toISOString(),
 }));
 
-const shouldRefreshScriptures = computed(
-  () =>
-    settingsOpen.value &&
-    settingsSection.value === "scriptures" &&
-    scriptures.value.some((scripture) => scripture.current_indexing_job),
+const activeIndexingJobs = computed(() =>
+  scriptures.value
+    .map((scripture) => ({
+      scripture,
+      job: scripture.current_indexing_job,
+    }))
+    .filter(
+      (
+        entry,
+      ): entry is {
+        scripture: Scripture;
+        job: NonNullable<Scripture["current_indexing_job"]>;
+      } => Boolean(entry.job),
+    ),
+);
+
+const scriptureRefreshDelay = computed(() =>
+  activeIndexingJobs.value.length ? 3000 : 20000,
+);
+
+const scriptureProgressLabel = computed(() => {
+  if (!scriptures.value.length) return "No collections";
+  if (!activeIndexingJobs.value.length) {
+    return `${scriptures.value.filter((scripture) => scripture.is_indexed).length}/${scriptures.value.length} ready`;
+  }
+  const ocrPages = activeIndexingJobs.value.reduce((sum, entry) => {
+    if (entry.job.progress >= 70) return sum;
+    return sum + entry.job.chunks_indexed;
+  }, 0);
+  if (ocrPages > 0) {
+    return `OCR ${ocrPages.toLocaleString()} pages`;
+  }
+  const average = Math.round(
+    activeIndexingJobs.value.reduce(
+      (sum, entry) => sum + entry.job.progress,
+      0,
+    ) / activeIndexingJobs.value.length,
+  );
+  return `${activeIndexingJobs.value.length} indexing · ${average}%`;
+});
+
+const scriptureProgressDetail = computed(() => {
+  if (!activeIndexingJobs.value.length) {
+    return `${scriptures.value.filter((scripture) => scripture.is_indexed).length} of ${scriptures.value.length} scripture collections ready`;
+  }
+  return activeIndexingJobs.value
+    .map((entry) => {
+      if (entry.job.progress < 70 && entry.job.chunks_indexed > 0) {
+        return `${entry.scripture.name} OCR ${entry.job.chunks_indexed.toLocaleString()} pages`;
+      }
+      return `${entry.scripture.name} ${entry.job.progress}%`;
+    })
+    .join(", ");
+});
+
+const scriptureProgressTone = computed(() =>
+  activeIndexingJobs.value.length ? "running" : "idle",
 );
 
 onMounted(async () => {
@@ -238,6 +290,7 @@ onMounted(async () => {
       "Your conversations could not load. Refresh the page to try again.";
   } finally {
     workspaceLoading.value = false;
+    scheduleScriptureRefresh();
     scheduleRuntimeHealthRefresh();
     await scrollToLatest("auto");
   }
@@ -262,11 +315,6 @@ watch(
     await scrollToLatest("smooth");
   },
 );
-
-watch(shouldRefreshScriptures, (shouldRefresh) => {
-  clearTimeout(scriptureRefreshTimer);
-  if (shouldRefresh) scheduleScriptureRefresh();
-});
 
 async function loadProfiles() {
   const page = await api.modelProfiles();
@@ -340,15 +388,16 @@ async function loadScriptures() {
 }
 
 function scheduleScriptureRefresh() {
+  clearTimeout(scriptureRefreshTimer);
   scriptureRefreshTimer = setTimeout(async () => {
     try {
       await loadScriptures();
     } catch {
       // Keep last known progress visible while a transient refresh fails.
     } finally {
-      if (shouldRefreshScriptures.value) scheduleScriptureRefresh();
+      scheduleScriptureRefresh();
     }
-  }, 5000);
+  }, scriptureRefreshDelay.value);
 }
 
 async function selectChat(chatId: string) {
@@ -861,6 +910,21 @@ async function scrollToLatest(behavior: ScrollBehavior) {
             <b aria-hidden="true">·</b>
             <small>{{ activeModelDetail }}</small>
           </span>
+          <button
+            :class="[
+              'library-status',
+              `library-status--${scriptureProgressTone}`,
+            ]"
+            type="button"
+            :aria-label="`Scripture library: ${scriptureProgressDetail}`"
+            @click="
+              settingsSection = 'scriptures';
+              settingsOpen = true;
+            "
+          >
+            <UIcon name="i-lucide-library" aria-hidden="true" />
+            <span>{{ scriptureProgressLabel }}</span>
+          </button>
           <UTooltip v-if="streamDisconnected" text="Reconnect response stream">
             <button
               class="header-icon"
@@ -1253,6 +1317,36 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.library-status {
+  align-items: center;
+  background: var(--moksha-control);
+  border: 1px solid var(--moksha-glass-line);
+  border-radius: 999px;
+  color: var(--moksha-muted);
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 680;
+  gap: 0.35rem;
+  min-height: 1.85rem;
+  padding: 0 0.62rem;
+  white-space: nowrap;
+}
+
+.library-status:hover {
+  background: var(--moksha-glass-raised);
+  color: var(--moksha-ink);
+}
+
+.library-status--running {
+  background: var(--moksha-accent-soft);
+  border-color: var(--moksha-accent-line);
+  color: var(--moksha-accent-ink);
+}
+
+.library-status--running svg {
+  animation: breathe 1.45s ease-in-out infinite;
 }
 
 .message-viewport {
@@ -1651,8 +1745,16 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 
   .connection-status span,
   .connection-status b,
-  .connection-status small {
+  .connection-status small,
+  .library-status span {
     display: none;
+  }
+
+  .library-status {
+    border-radius: 0.55rem;
+    min-height: 2rem;
+    padding: 0;
+    width: 2rem;
   }
 
   .empty-conversation {

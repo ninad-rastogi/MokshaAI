@@ -6,6 +6,7 @@ Loads PDFs from data/docs/<ScriptureName>/ directories.
 """
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ import fitz  # PyMuPDF
 from django.conf import settings
 
 from chat.rag.chunker import ScriptureChunker
+from chat.rag.ocr import OcrUnavailableError, configured_ocr_engine
 
 logger = logging.getLogger("chat.rag.loader")
 
@@ -108,6 +110,8 @@ class ScriptureDocumentLoader:
         pdf_path: Path,
         scripture_name: str,
         collection_path: Path | None = None,
+        force_ocr: bool = False,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> list[dict[str, Any]]:
         """Load a PDF and split into semantic chunks."""
         chunks: list[dict[str, Any]] = []
@@ -116,15 +120,22 @@ class ScriptureDocumentLoader:
             if collection_path
             else pdf_path.name
         )
+        ocr_engine = configured_ocr_engine() if force_ocr else None
 
         try:
             pdf_doc = fitz.open(str(pdf_path))
 
             for page_num in range(len(pdf_doc)):
                 page = pdf_doc[page_num]
-                text = page.get_text()
+                text = (
+                    self._ocr_page(page, pdf_path, page_num + 1, ocr_engine)
+                    if ocr_engine
+                    else page.get_text()
+                )
 
                 if not text.strip():
+                    if progress_callback:
+                        progress_callback(page_num + 1, len(pdf_doc))
                     continue
 
                 # Use the semantic chunker to split page content
@@ -136,6 +147,8 @@ class ScriptureDocumentLoader:
                     total_pages=len(pdf_doc),
                 )
                 chunks.extend(page_chunks)
+                if progress_callback:
+                    progress_callback(page_num + 1, len(pdf_doc))
 
             pdf_doc.close()
 
@@ -143,6 +156,27 @@ class ScriptureDocumentLoader:
             logger.exception("Could not load PDF %s", pdf_path.name)
 
         return chunks
+
+    def _ocr_page(
+        self,
+        page: fitz.Page,
+        pdf_path: Path,
+        page_number: int,
+        ocr_engine: Any,
+    ) -> str:
+        """OCR one page while keeping logs sanitized."""
+        try:
+            return str(ocr_engine.cached_ocr_page(page, pdf_path, page_number))
+        except OcrUnavailableError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "OCR failed for %s page %s with %s",
+                pdf_path.name,
+                page_number,
+                exc.__class__.__name__,
+            )
+            raise OcrUnavailableError("ocr_page_failed") from exc
 
     def get_available_scriptures(self) -> list[str]:
         """Return list of available scripture names."""
