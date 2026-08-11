@@ -115,11 +115,20 @@ def validate_result(result: dict[str, object], *, mock_api: bool) -> list[str]:
         failures.append("browser_console_errors")
     if result.get("request_failures"):
         failures.append("browser_request_failures")
+    if result.get("assistant_timeout"):
+        failures.append("assistant_response_timeout")
     library_status = str(result.get("library_status_text", ""))
     if any(marker in library_status.lower() for marker in ("ocr", "indexing")):
         panel_text = str(result.get("library_progress_panel_text", ""))
         if "Preparing scripture library" not in panel_text:
             failures.append("indexing_progress_panel_missing")
+    latest_assistant_text = str(result.get("latest_assistant_text", ""))
+    no_exact_verse_panel = not str(result.get("exact_verse_text", "")).strip()
+    if no_exact_verse_panel and any(
+        marker in latest_assistant_text.lower()
+        for marker in ("source:", "(from ", "file:", " page ", " p. ")
+    ):
+        failures.append("assistant_invented_source_without_exact_verse")
     if mock_api:
         if result.get("connection_removed") is not True:
             failures.append("connection_remove_flow_failed")
@@ -621,9 +630,39 @@ def run(
             "I feel overwhelmed by expectations. "
             "How should I act without losing myself?"
         )
+        messages_before_send = page.locator(".message").count()
         composer.press("Enter")
-        page.locator(".message--assistant").last.wait_for(timeout=60_000)
-        page.locator(".run-status").wait_for(state="detached", timeout=120_000)
+        try:
+            page.locator(".message--user").last.wait_for(timeout=5_000)
+            result["user_message_visible_after_enter"] = (
+                page.locator(".message").count() > messages_before_send
+            )
+            page.locator(".message--assistant").last.wait_for(timeout=60_000)
+            page.locator(".run-status").wait_for(state="detached", timeout=120_000)
+        except PlaywrightTimeoutError:
+            result["assistant_timeout"] = {
+                "url": page.url,
+                "composer_value": composer.input_value(timeout=1_000),
+                "message_count": page.locator(".message").count(),
+                "messages_before_send": messages_before_send,
+                "user_messages": page.locator(".message--user").count(),
+                "assistant_messages": page.locator(".message--assistant").count(),
+                "connection_status": (
+                    page.locator(".connection-status").inner_text(timeout=1_000)
+                    if page.locator(".connection-status").count()
+                    else ""
+                ),
+            }
+            page.screenshot(path=output_dir / "assistant-timeout.png", full_page=True)
+            result["console_errors"] = console_errors
+            result["request_failures"] = [
+                failure
+                for failure in request_failures
+                if "kaspersky-labs.com" not in str(failure["url"])
+                and not is_benign_abort(failure)
+            ]
+            browser.close()
+            return result
         page.screenshot(path=output_dir / "app-chat.png", full_page=True)
         result["composer_cleared"] = composer.input_value() == ""
         run_status = page.locator(".run-status")
@@ -640,6 +679,7 @@ def run(
             translation.inner_text() if translation.count() else ""
         )
         latest_assistant = page.locator(".message--assistant").last.inner_text()
+        result["latest_assistant_text"] = latest_assistant
         result["assistant_progress_leak"] = any(
             marker.lower() in latest_assistant.lower()
             for marker in (

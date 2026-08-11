@@ -21,6 +21,7 @@ def _passing_result() -> dict[str, object]:
         "connection_status_aria": "Online · Moksha local · qwen3:4b",
         "exact_verse_text": "Exact verse\nउत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत।",
         "translation_text": "Translation\nArise, awake, and learn from the wise.",
+        "latest_assistant_text": "Begin with one honest boundary.",
     }
 
 
@@ -54,3 +55,24 @@ def test_live_walkthrough_validator_rejects_missing_indexing_progress_panel():
     failures = validate_result(result, mock_api=False)
 
     assert "indexing_progress_panel_missing" in failures
+
+
+def test_live_walkthrough_validator_rejects_fake_source_without_exact_verse():
+    result = _passing_result()
+    result["exact_verse_text"] = ""
+    result["latest_assistant_text"] = (
+        "The sacred text says this. (From The Book of Life, File: Wisdom, Page 34)"
+    )
+
+    failures = validate_result(result, mock_api=False)
+
+    assert "assistant_invented_source_without_exact_verse" in failures
+
+
+def test_live_walkthrough_validator_rejects_assistant_timeout():
+    result = _passing_result()
+    result["assistant_timeout"] = {"message_count": 1}
+
+    failures = validate_result(result, mock_api=False)
+
+    assert "assistant_response_timeout" in failures
