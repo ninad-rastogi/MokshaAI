@@ -10,7 +10,7 @@ from pathlib import Path
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 logger = logging.getLogger("moksha.operations")
@@ -145,7 +145,7 @@ def recover_stale_jobs() -> dict[str, int]:
     stale_index_jobs = IndexingJob.objects.filter(
         status=IndexingJob.Status.RUNNING,
         started_at__lt=cutoff,
-    )
+    ).filter(models.Q(heartbeat_at__isnull=True) | models.Q(heartbeat_at__lt=cutoff))
     stale_version_ids = list(
         stale_index_jobs.exclude(index_version=None).values_list(
             "index_version_id",
@@ -167,6 +167,26 @@ def recover_stale_jobs() -> dict[str, int]:
         status=ScriptureIndexVersion.Status.FAILED,
         failure_code="worker_restarted",
     )
+    orphan_index_versions = (
+        ScriptureIndexVersion.objects.filter(
+            status__in=[
+                ScriptureIndexVersion.Status.BUILDING,
+                ScriptureIndexVersion.Status.QUALIFIED,
+            ],
+            created_at__lt=cutoff,
+        )
+        .exclude(
+            jobs__status__in=[
+                IndexingJob.Status.PENDING,
+                IndexingJob.Status.RUNNING,
+            ]
+        )
+        .distinct()
+    )
+    index_versions = orphan_index_versions.update(
+        status=ScriptureIndexVersion.Status.FAILED,
+        failure_code="orphan_build_interrupted",
+    )
     installations = ModelInstallationJob.objects.filter(
         status=ModelInstallationJob.Status.RUNNING,
         started_at__lt=cutoff,
@@ -179,6 +199,7 @@ def recover_stale_jobs() -> dict[str, int]:
     return {
         "generation_runs": generations,
         "indexing_jobs": indexing,
+        "index_versions": index_versions,
         "model_installations": installations,
     }
 

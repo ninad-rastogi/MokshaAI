@@ -63,6 +63,7 @@ def record_embedding_progress(job_id: int, completed: int, total: int) -> None:
     IndexingJob.objects.filter(pk=job_id).update(
         progress=progress,
         chunks_indexed=completed,
+        heartbeat_at=timezone.now(),
     )
 
 
@@ -126,6 +127,7 @@ def index_scripture(self, job_id: int) -> None:
     }
     if job.started_at is None:
         job_updates["started_at"] = timezone.now()
+    job_updates["heartbeat_at"] = timezone.now()
     IndexingJob.objects.filter(pk=job.pk).update(
         **job_updates,
     )
@@ -148,7 +150,8 @@ def index_scripture(self, job_id: int) -> None:
                 progress=max(
                     progress_floor,
                     min(70, 5 + int(number / len(pdf_files) * 65)),
-                )
+                ),
+                heartbeat_at=timezone.now(),
             )
         if not chunks:
             raise ValueError("No extractable text was found in the PDFs.")
@@ -187,6 +190,7 @@ def index_scripture(self, job_id: int) -> None:
                 IndexingJob.objects.filter(pk=job.pk).update(
                     progress=max(progress_floor, 8),
                     error_message="ocr_fallback_running",
+                    heartbeat_at=timezone.now(),
                 )
                 ocr_chunks = []
                 total_ocr_pages = sum(volume[2] for volume in volumes)
@@ -213,6 +217,7 @@ def index_scripture(self, job_id: int) -> None:
                             chunks_indexed=completed_pages,
                             volumes_processed=volume_number - 1,
                             error_message="ocr_fallback_running",
+                            heartbeat_at=timezone.now(),
                         )
 
                     ocr_chunks.extend(
@@ -229,7 +234,8 @@ def index_scripture(self, job_id: int) -> None:
                         progress=max(
                             progress_floor,
                             min(70, 8 + int(number / len(pdf_files) * 62)),
-                        )
+                        ),
+                        heartbeat_at=timezone.now(),
                     )
             except OcrUnavailableError as exc:
                 raise RuntimeError(INDEX_FAILURE_OCR_UNAVAILABLE) from exc
@@ -260,6 +266,7 @@ def index_scripture(self, job_id: int) -> None:
             volumes_processed=len(volumes),
             chunks_indexed=0,
             error_message="",
+            heartbeat_at=timezone.now(),
         )
 
         # Write candidate first. Existing active retrieval remains available.
@@ -276,7 +283,10 @@ def index_scripture(self, job_id: int) -> None:
                 len(chunks),
             ),
         )
-        IndexingJob.objects.filter(pk=job.pk).update(progress=85)
+        IndexingJob.objects.filter(pk=job.pk).update(
+            progress=85,
+            heartbeat_at=timezone.now(),
+        )
         smoke_query = str(chunks[0]["text"])[:500]
         smoke_results = vector_store.search(
             smoke_query,
@@ -362,6 +372,7 @@ def index_scripture(self, job_id: int) -> None:
                 volumes_processed=len(volumes),
                 finished_at=timezone.now(),
                 error_message="",
+                heartbeat_at=timezone.now(),
             )
         retained_previous_ids = list(
             ScriptureIndexVersion.objects.filter(
@@ -388,6 +399,7 @@ def index_scripture(self, job_id: int) -> None:
         ):
             IndexingJob.objects.filter(pk=job.pk).update(
                 error_message="index_retry_pending",
+                heartbeat_at=timezone.now(),
             )
             raise
         failure_code = {
@@ -410,6 +422,7 @@ def index_scripture(self, job_id: int) -> None:
             status=IndexingJob.Status.FAILED,
             error_message=failure_code,
             finished_at=timezone.now(),
+            heartbeat_at=timezone.now(),
         )
         DocumentChunk.objects.filter(index_version=version.pk).delete()
         raise
