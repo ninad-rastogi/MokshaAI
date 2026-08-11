@@ -1268,6 +1268,17 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   color: var(--moksha-ink);
 }
 
+.header-icon svg,
+.header-icon .iconify,
+.library-status svg,
+.library-status .iconify {
+  color: currentcolor;
+  flex: 0 0 auto;
+  height: 1rem;
+  stroke-width: 2;
+  width: 1rem;
+}
+
 .mobile-menu {
   display: none;
 }
@@ -1342,7 +1353,7 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 .library-status--running {
   background: var(--moksha-accent-soft);
   border-color: var(--moksha-accent-line);
-  color: var(--moksha-accent-ink);
+  color: color-mix(in srgb, var(--moksha-accent-ink) 82%, var(--moksha-ink));
 }
 
 .library-status--running svg {
@@ -1748,6 +1759,10 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   .connection-status small,
   .library-status span {
     display: none;
+  }
+
+  .library-status .iconify {
+    display: inline-block;
   }
 
   .library-status {
