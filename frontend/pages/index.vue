@@ -65,6 +65,9 @@ function authErrorMessage(authError: unknown) {
     if (authError.status === 403) {
       return "Your secure session expired. Refresh the page and try again.";
     }
+    if (authError.status === 429) {
+      return "Too many authentication attempts. Wait a moment, then try again.";
+    }
     if (authError.status >= 500) {
       return "Moksha AI is unavailable right now. Try again in a moment.";
     }

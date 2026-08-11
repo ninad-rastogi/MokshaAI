@@ -182,6 +182,9 @@ describe("app shell", () => {
     expect(indexPage).toContain(
       "An account with this email already exists. Sign in instead.",
     );
+    expect(indexPage).toContain(
+      "Too many authentication attempts. Wait a moment, then try again.",
+    );
     expect(apiComposable).toContain("class ApiRequestError");
   });
 

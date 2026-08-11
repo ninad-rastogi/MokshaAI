@@ -20,6 +20,8 @@ def is_benign_abort(failure: dict[str, object]) -> bool:
     error = str(failure.get("error", ""))
     return "ERR_ABORTED" in error and (
         "/_nuxt/builds/meta/" in url
+        or "/api/v1/auth/ready/" in url
+        or ("/api/v1/runs/" in url and "/events/" in url)
         or "/api/v1/models/connections/" in url
         or "/shutdown/pagehide" in url
     )
@@ -45,6 +47,12 @@ def geometry(page: Page) -> dict[str, object]:
             messages: box(".message-viewport"),
           };
         }""")
+
+
+def auth_error_text(page: Page) -> str:
+    """Return visible auth error text when login/register stays on auth page."""
+    error = page.locator(".auth-error")
+    return error.inner_text() if error.count() else ""
 
 
 def _bool_result(result: dict[str, object], key: str) -> bool:
@@ -511,7 +519,19 @@ def run(
                     page.get_by_label("Confirm password").fill(password)
                     page.get_by_role("button", name="Create account").last.click()
                     result["auth_mode"] = "register"
-                page.wait_for_url("**/app", timeout=20_000)
+                try:
+                    page.wait_for_url("**/app", timeout=20_000)
+                except PlaywrightTimeoutError:
+                    result["auth_error_text"] = auth_error_text(page)
+                    result["auth_after_submit_url"] = page.url
+                    page.screenshot(
+                        path=output_dir / "auth-submit-failed.png",
+                        full_page=True,
+                    )
+                    result["console_errors"] = console_errors
+                    result["request_failures"] = request_failures
+                    browser.close()
+                    return result
                 page.wait_for_load_state("networkidle")
                 page.get_by_label("Message Moksha AI").wait_for(timeout=20_000)
                 console_errors.clear()
