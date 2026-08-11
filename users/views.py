@@ -83,6 +83,22 @@ class SessionLoginView(APIView):
         return Response(UserSerializer(user).data)
 
 
+class SessionStatusView(APIView):
+    """Report browser session state without logging normal anonymous visits."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request: Request) -> Response:
+        if not request.user.is_authenticated:
+            return Response({"authenticated": False, "user": None})
+        return Response(
+            {
+                "authenticated": True,
+                "user": UserSerializer(request.user).data,
+            }
+        )
+
+
 class SessionLogoutView(APIView):
     """Clear a Django browser session."""
 

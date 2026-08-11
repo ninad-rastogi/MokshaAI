@@ -13,6 +13,7 @@ from users.views import (
     RegisterView,
     SessionLoginView,
     SessionLogoutView,
+    SessionStatusView,
 )
 
 app_name = "users"
@@ -22,6 +23,7 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("refresh/", RefreshView.as_view(), name="token-refresh"),
     path("csrf/", CsrfTokenView.as_view(), name="csrf"),
+    path("session/", SessionStatusView.as_view(), name="session-status"),
     path("session/login/", SessionLoginView.as_view(), name="session-login"),
     path("session/logout/", SessionLogoutView.as_view(), name="session-logout"),
     path("me/", ProfileView.as_view(), name="profile"),

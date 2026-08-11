@@ -16,9 +16,11 @@ let pointerFrame = 0;
 
 onMounted(async () => {
   try {
-    const profile = await api.me();
-    colorMode.preference = profile.preferred_theme;
-    await navigateTo("/app");
+    const session = await api.sessionStatus();
+    if (session.authenticated && session.user) {
+      colorMode.preference = session.user.preferred_theme;
+      await navigateTo("/app");
+    }
   } catch {
     checkingSession.value = false;
   } finally {

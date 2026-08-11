@@ -62,6 +62,12 @@ class TestRegisterView:
 class TestSessionAuthView:
     """Tests for browser cookie-based authentication."""
 
+    def test_session_status_is_quiet_for_anonymous_visits(self, api_client):
+        """Anonymous browser visits get a 200 status probe, not a console-noisy 403."""
+        response = api_client.get("/api/auth/session/")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {"authenticated": False, "user": None}
+
     def test_csrf_and_session_login(self, api_client):
         """CSRF token endpoint and session login work for browser clients."""
         register = api_client.post(
@@ -87,6 +93,11 @@ class TestSessionAuthView:
 
         profile = api_client.get("/api/auth/me/")
         assert profile.status_code == status.HTTP_200_OK
+
+        session = api_client.get("/api/auth/session/")
+        assert session.status_code == status.HTTP_200_OK
+        assert session.data["authenticated"] is True
+        assert session.data["user"]["email"] == "session@example.com"
 
 
 @pytest.mark.django_db

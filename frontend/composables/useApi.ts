@@ -110,6 +110,11 @@ const userSchema = z.object({
   created_at: z.string(),
 });
 
+const sessionStatusSchema = z.object({
+  authenticated: z.boolean(),
+  user: userSchema.nullable(),
+});
+
 const scriptureSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -215,6 +220,7 @@ export function useApi() {
 
   return {
     me: () => request<UserProfile>("/auth/me/", userSchema),
+    sessionStatus: () => request("/auth/session/", sessionStatusSchema),
     readiness,
     updateMe: (data: Partial<Pick<UserProfile, "preferred_theme">>) =>
       request<UserProfile>("/auth/me/", userSchema, {
