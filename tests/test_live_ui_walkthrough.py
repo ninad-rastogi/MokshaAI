@@ -11,6 +11,10 @@ def _passing_result() -> dict[str, object]:
         "settings_geometry": {"client": 670, "scroll": 670},
         "console_errors": [],
         "request_failures": [],
+        "library_status_text": "OCR 96/768 pages",
+        "library_progress_panel_text": (
+            "Preparing scripture library\nYoga Sutras OCR 96 of 768 pages\nDetails"
+        ),
         "connection_removed": True,
         "mobile_history_close": True,
         "primary_model_after_refresh": "Moksha local",
@@ -41,3 +45,12 @@ def test_live_walkthrough_validator_rejects_broken_browser_contracts():
     assert "desktop_body_scrolls" in failures
     assert "model_connection_status_missing_online_model" in failures
     assert "exact_verse_not_visible" in failures
+
+
+def test_live_walkthrough_validator_rejects_missing_indexing_progress_panel():
+    result = _passing_result()
+    result["library_progress_panel_text"] = ""
+
+    failures = validate_result(result, mock_api=False)
+
+    assert "indexing_progress_panel_missing" in failures

@@ -115,6 +115,11 @@ def validate_result(result: dict[str, object], *, mock_api: bool) -> list[str]:
         failures.append("browser_console_errors")
     if result.get("request_failures"):
         failures.append("browser_request_failures")
+    library_status = str(result.get("library_status_text", ""))
+    if any(marker in library_status.lower() for marker in ("ocr", "indexing")):
+        panel_text = str(result.get("library_progress_panel_text", ""))
+        if "Preparing scripture library" not in panel_text:
+            failures.append("indexing_progress_panel_missing")
     if mock_api:
         if result.get("connection_removed") is not True:
             failures.append("connection_remove_flow_failed")
@@ -567,6 +572,12 @@ def run(
         library_status = page.locator(".library-status")
         result["library_status_text"] = (
             library_status.inner_text() if library_status.count() else ""
+        )
+        library_progress_panel = page.locator(".library-progress-panel")
+        result["library_progress_panel_text"] = (
+            library_progress_panel.inner_text()
+            if library_progress_panel.count()
+            else ""
         )
 
         composer = page.get_by_label("Message Moksha AI")
