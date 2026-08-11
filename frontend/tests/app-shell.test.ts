@@ -69,7 +69,9 @@ describe("app shell", () => {
     expect(settingsComponent).toContain('emit("section", section)');
     expect(appPage).toContain("activeIndexingJobs");
     expect(appPage).toContain("scriptureProgressLabel");
+    expect(appPage).toContain("scriptureProgressCompactLabel");
     expect(appPage).toContain("library-status");
+    expect(appPage).toContain("library-status__compact");
     expect(appPage).toContain("scheduleScriptureRefresh");
     expect(appPage).toContain("scriptureRefreshDelay");
     expect(appPage).toContain('@section="settingsSection = $event"');

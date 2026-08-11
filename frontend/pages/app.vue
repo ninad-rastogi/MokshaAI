@@ -238,6 +238,29 @@ const scriptureProgressLabel = computed(() => {
   return `${activeIndexingJobs.value.length} indexing · ${average}%`;
 });
 
+const scriptureProgressCompactLabel = computed(() => {
+  if (!activeIndexingJobs.value.length) {
+    return `${scriptures.value.filter((scripture) => scripture.is_indexed).length}/${scriptures.value.length}`;
+  }
+  const ocrPages = activeIndexingJobs.value.reduce((sum, entry) => {
+    if (entry.job.progress >= 70) return sum;
+    return sum + entry.job.chunks_indexed;
+  }, 0);
+  if (ocrPages > 0) {
+    return `OCR ${Intl.NumberFormat("en", {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(ocrPages)}`;
+  }
+  const average = Math.round(
+    activeIndexingJobs.value.reduce(
+      (sum, entry) => sum + entry.job.progress,
+      0,
+    ) / activeIndexingJobs.value.length,
+  );
+  return `${average}%`;
+});
+
 const scriptureProgressDetail = computed(() => {
   if (!activeIndexingJobs.value.length) {
     return `${scriptures.value.filter((scripture) => scripture.is_indexed).length} of ${scriptures.value.length} scripture collections ready`;
@@ -933,7 +956,12 @@ async function scrollToLatest(behavior: ScrollBehavior) {
             "
           >
             <UIcon name="i-lucide-library" aria-hidden="true" />
-            <span>{{ scriptureProgressLabel }}</span>
+            <span class="library-status__label">{{
+              scriptureProgressLabel
+            }}</span>
+            <span class="library-status__compact">
+              {{ scriptureProgressCompactLabel }}
+            </span>
           </button>
           <UTooltip v-if="streamDisconnected" text="Reconnect response stream">
             <button
@@ -1370,6 +1398,10 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   animation: breathe 1.45s ease-in-out infinite;
 }
 
+.library-status__compact {
+  display: none;
+}
+
 .message-viewport {
   min-height: 0;
   overflow: auto;
@@ -1766,20 +1798,28 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 
   .connection-status span,
   .connection-status b,
-  .connection-status small,
-  .library-status span {
+  .connection-status small {
     display: none;
-  }
-
-  .library-status .iconify {
-    display: inline-block;
   }
 
   .library-status {
     border-radius: 0.55rem;
+    gap: 0.28rem;
     min-height: 2rem;
-    padding: 0;
-    width: 2rem;
+    max-width: 6.4rem;
+    min-width: 4.55rem;
+    padding: 0 0.45rem;
+  }
+
+  .library-status__label {
+    display: none;
+  }
+
+  .library-status__compact {
+    display: inline;
+    max-width: 4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .empty-conversation {
