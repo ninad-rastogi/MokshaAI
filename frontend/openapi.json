@@ -350,6 +350,10 @@
                 "readOnly": true,
                 "type": "integer"
               },
+              "source_pages": {
+                "readOnly": true,
+                "type": "string"
+              },
               "status": {
                 "enum": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"],
                 "readOnly": true,
@@ -716,6 +720,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Register"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": ["api"]
+      }
+    },
+    "/api/v1/auth/session/": {
+      "get": {
+        "description": "Report browser session state without logging normal anonymous visits.",
+        "operationId": "getApiV1AuthSession",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array"
                 }
               }
             },

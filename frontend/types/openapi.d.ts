@@ -139,6 +139,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/auth/session/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description Report browser session state without logging normal anonymous visits. */
+    get: operations["getApiV1AuthSession"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/auth/session/login/": {
     parameters: {
       query?: never;
@@ -793,6 +810,7 @@ export interface components {
       readonly current_indexing_job?: {
         readonly chunks_indexed?: number;
         readonly progress?: number;
+        readonly source_pages?: string;
         /** @enum {string} */
         readonly status?: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
         readonly volumes_processed?: number;
@@ -1025,6 +1043,25 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Register"];
+        };
+      };
+    };
+  };
+  getApiV1AuthSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown[];
         };
       };
     };

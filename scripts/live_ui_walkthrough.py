@@ -356,6 +356,8 @@ def install_mock_api(page: Page) -> None:
                             "total_volumes": 1,
                             "total_pages": 118,
                             "last_indexed_at": now,
+                            "current_indexing_job": None,
+                            "latest_indexing_failure": None,
                         },
                         {
                             "id": 2,
@@ -365,6 +367,14 @@ def install_mock_api(page: Page) -> None:
                             "total_volumes": 1,
                             "total_pages": 0,
                             "last_indexed_at": None,
+                            "current_indexing_job": {
+                                "status": "RUNNING",
+                                "progress": 12,
+                                "chunks_indexed": 96,
+                                "volumes_processed": 0,
+                                "source_pages": 768,
+                            },
+                            "latest_indexing_failure": None,
                         },
                     ],
                 },

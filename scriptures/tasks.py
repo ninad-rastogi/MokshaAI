@@ -167,6 +167,13 @@ def index_scripture(self, job_id: int) -> None:
         version.source_manifest = source_manifest
         version.volume_count = len(volumes)
         version.page_count = sum(volume[2] for volume in volumes)
+        version.save(
+            update_fields=[
+                "source_manifest",
+                "volume_count",
+                "page_count",
+            ]
+        )
         text_quality = source_text_quality(chunks)
         qualification_context: dict[str, Any] = {"source_text": text_quality}
         if not text_quality["source_text_qualified"]:

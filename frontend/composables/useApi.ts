@@ -129,6 +129,7 @@ const scriptureSchema = z.object({
       progress: z.number().int().min(0).max(100),
       chunks_indexed: z.number().int().nonnegative(),
       volumes_processed: z.number().int().nonnegative(),
+      source_pages: z.number().int().nonnegative(),
     })
     .nullable(),
   latest_indexing_failure: z

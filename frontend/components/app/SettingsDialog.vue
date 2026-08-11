@@ -112,10 +112,14 @@ function scriptureDetail(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (job) {
     if (job.progress < 70 && job.chunks_indexed > 0) {
+      if (job.source_pages > 0) {
+        return `${job.chunks_indexed.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
+      }
       return `${job.chunks_indexed.toLocaleString()} OCR pages scanned`;
     }
     if (job.progress < 70) {
-      return `${scripture.total_pages.toLocaleString()} pages queued for OCR/text extraction`;
+      const pages = job.source_pages || scripture.total_pages;
+      return `${pages.toLocaleString()} pages queued for OCR/text extraction`;
     }
     return `${job.volumes_processed} volumes, ${job.chunks_indexed.toLocaleString()} passages committed`;
   }

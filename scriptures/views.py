@@ -25,8 +25,8 @@ class ScriptureViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Scripture.objects.prefetch_related(
         Prefetch(
             "indexing_jobs",
-            queryset=IndexingJob.objects.filter(
-                status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING]
+            queryset=IndexingJob.objects.select_related("index_version").filter(
+                status__in=[IndexingJob.Status.PENDING, IndexingJob.Status.RUNNING],
             ),
             to_attr="active_indexing_jobs",
         ),

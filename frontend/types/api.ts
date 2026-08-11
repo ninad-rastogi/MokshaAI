@@ -103,6 +103,7 @@ export type Scripture = {
     progress: number;
     chunks_indexed: number;
     volumes_processed: number;
+    source_pages: number;
   } | null;
   latest_indexing_failure: {
     failure_code: string;

@@ -220,6 +220,13 @@ const scriptureProgressLabel = computed(() => {
     return sum + entry.job.chunks_indexed;
   }, 0);
   if (ocrPages > 0) {
+    const ocrTotal = activeIndexingJobs.value.reduce((sum, entry) => {
+      if (entry.job.progress >= 70) return sum;
+      return sum + entry.job.source_pages;
+    }, 0);
+    if (ocrTotal > 0) {
+      return `OCR ${ocrPages.toLocaleString()}/${ocrTotal.toLocaleString()} pages`;
+    }
     return `OCR ${ocrPages.toLocaleString()} pages`;
   }
   const average = Math.round(
@@ -238,6 +245,9 @@ const scriptureProgressDetail = computed(() => {
   return activeIndexingJobs.value
     .map((entry) => {
       if (entry.job.progress < 70 && entry.job.chunks_indexed > 0) {
+        if (entry.job.source_pages > 0) {
+          return `${entry.scripture.name} OCR ${entry.job.chunks_indexed.toLocaleString()} of ${entry.job.source_pages.toLocaleString()} pages`;
+        }
         return `${entry.scripture.name} OCR ${entry.job.chunks_indexed.toLocaleString()} pages`;
       }
       return `${entry.scripture.name} ${entry.job.progress}%`;

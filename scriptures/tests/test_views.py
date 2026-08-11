@@ -3,7 +3,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from scriptures.models import IndexingJob, Scripture
+from scriptures.models import IndexingJob, Scripture, ScriptureIndexVersion
 from users.models import User
 
 
@@ -17,8 +17,14 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
         name="Living wisdom",
         folder_path="Living wisdom",
     )
+    index_version = ScriptureIndexVersion.objects.create(
+        scripture=scripture,
+        embedding_model="bge-m3",
+        page_count=128,
+    )
     IndexingJob.objects.create(
         scripture=scripture,
+        index_version=index_version,
         requested_by=user,
         status=IndexingJob.Status.RUNNING,
         progress=71,
@@ -38,6 +44,7 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
         "progress": 71,
         "chunks_indexed": 6720,
         "volumes_processed": 6,
+        "source_pages": 128,
     }
     assert "error_message" not in progress
 
