@@ -188,8 +188,18 @@ if not DEBUG:
         "1",
         "yes",
     )
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = os.getenv(
+        "DJANGO_SESSION_COOKIE_SECURE", "True"
+    ).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    CSRF_COOKIE_SECURE = os.getenv("DJANGO_CSRF_COOKIE_SECURE", "True").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "31536000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

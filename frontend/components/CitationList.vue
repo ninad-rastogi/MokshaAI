@@ -141,11 +141,11 @@ blockquote,
 blockquote {
   align-items: start;
   display: grid;
-  font-size: 0.72rem;
-  gap: 0.4rem;
+  font-size: 0.82rem;
+  gap: 0.5rem;
   grid-template-columns: auto minmax(0, 1fr);
-  line-height: 1.55;
-  padding: 0.55rem 0.6rem;
+  line-height: 1.7;
+  padding: 0.7rem 0.75rem;
 }
 
 blockquote strong,
@@ -174,12 +174,20 @@ blockquote svg {
   white-space: pre-wrap;
 }
 
+.verse-text {
+  font-family:
+    "Noto Sans Devanagari Variable", "Nirmala UI", Mangal, var(--moksha-font);
+  font-size: 0.95rem;
+  font-weight: 580;
+  letter-spacing: 0;
+}
+
 .translation-panel {
   display: grid;
-  font-size: 0.72rem;
-  gap: 0.32rem;
-  line-height: 1.55;
-  padding: 0.55rem 0.6rem;
+  font-size: 0.8rem;
+  gap: 0.4rem;
+  line-height: 1.65;
+  padding: 0.65rem 0.75rem;
 }
 
 .source-details {
