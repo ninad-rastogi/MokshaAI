@@ -176,9 +176,16 @@ function scriptureStatus(scripture: Scripture) {
   }
   if (job.status === "PENDING") return "Queued";
   if (isOcrRunning(scripture)) {
-    return `OCR ${indexingDisplayPercent(scripture)}%`;
+    return ocrStatusLabel(job);
   }
   return `Indexing ${indexingDisplayPercent(scripture)}%`;
+}
+
+function ocrStatusLabel(job: NonNullable<Scripture["current_indexing_job"]>) {
+  if (job.source_pages > 0) {
+    return `OCR ${job.chunks_indexed.toLocaleString()} / ${job.source_pages.toLocaleString()} pages`;
+  }
+  return `OCR ${job.chunks_indexed.toLocaleString()} pages`;
 }
 
 function indexingPhase(scripture: Scripture) {

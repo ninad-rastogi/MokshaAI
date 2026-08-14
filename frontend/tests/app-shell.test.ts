@@ -84,8 +84,12 @@ describe("app shell", () => {
     expect(appPage).toContain('@section="settingsSection = $event"');
     expect(settingsComponent).toContain("indexingPhase");
     expect(settingsComponent).toContain("indexingDisplayPercent");
+    expect(settingsComponent).toContain("ocrStatusLabel");
     expect(settingsComponent).toContain("index-progress");
-    expect(settingsComponent).toContain("OCR ${indexingDisplayPercent");
+    expect(settingsComponent).not.toContain("OCR ${indexingDisplayPercent");
+    expect(settingsComponent).toContain(
+      "OCR ${job.chunks_indexed.toLocaleString()} / ${job.source_pages.toLocaleString()} pages",
+    );
     expect(settingsComponent).toContain(
       "job.chunks_indexed / job.source_pages",
     );
