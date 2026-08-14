@@ -57,7 +57,10 @@ describe("app shell", () => {
     expect(settingsComponent).toContain("<UModal");
     expect(appPage).toContain("settingsOpen");
     expect(appPage).toContain("settingsMessageSection");
+    expect(appPage).toContain(':section="settingsSection"');
     expect(settingsComponent).toContain("messageSection: SettingsSection");
+    expect(settingsComponent).toContain("section: SettingsSection");
+    expect(settingsComponent).toContain("activeSection.value = section");
     expect(settingsComponent).toContain("visibleMessage");
     expect(appPage).toContain("saveModelPreference");
     expect(apiComposable).toContain("updateModelPreference");

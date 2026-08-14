@@ -14,6 +14,7 @@ def indexing_display_progress(job: IndexingJob) -> int:
     source_pages = job.source_pages
     if (
         job.status == IndexingJob.Status.RUNNING
+        and indexing_phase(job) == "ocr"
         and job.chunks_indexed > 0
         and source_pages > 0
         and job.chunks_indexed < source_pages
@@ -21,6 +22,21 @@ def indexing_display_progress(job: IndexingJob) -> int:
         percentage = round(job.chunks_indexed / source_pages * 100)
         return max(1, min(69, percentage))
     return job.progress
+
+
+def indexing_phase(job: IndexingJob) -> str:
+    """Expose a bounded indexing phase without leaking internal failure details."""
+    if job.status == IndexingJob.Status.PENDING:
+        return "queued"
+    if job.error_message == "ocr_fallback_running":
+        return "ocr"
+    if job.progress < 70:
+        return "reading_source"
+    if job.progress < 85:
+        return "embedding"
+    if job.progress < 100:
+        return "qualifying"
+    return "activating"
 
 
 class VolumeSerializer(serializers.ModelSerializer):
@@ -44,14 +60,19 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
     source_volumes = serializers.IntegerField(read_only=True)
     source_pages = serializers.IntegerField(read_only=True)
     progress = serializers.SerializerMethodField()
+    phase = serializers.SerializerMethodField()
 
     def get_progress(self, job: IndexingJob) -> int:
         return indexing_display_progress(job)
+
+    def get_phase(self, job: IndexingJob) -> str:
+        return indexing_phase(job)
 
     class Meta:
         model = IndexingJob
         fields = (
             "status",
+            "phase",
             "progress",
             "chunks_indexed",
             "volumes_processed",
@@ -127,9 +148,13 @@ class IndexingJobSerializer(serializers.ModelSerializer):
 
     scripture_name = serializers.CharField(source="scripture.name", read_only=True)
     progress = serializers.SerializerMethodField()
+    phase = serializers.SerializerMethodField()
 
     def get_progress(self, job: IndexingJob) -> int:
         return indexing_display_progress(job)
+
+    def get_phase(self, job: IndexingJob) -> str:
+        return indexing_phase(job)
 
     class Meta:
         model = IndexingJob
@@ -139,6 +164,7 @@ class IndexingJobSerializer(serializers.ModelSerializer):
             "scripture_name",
             "index_version",
             "status",
+            "phase",
             "progress",
             "error_message",
             "chunks_indexed",

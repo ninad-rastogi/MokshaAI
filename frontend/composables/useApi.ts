@@ -126,6 +126,14 @@ const scriptureSchema = z.object({
   current_indexing_job: z
     .object({
       status: z.enum(["PENDING", "RUNNING"]),
+      phase: z.enum([
+        "queued",
+        "reading_source",
+        "ocr",
+        "embedding",
+        "qualifying",
+        "activating",
+      ]),
       progress: z.number().int().min(0).max(100),
       chunks_indexed: z.number().int().nonnegative(),
       volumes_processed: z.number().int().nonnegative(),

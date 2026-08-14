@@ -45,9 +45,13 @@
             "readOnly": true,
             "type": "string"
           },
+          "phase": {
+            "readOnly": true,
+            "type": "string"
+          },
           "progress": {
             "readOnly": true,
-            "type": "integer"
+            "type": "string"
           },
           "scripture": {
             "readOnly": true,
@@ -346,9 +350,13 @@
                 "readOnly": true,
                 "type": "integer"
               },
+              "phase": {
+                "readOnly": true,
+                "type": "string"
+              },
               "progress": {
                 "readOnly": true,
-                "type": "integer"
+                "type": "string"
               },
               "source_pages": {
                 "readOnly": true,

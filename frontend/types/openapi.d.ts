@@ -707,7 +707,8 @@ export interface components {
       readonly finished_at?: string | null;
       readonly id?: number;
       readonly index_version?: string | null;
-      readonly progress?: number;
+      readonly phase?: string;
+      readonly progress?: string;
       readonly scripture?: string;
       readonly scripture_name?: string;
       /** Format: date-time */
@@ -809,7 +810,8 @@ export interface components {
       readonly created_at?: string;
       readonly current_indexing_job?: {
         readonly chunks_indexed?: number;
-        readonly progress?: number;
+        readonly phase?: string;
+        readonly progress?: string;
         readonly source_pages?: number;
         readonly source_volumes?: number;
         /** @enum {string} */

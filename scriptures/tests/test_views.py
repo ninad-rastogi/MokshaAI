@@ -42,6 +42,7 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
     progress = response.data["results"][0]["current_indexing_job"]
     assert progress == {
         "status": "RUNNING",
+        "phase": "embedding",
         "progress": 71,
         "chunks_indexed": 6720,
         "volumes_processed": 6,
@@ -75,6 +76,7 @@ def test_scripture_list_derives_ocr_progress_from_scanned_pages() -> None:
         progress=70,
         chunks_indexed=8351,
         volumes_processed=3,
+        error_message="ocr_fallback_running",
     )
     client = APIClient()
     client.force_authenticate(user)
@@ -83,9 +85,47 @@ def test_scripture_list_derives_ocr_progress_from_scanned_pages() -> None:
 
     assert response.status_code == 200
     progress = response.data["results"][0]["current_indexing_job"]
+    assert progress["phase"] == "ocr"
     assert progress["progress"] == 54
     assert progress["chunks_indexed"] == 8351
     assert progress["source_pages"] == 15432
+
+
+@pytest.mark.django_db
+def test_scripture_list_does_not_mislabel_embedding_as_ocr() -> None:
+    user = User.objects.create_user(
+        email="scripture-embedding-progress@example.test",
+        password="StrongPass123!",
+    )
+    scripture = Scripture.objects.create(
+        name="Living wisdom embeddings",
+        folder_path="Living wisdom embeddings",
+    )
+    index_version = ScriptureIndexVersion.objects.create(
+        scripture=scripture,
+        embedding_model="bge-m3",
+        volume_count=6,
+        page_count=15432,
+    )
+    IndexingJob.objects.create(
+        scripture=scripture,
+        index_version=index_version,
+        requested_by=user,
+        status=IndexingJob.Status.RUNNING,
+        progress=74,
+        chunks_indexed=4096,
+        volumes_processed=6,
+        error_message="",
+    )
+    client = APIClient()
+    client.force_authenticate(user)
+
+    response = client.get("/api/v1/scriptures/")
+
+    assert response.status_code == 200
+    progress = response.data["results"][0]["current_indexing_job"]
+    assert progress["phase"] == "embedding"
+    assert progress["progress"] == 74
 
 
 @pytest.mark.django_db

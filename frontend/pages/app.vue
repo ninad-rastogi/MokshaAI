@@ -219,12 +219,7 @@ const scriptureRefreshDelay = computed(() =>
 );
 
 const activeOcrJobs = computed(() =>
-  activeIndexingJobs.value.filter(
-    (entry) =>
-      entry.job.chunks_indexed > 0 &&
-      entry.job.source_pages > 0 &&
-      entry.job.chunks_indexed < entry.job.source_pages,
-  ),
+  activeIndexingJobs.value.filter((entry) => entry.job.phase === "ocr"),
 );
 
 const scriptureProgressLabel = computed(() => {
@@ -282,6 +277,7 @@ const scriptureProgressDetail = computed(() => {
   return activeIndexingJobs.value
     .map((entry) => {
       if (
+        entry.job.phase === "ocr" &&
         entry.job.chunks_indexed > 0 &&
         entry.job.source_pages > 0 &&
         entry.job.chunks_indexed < entry.job.source_pages
@@ -1172,6 +1168,7 @@ async function scrollToLatest(behavior: ScrollBehavior) {
       :model-options="modelOptions"
       :profiles="profiles"
       :scriptures="scriptures"
+      :section="settingsSection"
       :message="settingsMessage"
       :message-section="settingsMessageSection"
       :saving="settingsSaving"

@@ -24,6 +24,7 @@ const props = defineProps<{
   modelOptions: ModelOption[];
   profiles: ModelProfile[];
   scriptures: Scripture[];
+  section: SettingsSection;
   message: string;
   messageSection: SettingsSection;
   saving?: boolean;
@@ -94,6 +95,14 @@ const visibleMessage = computed(() =>
   props.messageSection === activeSection.value ? props.message : "",
 );
 
+watch(
+  () => props.section,
+  (section) => {
+    activeSection.value = section;
+  },
+  { immediate: true },
+);
+
 const localModelOptions = computed(() =>
   props.modelOptions.filter((option) => option.category === "local"),
 );
@@ -117,11 +126,11 @@ function scriptureDetail(scripture: Scripture) {
       : `${job.volumes_processed} source volumes scanned by OCR`;
     const pageTotal = job.source_pages || scripture.total_pages;
     const pagesScanned = job.chunks_indexed;
-    const ocrStillRunning =
-      pageTotal > 0 ? pagesScanned < pageTotal : job.progress <= 70;
+    const ocrStillRunning = job.phase === "ocr";
     if (pagesScanned > 0) {
       if (job.source_pages > 0) {
-        const suffix = ocrStillRunning ? " · waiting for embedding" : "";
+        const suffix =
+          job.phase === "embedding" ? " · embedding passages now" : "";
         return `${volumeText} · ${pagesScanned.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned${suffix}`;
       }
       return `${volumeText} · ${pagesScanned.toLocaleString()} OCR pages scanned · waiting for embedding`;
@@ -175,21 +184,23 @@ function scriptureStatus(scripture: Scripture) {
 function indexingPhase(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (!job) return "";
-  if (job.status === "PENDING") return "Waiting for worker";
-  if (isOcrRunning(scripture)) return "Running local OCR";
-  if (job.progress < 70) return "Reading source volumes";
-  if (job.progress < 85) return "Embedding passages";
-  if (job.progress < 100) return "Qualifying retrieval";
-  return "Activating index";
+  const labels = {
+    queued: "Waiting for worker",
+    reading_source: "Reading source volumes",
+    ocr: "Running local OCR",
+    embedding: "Embedding passages",
+    qualifying: "Qualifying retrieval",
+    activating: "Activating index",
+  } satisfies Record<
+    NonNullable<Scripture["current_indexing_job"]>["phase"],
+    string
+  >;
+  return labels[job.phase];
 }
 
 function isOcrRunning(scripture: Scripture) {
   const job = scripture.current_indexing_job;
-  if (!job) return false;
-  const pageTotal = job.source_pages || scripture.total_pages;
-  return (
-    job.chunks_indexed > 0 && pageTotal > 0 && job.chunks_indexed < pageTotal
-  );
+  return job?.phase === "ocr";
 }
 
 function indexingDisplayPercent(scripture: Scripture) {
@@ -273,14 +284,16 @@ watch(
       <div class="settings-layout">
         <nav class="settings-nav" aria-label="Settings sections">
           <button
-            v-for="section in sections"
-            :key="section.id"
+            v-for="sectionItem in sections"
+            :key="sectionItem.id"
             type="button"
-            :aria-current="activeSection === section.id ? 'page' : undefined"
-            @click="selectSection(section.id)"
+            :aria-current="
+              activeSection === sectionItem.id ? 'page' : undefined
+            "
+            @click="selectSection(sectionItem.id)"
           >
-            <UIcon :name="section.icon" aria-hidden="true" />
-            {{ section.label }}
+            <UIcon :name="sectionItem.icon" aria-hidden="true" />
+            {{ sectionItem.label }}
           </button>
         </nav>
 

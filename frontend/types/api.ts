@@ -100,6 +100,13 @@ export type Scripture = {
   last_indexed_at: string | null;
   current_indexing_job: {
     status: "PENDING" | "RUNNING";
+    phase:
+      | "queued"
+      | "reading_source"
+      | "ocr"
+      | "embedding"
+      | "qualifying"
+      | "activating";
     progress: number;
     chunks_indexed: number;
     volumes_processed: number;
