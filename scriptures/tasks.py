@@ -93,6 +93,25 @@ def ocr_page_progress(completed_pages: int, total_pages: int) -> int:
     return max(1, min(69, percentage))
 
 
+def record_ocr_progress(
+    job_id: int,
+    completed_pages: int,
+    total_pages: int,
+    *,
+    volumes_processed: int | None = None,
+) -> None:
+    """Persist page-based OCR progress, even when resuming from a stale floor."""
+    updates: dict[str, object] = {
+        "progress": ocr_page_progress(completed_pages, total_pages),
+        "chunks_indexed": completed_pages,
+        "error_message": "ocr_fallback_running",
+        "heartbeat_at": timezone.now(),
+    }
+    if volumes_processed is not None:
+        updates["volumes_processed"] = volumes_processed
+    IndexingJob.objects.filter(pk=job_id).update(**updates)
+
+
 def compute_file_hash(file_path: Path) -> str:
     hasher = hashlib.sha256()
     with file_path.open("rb") as file_handle:
@@ -195,20 +214,17 @@ def index_scripture(self, job_id: int) -> None:
                 if ocr_engine is None:
                     raise OcrUnavailableError("ocr_disabled")
                 ocr_engine.assert_available()
-                IndexingJob.objects.filter(pk=job.pk).update(
-                    progress=ocr_page_progress(
-                        job.chunks_indexed,
-                        version.page_count or sum(volume[2] for volume in volumes),
-                    ),
-                    error_message="ocr_fallback_running",
-                    heartbeat_at=timezone.now(),
+                record_ocr_progress(
+                    job.pk,
+                    job.chunks_indexed,
+                    version.page_count or sum(volume[2] for volume in volumes),
                 )
                 ocr_chunks = []
                 total_ocr_pages = sum(volume[2] for volume in volumes)
                 pages_before_volume = 0
                 for number, pdf_path in enumerate(pdf_files, start=1):
 
-                    def record_ocr_progress(
+                    def record_volume_ocr_progress(
                         page_number: int,
                         _pages: int,
                         *,
@@ -216,16 +232,11 @@ def index_scripture(self, job_id: int) -> None:
                         volume_number: int = number,
                     ) -> None:
                         completed_pages = pages_before + page_number
-                        progress = ocr_page_progress(
+                        record_ocr_progress(
+                            job.pk,
                             completed_pages,
                             total_ocr_pages,
-                        )
-                        IndexingJob.objects.filter(pk=job.pk).update(
-                            progress=progress,
-                            chunks_indexed=completed_pages,
                             volumes_processed=volume_number - 1,
-                            error_message="ocr_fallback_running",
-                            heartbeat_at=timezone.now(),
                         )
 
                     ocr_chunks.extend(
@@ -234,16 +245,15 @@ def index_scripture(self, job_id: int) -> None:
                             scripture.name,
                             scripture_path,
                             force_ocr=True,
-                            progress_callback=record_ocr_progress,
+                            progress_callback=record_volume_ocr_progress,
                         )
                     )
                     pages_before_volume += volumes[number - 1][2]
-                    IndexingJob.objects.filter(pk=job.pk).update(
-                        progress=max(
-                            ocr_page_progress(pages_before_volume, total_ocr_pages),
-                            ocr_page_progress(job.chunks_indexed, total_ocr_pages),
-                        ),
-                        heartbeat_at=timezone.now(),
+                    record_ocr_progress(
+                        job.pk,
+                        pages_before_volume,
+                        total_ocr_pages,
+                        volumes_processed=number,
                     )
             except OcrUnavailableError as exc:
                 raise RuntimeError(INDEX_FAILURE_OCR_UNAVAILABLE) from exc

@@ -14,6 +14,7 @@ from scriptures.tasks import (
     index_progress_floor,
     ocr_page_progress,
     record_embedding_progress,
+    record_ocr_progress,
     source_text_quality,
 )
 from users.models import User
@@ -95,6 +96,40 @@ def test_ocr_page_progress_uses_scanned_pages_not_resume_floor() -> None:
     assert ocr_page_progress(completed_pages=8077, total_pages=15432) == 52
     assert ocr_page_progress(completed_pages=1, total_pages=15432) == 1
     assert ocr_page_progress(completed_pages=15432, total_pages=15432) == 69
+
+
+@pytest.mark.django_db
+def test_record_ocr_progress_replaces_stale_resume_floor() -> None:
+    operator = User.objects.create_user(
+        email="ocr-progress@example.test",
+        password="StrongPass123!",
+    )
+    scripture = Scripture.objects.create(
+        name="OCR progress collection",
+        folder_path="OCR progress collection",
+    )
+    job = IndexingJob.objects.create(
+        scripture=scripture,
+        requested_by=operator,
+        status=IndexingJob.Status.RUNNING,
+        progress=70,
+        chunks_indexed=8351,
+        error_message="ocr_fallback_running",
+    )
+
+    record_ocr_progress(
+        job.pk,
+        completed_pages=8351,
+        total_pages=15432,
+        volumes_processed=2,
+    )
+
+    job.refresh_from_db()
+    assert job.progress == 54
+    assert job.chunks_indexed == 8351
+    assert job.volumes_processed == 2
+    assert job.error_message == "ocr_fallback_running"
+    assert job.heartbeat_at is not None
 
 
 def test_source_text_quality_accepts_clean_devanagari_verse() -> None:
