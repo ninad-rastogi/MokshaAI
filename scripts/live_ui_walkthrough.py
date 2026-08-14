@@ -117,11 +117,8 @@ def validate_result(result: dict[str, object], *, mock_api: bool) -> list[str]:
         failures.append("browser_request_failures")
     if result.get("assistant_timeout"):
         failures.append("assistant_response_timeout")
-    library_status = str(result.get("library_status_text", ""))
-    if any(marker in library_status.lower() for marker in ("ocr", "indexing")):
-        panel_text = str(result.get("library_progress_panel_text", ""))
-        if "Preparing scripture library" not in panel_text:
-            failures.append("indexing_progress_panel_missing")
+    if result.get("assistant_progress_leak") is True:
+        failures.append("assistant_progress_leak")
     latest_assistant_text = str(result.get("latest_assistant_text", ""))
     no_exact_verse_panel = not str(result.get("exact_verse_text", "")).strip()
     if no_exact_verse_panel and any(

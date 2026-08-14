@@ -996,44 +996,6 @@ async function scrollToLatest(behavior: ScrollBehavior) {
           <USkeleton class="mt-6 h-4 w-3/4" />
         </div>
 
-        <button
-          v-else-if="activeIndexingJobs.length"
-          class="library-progress-panel"
-          type="button"
-          :aria-label="`Open scripture indexing progress. ${scriptureProgressDetail}`"
-          @click="
-            settingsSection = 'scriptures';
-            settingsOpen = true;
-          "
-        >
-          <span class="library-progress-panel__icon">
-            <UIcon name="i-lucide-library" aria-hidden="true" />
-          </span>
-          <span class="library-progress-panel__copy">
-            <strong>Preparing scripture library</strong>
-            <small>{{ scriptureProgressDetail }}</small>
-          </span>
-          <span class="library-progress-panel__bar" aria-hidden="true">
-            <span
-              :style="{
-                width: `${Math.max(
-                  4,
-                  Math.round(
-                    activeIndexingJobs.reduce(
-                      (sum, entry) => sum + entry.job.progress,
-                      0,
-                    ) / activeIndexingJobs.length,
-                  ),
-                )}%`,
-              }"
-            />
-          </span>
-          <span class="library-progress-panel__action">
-            Details
-            <UIcon name="i-lucide-arrow-up-right" aria-hidden="true" />
-          </span>
-        </button>
-
         <div
           v-else-if="showArchived && !activeChat"
           class="empty-conversation empty-conversation--utility"
@@ -1451,90 +1413,6 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 .conversation-loading {
   margin: 4rem auto;
   max-width: 42rem;
-}
-
-.library-progress-panel {
-  align-items: center;
-  backdrop-filter: blur(18px) saturate(1.06);
-  background: var(--moksha-glass);
-  border: 1px solid var(--moksha-accent-line);
-  border-radius: 0.75rem;
-  box-shadow: 0 0.85rem 2.4rem rgb(22 28 24 / 8%);
-  color: var(--moksha-ink);
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: auto minmax(0, 1fr) minmax(5rem, 10rem) auto;
-  margin: 0 auto 1rem;
-  max-width: 48rem;
-  padding: 0.62rem 0.7rem;
-  text-align: left;
-  width: 100%;
-}
-
-.library-progress-panel:hover {
-  background: var(--moksha-glass-raised);
-  transform: translateY(-1px);
-}
-
-.library-progress-panel__icon {
-  align-items: center;
-  background: var(--moksha-accent-soft);
-  border: 1px solid var(--moksha-accent-line);
-  border-radius: 0.55rem;
-  color: var(--moksha-accent-ink);
-  display: flex;
-  height: 2rem;
-  justify-content: center;
-  width: 2rem;
-}
-
-.library-progress-panel__copy {
-  display: grid;
-  gap: 0.08rem;
-  min-width: 0;
-}
-
-.library-progress-panel__copy strong {
-  font-size: 0.76rem;
-  font-weight: 720;
-}
-
-.library-progress-panel__copy small {
-  color: var(--moksha-muted);
-  font-size: 0.68rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.library-progress-panel__bar {
-  background: var(--moksha-control);
-  border: 1px solid var(--moksha-glass-line);
-  border-radius: 999px;
-  height: 0.48rem;
-  overflow: hidden;
-}
-
-.library-progress-panel__bar span {
-  background: linear-gradient(
-    90deg,
-    var(--moksha-accent),
-    var(--moksha-success)
-  );
-  border-radius: inherit;
-  display: block;
-  height: 100%;
-  transition: width 240ms ease;
-}
-
-.library-progress-panel__action {
-  align-items: center;
-  color: var(--moksha-accent-ink);
-  display: inline-flex;
-  font-size: 0.68rem;
-  font-weight: 720;
-  gap: 0.25rem;
-  white-space: nowrap;
 }
 
 .empty-conversation {
@@ -1966,14 +1844,6 @@ async function scrollToLatest(behavior: ScrollBehavior) {
   .archive-banner {
     align-items: stretch;
     flex-wrap: wrap;
-  }
-
-  .library-progress-panel {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .library-progress-panel__bar {
-    grid-column: 1 / -1;
   }
 
   .archive-banner > div {

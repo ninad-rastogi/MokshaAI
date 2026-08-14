@@ -18,9 +18,17 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from scriptures.models import IndexingJob, Scripture, ScriptureIndexVersion
-from scriptures.tasks import INDEX_FAILURE_BUILD, index_scripture
+from scriptures.tasks import (
+    INDEX_FAILURE_BUILD,
+    INDEX_FAILURE_OCR_UNAVAILABLE,
+    index_scripture,
+)
 
 logger = logging.getLogger("chat.management.discover")
+RESUMABLE_FAILURE_CODES = {
+    INDEX_FAILURE_BUILD,
+    INDEX_FAILURE_OCR_UNAVAILABLE,
+}
 
 
 def run_index_task(job_id: int) -> None:
@@ -144,9 +152,9 @@ class Command(BaseCommand):
                     .filter(
                         scripture=scripture,
                         status=IndexingJob.Status.FAILED,
-                        error_message=INDEX_FAILURE_BUILD,
+                        error_message__in=RESUMABLE_FAILURE_CODES,
                         index_version__status=ScriptureIndexVersion.Status.FAILED,
-                        index_version__failure_code=INDEX_FAILURE_BUILD,
+                        index_version__failure_code__in=RESUMABLE_FAILURE_CODES,
                     )
                     .first()
                 )

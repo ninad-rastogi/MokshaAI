@@ -12,9 +12,8 @@ def _passing_result() -> dict[str, object]:
         "console_errors": [],
         "request_failures": [],
         "library_status_text": "OCR 96/768 pages",
-        "library_progress_panel_text": (
-            "Preparing scripture library\nYoga Sutras OCR 96 of 768 pages\nDetails"
-        ),
+        "library_progress_panel_text": "",
+        "assistant_progress_leak": False,
         "connection_removed": True,
         "mobile_history_close": True,
         "primary_model_after_refresh": "Moksha local",
@@ -48,13 +47,13 @@ def test_live_walkthrough_validator_rejects_broken_browser_contracts():
     assert "exact_verse_not_visible" in failures
 
 
-def test_live_walkthrough_validator_rejects_missing_indexing_progress_panel():
+def test_live_walkthrough_validator_rejects_assistant_progress_leak():
     result = _passing_result()
-    result["library_progress_panel_text"] = ""
+    result["assistant_progress_leak"] = True
 
     failures = validate_result(result, mock_api=False)
 
-    assert "indexing_progress_panel_missing" in failures
+    assert "assistant_progress_leak" in failures
 
 
 def test_live_walkthrough_validator_rejects_fake_source_without_exact_verse():

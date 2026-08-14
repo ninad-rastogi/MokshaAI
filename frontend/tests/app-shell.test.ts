@@ -65,16 +65,13 @@ describe("app shell", () => {
     expect(appPage).not.toContain("Admin default");
   });
 
-  it("keeps scripture indexing progress visible across workspace and settings", () => {
+  it("keeps scripture indexing progress visible outside the chat transcript", () => {
     expect(settingsComponent).toContain('emit("section", section)');
     expect(appPage).toContain("activeIndexingJobs");
     expect(appPage).toContain("scriptureProgressLabel");
     expect(appPage).toContain("scriptureProgressCompactLabel");
     expect(appPage).toContain("library-status");
     expect(appPage).toContain("library-status__compact");
-    expect(appPage).toContain("library-progress-panel");
-    expect(appPage).toContain("Preparing scripture library");
-    expect(appPage).toContain("Open scripture indexing progress");
     expect(appPage).toContain("scheduleScriptureRefresh");
     expect(appPage).toContain("scriptureRefreshDelay");
     expect(appPage).toContain('@section="settingsSection = $event"');
@@ -86,6 +83,15 @@ describe("app shell", () => {
     const messageThreadStart = appPage.indexOf('class="message-thread"');
     const responseErrorStart = appPage.indexOf('class="response-error"');
     const messageThread = appPage.slice(messageThreadStart, responseErrorStart);
+    const messageViewportStart = appPage.indexOf('class="message-viewport"');
+    const messageViewportEnd = appPage.indexOf('class="composer-dock"');
+    const messageViewport = appPage.slice(
+      messageViewportStart,
+      messageViewportEnd,
+    );
+    expect(messageViewport).not.toContain("library-progress-panel");
+    expect(messageViewport).not.toContain("Preparing scripture library");
+    expect(appPage).not.toContain('v-else-if="activeIndexingJobs.length"');
     expect(messageThread).not.toContain("OCR");
     expect(messageThread).not.toContain("Embedding passages");
     expect(messageThread).not.toContain("indexing progress");
