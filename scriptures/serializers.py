@@ -42,8 +42,9 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_source_pages(self, obj: IndexingJob) -> int:
-        if obj.index_version_id and obj.index_version.page_count:
-            return obj.index_version.page_count
+        index_version = obj.index_version
+        if index_version is not None and index_version.page_count:
+            return index_version.page_count
         return obj.scripture.total_pages
 
 

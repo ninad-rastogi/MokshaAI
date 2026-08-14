@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import shutil
 from datetime import datetime, timedelta
+from functools import partial
 from pathlib import Path
 
 from celery import shared_task
@@ -14,6 +15,12 @@ from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 logger = logging.getLogger("moksha.operations")
+
+
+def queue_scripture_index(job_id: int) -> None:
+    from scriptures.tasks import index_scripture
+
+    index_scripture.delay(job_id)
 
 
 def disk_report(paths: list[Path]) -> list[dict[str, object]]:
@@ -63,7 +70,6 @@ def auto_discover_scripture_indexes() -> dict[str, int]:
     """Discover scripture folders and queue missing index builds."""
     from chat.rag.loader import ScriptureDocumentLoader
     from scriptures.models import IndexingJob, Scripture
-    from scriptures.tasks import index_scripture
 
     operator = get_user_model().objects.filter(is_staff=True).first()
     if operator is None:
@@ -108,7 +114,7 @@ def auto_discover_scripture_indexes() -> dict[str, int]:
         except IntegrityError:
             skipped += 1
             continue
-        transaction.on_commit(lambda job_id=job.pk: index_scripture.delay(job_id))
+        transaction.on_commit(partial(queue_scripture_index, job.pk))
         queued += 1
     return {"discovered": discovered, "queued": queued, "skipped": skipped}
 
