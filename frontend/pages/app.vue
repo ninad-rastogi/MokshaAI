@@ -161,7 +161,7 @@ const runLabel = computed(() => {
 });
 
 const connectionLabel = computed(() => {
-  if (connectionState.value === "error" || error.value) return "Error";
+  if (connectionState.value === "error") return "Error";
   if (connectionState.value === "offline") return "Offline";
   return activeModelStatusText.value;
 });

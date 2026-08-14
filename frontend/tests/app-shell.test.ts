@@ -161,6 +161,9 @@ describe("app shell", () => {
     expect(appPage).toContain("return activeModelStatusText.value");
     expect(appPage).toContain('connectionState.value === "offline"');
     expect(appPage).toContain('return "Offline"');
+    expect(appPage).not.toContain(
+      'connectionState.value === "error" || error.value',
+    );
     expect(appPage).not.toMatch(
       /streamDisconnected\.value[\s\S]{0,160}return "Offline"/,
     );
