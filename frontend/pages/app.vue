@@ -210,18 +210,25 @@ const scriptureRefreshDelay = computed(() =>
   activeIndexingJobs.value.length ? 3000 : 20000,
 );
 
+const activeOcrJobs = computed(() =>
+  activeIndexingJobs.value.filter(
+    (entry) =>
+      entry.job.chunks_indexed > 0 &&
+      entry.job.source_pages > 0 &&
+      entry.job.chunks_indexed < entry.job.source_pages,
+  ),
+);
+
 const scriptureProgressLabel = computed(() => {
   if (!scriptures.value.length) return "No collections";
   if (!activeIndexingJobs.value.length) {
     return `${scriptures.value.filter((scripture) => scripture.is_indexed).length}/${scriptures.value.length} ready`;
   }
-  const ocrPages = activeIndexingJobs.value.reduce((sum, entry) => {
-    if (entry.job.progress >= 70) return sum;
+  const ocrPages = activeOcrJobs.value.reduce((sum, entry) => {
     return sum + entry.job.chunks_indexed;
   }, 0);
   if (ocrPages > 0) {
-    const ocrTotal = activeIndexingJobs.value.reduce((sum, entry) => {
-      if (entry.job.progress >= 70) return sum;
+    const ocrTotal = activeOcrJobs.value.reduce((sum, entry) => {
       return sum + entry.job.source_pages;
     }, 0);
     if (ocrTotal > 0) {
@@ -242,8 +249,7 @@ const scriptureProgressCompactLabel = computed(() => {
   if (!activeIndexingJobs.value.length) {
     return `${scriptures.value.filter((scripture) => scripture.is_indexed).length}/${scriptures.value.length}`;
   }
-  const ocrPages = activeIndexingJobs.value.reduce((sum, entry) => {
-    if (entry.job.progress >= 70) return sum;
+  const ocrPages = activeOcrJobs.value.reduce((sum, entry) => {
     return sum + entry.job.chunks_indexed;
   }, 0);
   if (ocrPages > 0) {
@@ -267,11 +273,12 @@ const scriptureProgressDetail = computed(() => {
   }
   return activeIndexingJobs.value
     .map((entry) => {
-      if (entry.job.progress < 70 && entry.job.chunks_indexed > 0) {
-        if (entry.job.source_pages > 0) {
-          return `${entry.scripture.name} OCR ${entry.job.chunks_indexed.toLocaleString()} of ${entry.job.source_pages.toLocaleString()} pages`;
-        }
-        return `${entry.scripture.name} OCR ${entry.job.chunks_indexed.toLocaleString()} pages`;
+      if (
+        entry.job.chunks_indexed > 0 &&
+        entry.job.source_pages > 0 &&
+        entry.job.chunks_indexed < entry.job.source_pages
+      ) {
+        return `${entry.scripture.name} OCR ${entry.job.chunks_indexed.toLocaleString()} of ${entry.job.source_pages.toLocaleString()} pages`;
       }
       return `${entry.scripture.name} ${entry.job.progress}%`;
     })

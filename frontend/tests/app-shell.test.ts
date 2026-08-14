@@ -74,11 +74,17 @@ describe("app shell", () => {
     expect(appPage).toContain("library-status__compact");
     expect(appPage).toContain("scheduleScriptureRefresh");
     expect(appPage).toContain("scriptureRefreshDelay");
+    expect(appPage).toContain(
+      "entry.job.chunks_indexed < entry.job.source_pages",
+    );
+    expect(appPage).not.toContain("entry.job.progress >= 70) return sum");
     expect(appPage).toContain('@section="settingsSection = $event"');
     expect(settingsComponent).toContain("indexingPhase");
     expect(settingsComponent).toContain("index-progress");
     expect(settingsComponent).toContain("OCR pages scanned");
-    expect(settingsComponent).toContain("source volumes processed");
+    expect(settingsComponent).toContain("source volumes scanned by OCR");
+    expect(settingsComponent).toContain("waiting for embedding");
+    expect(settingsComponent).not.toContain("source volumes processed");
     expect(settingsComponent).toContain("Running local OCR");
     expect(settingsComponent).toContain("Embedding passages");
     expect(settingsComponent).not.toContain("passages committed");

@@ -113,20 +113,25 @@ function scriptureDetail(scripture: Scripture) {
   if (job) {
     const volumeTotal = job.source_volumes || scripture.total_volumes;
     const volumeText = volumeTotal
-      ? `${job.volumes_processed} of ${volumeTotal} source volumes processed`
-      : `${job.volumes_processed} source volumes processed`;
-    if (job.progress < 70 && job.chunks_indexed > 0) {
+      ? `${job.volumes_processed} of ${volumeTotal} source volumes scanned by OCR`
+      : `${job.volumes_processed} source volumes scanned by OCR`;
+    const pageTotal = job.source_pages || scripture.total_pages;
+    const pagesScanned = job.chunks_indexed;
+    const ocrStillRunning =
+      pageTotal > 0 ? pagesScanned < pageTotal : job.progress <= 70;
+    if (pagesScanned > 0) {
       if (job.source_pages > 0) {
-        return `${volumeText} · ${job.chunks_indexed.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
+        const suffix = ocrStillRunning ? " · waiting for embedding" : "";
+        return `${volumeText} · ${pagesScanned.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned${suffix}`;
       }
-      return `${volumeText} · ${job.chunks_indexed.toLocaleString()} OCR pages scanned`;
+      return `${volumeText} · ${pagesScanned.toLocaleString()} OCR pages scanned · waiting for embedding`;
     }
-    if (job.progress < 70) {
-      const pages = job.source_pages || scripture.total_pages;
+    if (ocrStillRunning) {
+      const pages = pageTotal;
       return `${volumeText} · ${pages.toLocaleString()} pages queued for OCR/text extraction`;
     }
     if (job.source_pages > 0) {
-      return `${volumeText} · ${job.chunks_indexed.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
+      return `${volumeText} · ${pagesScanned.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
     }
     return `${volumeText} · Preparing passages for embedding`;
   }
@@ -167,9 +172,10 @@ function indexingPhase(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (!job) return "";
   if (job.status === "PENDING") return "Waiting for worker";
+  const pageTotal = job.source_pages || scripture.total_pages;
   if (
     job.chunks_indexed > 0 &&
-    (!job.source_pages || job.chunks_indexed < job.source_pages)
+    (!pageTotal || job.chunks_indexed < pageTotal)
   ) {
     return "Running local OCR";
   }
