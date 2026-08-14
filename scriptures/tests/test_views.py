@@ -20,6 +20,7 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
     index_version = ScriptureIndexVersion.objects.create(
         scripture=scripture,
         embedding_model="bge-m3",
+        volume_count=6,
         page_count=128,
     )
     IndexingJob.objects.create(
@@ -44,6 +45,7 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
         "progress": 71,
         "chunks_indexed": 6720,
         "volumes_processed": 6,
+        "source_volumes": 6,
         "source_pages": 128,
     }
     assert "error_message" not in progress

@@ -158,3 +158,17 @@ class IndexingJob(models.Model):
 
     def __str__(self) -> str:
         return f"{self.scripture.name} ({self.status})"
+
+    @property
+    def source_volumes(self) -> int:
+        index_version = self.index_version
+        if index_version is not None and index_version.volume_count:
+            return index_version.volume_count
+        return self.scripture.total_volumes
+
+    @property
+    def source_pages(self) -> int:
+        index_version = self.index_version
+        if index_version is not None and index_version.page_count:
+            return index_version.page_count
+        return self.scripture.total_pages

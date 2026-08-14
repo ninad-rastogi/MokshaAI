@@ -352,7 +352,11 @@
               },
               "source_pages": {
                 "readOnly": true,
-                "type": "string"
+                "type": "integer"
+              },
+              "source_volumes": {
+                "readOnly": true,
+                "type": "integer"
               },
               "status": {
                 "enum": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"],

@@ -24,20 +24,12 @@ from users.serializers import RegisterSerializer, UserSerializer
 User = get_user_model()
 
 
-class RegistrationThrottle(AnonRateThrottle):
-    scope = "registration"
-
-
-class LoginThrottle(AnonRateThrottle):
-    scope = "login"
-
-
 class RefreshThrottle(AnonRateThrottle):
     scope = "refresh"
 
 
 class LoginView(TokenObtainPairView):
-    throttle_classes = [LoginThrottle]
+    throttle_classes: list[type[AnonRateThrottle]] = []
 
 
 class RefreshView(TokenRefreshView):
@@ -64,7 +56,7 @@ class SessionLoginView(APIView):
     """Create a Django session for first-party browser clients."""
 
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [LoginThrottle]
+    throttle_classes: list[type[AnonRateThrottle]] = []
 
     def post(self, request: Request) -> Response:
         serializer = SessionLoginSerializer(data=request.data)
@@ -114,7 +106,7 @@ class RegisterView(generics.CreateAPIView):
 
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [RegistrationThrottle]
+    throttle_classes: list[type[AnonRateThrottle]] = []
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         serializer = self.get_serializer(data=request.data)

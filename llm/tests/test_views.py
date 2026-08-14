@@ -73,6 +73,35 @@ def test_user_model_preference_api_reads_saved_profile_after_refresh(
 
 
 @pytest.mark.django_db
+def test_user_model_preference_api_assigns_admin_default_for_new_user(
+    authenticated_client,
+):
+    client, user = authenticated_client
+    ModelProfile.objects.update(is_admin_default=False)
+    connection = ModelConnection.objects.create(
+        name="Installed local model",
+        dialect=ModelConnection.Dialect.BUILTIN_OLLAMA,
+        status=ModelConnection.Status.CONNECTED,
+    )
+    profile = ModelProfile.objects.create(
+        name="Fresh account local default",
+        connection=connection,
+        model_id="moksha-qwen3:4b-instruct-q3km",
+        is_enabled=True,
+        is_admin_default=True,
+    )
+
+    response = client.get("/api/v1/models/preferences/me/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert str(response.data["primary_profile"]) == str(profile.pk)
+    assert response.data["primary_profile_detail"]["name"] == (
+        "Fresh account local default"
+    )
+    assert UserModelPreference.objects.get(user=user).primary_profile == profile
+
+
+@pytest.mark.django_db
 def test_profile_list_exposes_only_admin_and_current_user_models(
     authenticated_client,
 ):

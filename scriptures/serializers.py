@@ -28,7 +28,8 @@ class VolumeSerializer(serializers.ModelSerializer):
 class IndexingProgressSerializer(serializers.ModelSerializer):
     """Bounded active indexing progress safe for authenticated users."""
 
-    source_pages = serializers.SerializerMethodField()
+    source_volumes = serializers.IntegerField(read_only=True)
+    source_pages = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = IndexingJob
@@ -37,15 +38,10 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
             "progress",
             "chunks_indexed",
             "volumes_processed",
+            "source_volumes",
             "source_pages",
         )
         read_only_fields = fields
-
-    def get_source_pages(self, obj: IndexingJob) -> int:
-        index_version = obj.index_version
-        if index_version is not None and index_version.page_count:
-            return index_version.page_count
-        return obj.scripture.total_pages
 
 
 class IndexingFailureSerializer(serializers.ModelSerializer):

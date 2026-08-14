@@ -111,17 +111,24 @@ const fallbackOptions = computed(() =>
 function scriptureDetail(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (job) {
+    const volumeTotal = job.source_volumes || scripture.total_volumes;
+    const volumeText = volumeTotal
+      ? `${job.volumes_processed} of ${volumeTotal} source volumes processed`
+      : `${job.volumes_processed} source volumes processed`;
     if (job.progress < 70 && job.chunks_indexed > 0) {
       if (job.source_pages > 0) {
-        return `${job.chunks_indexed.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
+        return `${volumeText} · ${job.chunks_indexed.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
       }
-      return `${job.chunks_indexed.toLocaleString()} OCR pages scanned`;
+      return `${volumeText} · ${job.chunks_indexed.toLocaleString()} OCR pages scanned`;
     }
     if (job.progress < 70) {
       const pages = job.source_pages || scripture.total_pages;
-      return `${pages.toLocaleString()} pages queued for OCR/text extraction`;
+      return `${volumeText} · ${pages.toLocaleString()} pages queued for OCR/text extraction`;
     }
-    return `${job.volumes_processed} volumes, ${job.chunks_indexed.toLocaleString()} passages committed`;
+    if (job.source_pages > 0) {
+      return `${volumeText} · ${job.chunks_indexed.toLocaleString()} of ${job.source_pages.toLocaleString()} OCR pages scanned`;
+    }
+    return `${volumeText} · Preparing passages for embedding`;
   }
   if (
     scripture.latest_indexing_failure?.failure_code === "index_ocr_unavailable"
@@ -160,7 +167,12 @@ function indexingPhase(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (!job) return "";
   if (job.status === "PENDING") return "Waiting for worker";
-  if (job.progress < 70 && job.chunks_indexed > 0) return "Running local OCR";
+  if (
+    job.chunks_indexed > 0 &&
+    (!job.source_pages || job.chunks_indexed < job.source_pages)
+  ) {
+    return "Running local OCR";
+  }
   if (job.progress < 70) return "Reading source volumes";
   if (job.progress < 85) return "Embedding passages";
   if (job.progress < 100) return "Qualifying retrieval";

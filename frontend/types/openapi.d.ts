@@ -810,7 +810,8 @@ export interface components {
       readonly current_indexing_job?: {
         readonly chunks_indexed?: number;
         readonly progress?: number;
-        readonly source_pages?: string;
+        readonly source_pages?: number;
+        readonly source_volumes?: number;
         /** @enum {string} */
         readonly status?: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
         readonly volumes_processed?: number;

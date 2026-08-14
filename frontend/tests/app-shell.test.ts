@@ -78,8 +78,10 @@ describe("app shell", () => {
     expect(settingsComponent).toContain("indexingPhase");
     expect(settingsComponent).toContain("index-progress");
     expect(settingsComponent).toContain("OCR pages scanned");
+    expect(settingsComponent).toContain("source volumes processed");
     expect(settingsComponent).toContain("Running local OCR");
     expect(settingsComponent).toContain("Embedding passages");
+    expect(settingsComponent).not.toContain("passages committed");
     const messageThreadStart = appPage.indexOf('class="message-thread"');
     const responseErrorStart = appPage.indexOf('class="response-error"');
     const messageThread = appPage.slice(messageThreadStart, responseErrorStart);

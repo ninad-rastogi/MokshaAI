@@ -3,6 +3,8 @@
 import pytest
 from rest_framework import status
 
+from users.views import LoginView, RegisterView, SessionLoginView
+
 
 @pytest.mark.django_db
 class TestRegisterView:
@@ -98,6 +100,13 @@ class TestSessionAuthView:
         assert session.status_code == status.HTTP_200_OK
         assert session.data["authenticated"] is True
         assert session.data["user"]["email"] == "session@example.com"
+
+    def test_auth_entrypoints_do_not_count_attempts_for_lockout(self):
+        """Interactive auth should not throttle normal login/register attempts."""
+
+        assert SessionLoginView.throttle_classes == []
+        assert RegisterView.throttle_classes == []
+        assert LoginView.throttle_classes == []
 
 
 @pytest.mark.django_db

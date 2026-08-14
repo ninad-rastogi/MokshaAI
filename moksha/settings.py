@@ -124,8 +124,6 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.UserRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {
         "user": "300/hour",
-        "registration": "10/hour",
-        "login": "20/hour",
         "refresh": "60/hour",
         "chat_query": "30/hour",
         "indexing": "10/hour",

@@ -144,6 +144,19 @@ class UserModelPreferenceViewSet(viewsets.ViewSet):
         user = cast(User, request.user)
         preference, _ = UserModelPreference.objects.get_or_create(user=user)
         if request.method == "GET":
+            if preference.primary_profile_id is None:
+                default_profile = (
+                    ModelProfile.objects.filter(
+                        Q(connection__user=user) | Q(connection__user=None),
+                        is_enabled=True,
+                        is_admin_default=True,
+                    )
+                    .select_related("connection")
+                    .first()
+                )
+                if default_profile is not None:
+                    preference.primary_profile = default_profile
+                    preference.save(update_fields=["primary_profile", "updated_at"])
             return Response(UserModelPreferenceSerializer(preference).data)
         serializer = UserModelPreferenceSerializer(
             preference,
