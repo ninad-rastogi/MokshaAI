@@ -45,6 +45,7 @@ const settingsSection = ref<
 const historyOpen = ref(false);
 const shellReady = ref(false);
 const workspaceLoading = ref(true);
+const modelPreferenceLoading = ref(true);
 const historyLoading = ref(false);
 const renameChatId = ref("");
 const renameName = ref("");
@@ -114,11 +115,15 @@ const activeModelReady = computed(
 );
 
 const activeModelLabel = computed(
-  () => activeModelOption.value?.label || "Choose a model",
+  () =>
+    activeModelOption.value?.label ||
+    (modelPreferenceLoading.value ? "Loading model" : "Choose a model"),
 );
 
 const activeModelStatus = computed(
-  () => activeModelOption.value?.status || "disconnected",
+  () =>
+    activeModelOption.value?.status ||
+    (modelPreferenceLoading.value ? "checking" : "disconnected"),
 );
 
 const activeModelStatusText = computed(() => {
@@ -138,6 +143,9 @@ const activeModelStatusText = computed(() => {
 });
 
 const activeModelDetail = computed(() => {
+  if (modelPreferenceLoading.value && !activeModelOption.value) {
+    return "Loading model";
+  }
   if (!activeModelOption.value) return "No model selected";
   return `${activeModelOption.value.label} · ${activeModelOption.value.modelId}`;
 });
@@ -318,7 +326,11 @@ onMounted(async () => {
       "Your saved model preference could not load. Refresh the page to try again.";
   }
 
-  await ensureModelPreference();
+  try {
+    await ensureModelPreference();
+  } finally {
+    modelPreferenceLoading.value = false;
+  }
   try {
     if (!activeChatId.value && !showArchived.value) {
       await createOrSelectDraft();

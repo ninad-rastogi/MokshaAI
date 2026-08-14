@@ -151,6 +151,9 @@ describe("app shell", () => {
     expect(appPage).toContain("activeModelStatusText");
     expect(appPage).toContain("activeModelDetail");
     expect(appPage).toContain("connectionStatusText");
+    expect(appPage).toContain("modelPreferenceLoading");
+    expect(appPage).toContain('"Loading model"');
+    expect(appPage).toContain('? "checking"');
     expect(composerComponent).not.toContain("modelLabel");
   });
 
