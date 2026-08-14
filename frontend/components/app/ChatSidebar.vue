@@ -78,7 +78,8 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
     v-if="open"
     class="sidebar-scrim"
     type="button"
-    aria-label="Close conversation history overlay"
+    aria-hidden="true"
+    tabindex="-1"
     @click="closeHistory"
   />
 
@@ -97,7 +98,7 @@ function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
         <button
           class="icon-control mobile-close"
           type="button"
-          aria-label="Close history panel"
+          aria-label="Close conversation history"
           @click.stop="closeHistory"
           @pointerdown.stop
         >

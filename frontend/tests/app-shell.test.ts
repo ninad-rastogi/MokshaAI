@@ -188,6 +188,11 @@ describe("app shell", () => {
     );
     expect(sidebarComponent).toContain("function closeHistory()");
     expect(sidebarComponent).toContain('@click.stop="closeHistory"');
+    expect(sidebarComponent).toContain(
+      'aria-label="Close conversation history"',
+    );
+    expect(sidebarComponent).toContain('aria-hidden="true"');
+    expect(sidebarComponent).toContain('tabindex="-1"');
     expect(appPage).toContain("workspace--history-collapsed");
     expect(appPage).toContain("shellReady && !historyOpen");
     expect(sidebarComponent).toContain("@keydown.esc.stop");
