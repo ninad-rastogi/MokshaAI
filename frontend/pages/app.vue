@@ -667,8 +667,7 @@ async function addProviderConnection(payload: {
   } catch (providerError) {
     if (providerError instanceof ApiRequestError) {
       if (providerError.status === 400) {
-        settingsMessage.value =
-          "Connection rejected. Check the HTTPS endpoint, model ID, consent, and API key.";
+        settingsMessage.value = providerConnectionError(providerError.payload);
       } else if (providerError.status === 503) {
         settingsMessage.value =
           "Encrypted key storage is unavailable. Ask an administrator to configure the BYOK master key.";
@@ -683,6 +682,42 @@ async function addProviderConnection(payload: {
   } finally {
     settingsSaving.value = false;
   }
+}
+
+function collectProviderErrorCodes(payload: unknown): string[] {
+  if (typeof payload === "string") return [payload];
+  if (!payload || typeof payload !== "object") return [];
+  return Object.values(payload as Record<string, unknown>).flatMap((value) => {
+    if (Array.isArray(value)) return value.flatMap(collectProviderErrorCodes);
+    return collectProviderErrorCodes(value);
+  });
+}
+
+function providerConnectionError(payload: unknown) {
+  const codes = collectProviderErrorCodes(payload).join(" ").toLowerCase();
+  if (
+    codes.includes("endpoint_must_use_public_https") ||
+    codes.includes("endpoint_private_network_forbidden")
+  ) {
+    return "Use a public HTTPS provider endpoint. Local, private, loopback, and intranet endpoints are admin-only.";
+  }
+  if (codes.includes("endpoint_port_forbidden")) {
+    return "Use the provider's standard HTTPS endpoint. Custom ports are not allowed for user connections.";
+  }
+  if (
+    codes.includes("endpoint_dns_required") ||
+    codes.includes("endpoint_dns_invalid") ||
+    codes.includes("endpoint_host_required")
+  ) {
+    return "Endpoint host could not be verified. Enter the provider's public HTTPS API URL.";
+  }
+  if (codes.includes("endpoint_credentials_forbidden")) {
+    return "Do not put credentials in the endpoint URL. Paste the API key only in the API key field.";
+  }
+  if (codes.includes("remote_data_consent_required")) {
+    return "Confirm remote-data consent before saving this provider.";
+  }
+  return "Connection rejected. Check the HTTPS endpoint, model ID, consent, and API key.";
 }
 
 async function probeProviderConnection(connectionId: string) {

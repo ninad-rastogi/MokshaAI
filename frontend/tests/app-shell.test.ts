@@ -139,6 +139,12 @@ describe("app shell", () => {
     expect(settingsComponent).toContain(
       ":required=\"providerDialect === 'openai_compatible'\"",
     );
+    expect(appPage).toContain("providerConnectionError");
+    expect(appPage).toContain("endpoint_must_use_public_https");
+    expect(appPage).toContain("endpoint_private_network_forbidden");
+    expect(appPage).toContain(
+      "Local, private, loopback, and intranet endpoints are admin-only.",
+    );
   });
 
   it("loads model profiles before resolving saved fallback preferences", () => {
