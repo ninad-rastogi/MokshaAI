@@ -10,6 +10,19 @@ from scriptures.models import (
 )
 
 
+def indexing_display_progress(job: IndexingJob) -> int:
+    source_pages = job.source_pages
+    if (
+        job.status == IndexingJob.Status.RUNNING
+        and job.chunks_indexed > 0
+        and source_pages > 0
+        and job.chunks_indexed < source_pages
+    ):
+        percentage = round(job.chunks_indexed / source_pages * 100)
+        return max(1, min(69, percentage))
+    return job.progress
+
+
 class VolumeSerializer(serializers.ModelSerializer):
     """Serializer for Volume model."""
 
@@ -30,6 +43,10 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
 
     source_volumes = serializers.IntegerField(read_only=True)
     source_pages = serializers.IntegerField(read_only=True)
+    progress = serializers.SerializerMethodField()
+
+    def get_progress(self, job: IndexingJob) -> int:
+        return indexing_display_progress(job)
 
     class Meta:
         model = IndexingJob
@@ -109,6 +126,10 @@ class IndexingJobSerializer(serializers.ModelSerializer):
     """Expose job progress without leaking unrelated user information."""
 
     scripture_name = serializers.CharField(source="scripture.name", read_only=True)
+    progress = serializers.SerializerMethodField()
+
+    def get_progress(self, job: IndexingJob) -> int:
+        return indexing_display_progress(job)
 
     class Meta:
         model = IndexingJob

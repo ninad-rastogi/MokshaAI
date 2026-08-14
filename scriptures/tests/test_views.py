@@ -52,6 +52,43 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
 
 
 @pytest.mark.django_db
+def test_scripture_list_derives_ocr_progress_from_scanned_pages() -> None:
+    user = User.objects.create_user(
+        email="scripture-ocr-progress@example.test",
+        password="StrongPass123!",
+    )
+    scripture = Scripture.objects.create(
+        name="Living wisdom OCR",
+        folder_path="Living wisdom OCR",
+    )
+    index_version = ScriptureIndexVersion.objects.create(
+        scripture=scripture,
+        embedding_model="bge-m3",
+        volume_count=6,
+        page_count=15432,
+    )
+    IndexingJob.objects.create(
+        scripture=scripture,
+        index_version=index_version,
+        requested_by=user,
+        status=IndexingJob.Status.RUNNING,
+        progress=70,
+        chunks_indexed=8351,
+        volumes_processed=3,
+    )
+    client = APIClient()
+    client.force_authenticate(user)
+
+    response = client.get("/api/v1/scriptures/")
+
+    assert response.status_code == 200
+    progress = response.data["results"][0]["current_indexing_job"]
+    assert progress["progress"] == 54
+    assert progress["chunks_indexed"] == 8351
+    assert progress["source_pages"] == 15432
+
+
+@pytest.mark.django_db
 def test_scripture_list_exposes_only_bounded_latest_failure() -> None:
     user = User.objects.create_user(
         email="scripture-failure@example.test",
