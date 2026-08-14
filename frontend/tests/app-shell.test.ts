@@ -80,11 +80,17 @@ describe("app shell", () => {
     expect(appPage).not.toContain("entry.job.progress >= 70) return sum");
     expect(appPage).toContain('@section="settingsSection = $event"');
     expect(settingsComponent).toContain("indexingPhase");
+    expect(settingsComponent).toContain("indexingDisplayPercent");
     expect(settingsComponent).toContain("index-progress");
+    expect(settingsComponent).toContain("OCR ${indexingDisplayPercent");
+    expect(settingsComponent).toContain(
+      "job.chunks_indexed / job.source_pages",
+    );
     expect(settingsComponent).toContain("OCR pages scanned");
     expect(settingsComponent).toContain("source volumes scanned by OCR");
     expect(settingsComponent).toContain("waiting for embedding");
     expect(settingsComponent).not.toContain("source volumes processed");
+    expect(settingsComponent).not.toContain("Indexing ${job.progress}%");
     expect(settingsComponent).toContain("Running local OCR");
     expect(settingsComponent).toContain("Embedding passages");
     expect(settingsComponent).not.toContain("passages committed");

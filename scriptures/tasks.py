@@ -85,6 +85,14 @@ def index_progress_floor(current: int, resuming: bool) -> int:
     return max(current, 70) if resuming else 5
 
 
+def ocr_page_progress(completed_pages: int, total_pages: int) -> int:
+    """Expose live OCR page progress before embedding begins."""
+    if total_pages <= 0:
+        return 1
+    percentage = round(completed_pages / total_pages * 100)
+    return max(1, min(69, percentage))
+
+
 def compute_file_hash(file_path: Path) -> str:
     hasher = hashlib.sha256()
     with file_path.open("rb") as file_handle:
@@ -188,7 +196,10 @@ def index_scripture(self, job_id: int) -> None:
                     raise OcrUnavailableError("ocr_disabled")
                 ocr_engine.assert_available()
                 IndexingJob.objects.filter(pk=job.pk).update(
-                    progress=max(progress_floor, 8),
+                    progress=ocr_page_progress(
+                        job.chunks_indexed,
+                        version.page_count or sum(volume[2] for volume in volumes),
+                    ),
                     error_message="ocr_fallback_running",
                     heartbeat_at=timezone.now(),
                 )
@@ -205,12 +216,9 @@ def index_scripture(self, job_id: int) -> None:
                         volume_number: int = number,
                     ) -> None:
                         completed_pages = pages_before + page_number
-                        progress = max(
-                            progress_floor,
-                            min(
-                                70,
-                                8 + int(completed_pages / max(total_ocr_pages, 1) * 62),
-                            ),
+                        progress = ocr_page_progress(
+                            completed_pages,
+                            total_ocr_pages,
                         )
                         IndexingJob.objects.filter(pk=job.pk).update(
                             progress=progress,
@@ -232,8 +240,8 @@ def index_scripture(self, job_id: int) -> None:
                     pages_before_volume += volumes[number - 1][2]
                     IndexingJob.objects.filter(pk=job.pk).update(
                         progress=max(
-                            progress_floor,
-                            min(70, 8 + int(number / len(pdf_files) * 62)),
+                            ocr_page_progress(pages_before_volume, total_ocr_pages),
+                            ocr_page_progress(job.chunks_indexed, total_ocr_pages),
                         ),
                         heartbeat_at=timezone.now(),
                     )

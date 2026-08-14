@@ -165,24 +165,43 @@ function scriptureStatus(scripture: Scripture) {
     if (failureCode === "index_ocr_quality_failed") return "OCR needs review";
     return scripture.latest_indexing_failure ? "Index failed" : "Pending";
   }
-  return job.status === "PENDING" ? "Queued" : `Indexing ${job.progress}%`;
+  if (job.status === "PENDING") return "Queued";
+  if (isOcrRunning(scripture)) {
+    return `OCR ${indexingDisplayPercent(scripture)}%`;
+  }
+  return `Indexing ${indexingDisplayPercent(scripture)}%`;
 }
 
 function indexingPhase(scripture: Scripture) {
   const job = scripture.current_indexing_job;
   if (!job) return "";
   if (job.status === "PENDING") return "Waiting for worker";
-  const pageTotal = job.source_pages || scripture.total_pages;
-  if (
-    job.chunks_indexed > 0 &&
-    (!pageTotal || job.chunks_indexed < pageTotal)
-  ) {
-    return "Running local OCR";
-  }
+  if (isOcrRunning(scripture)) return "Running local OCR";
   if (job.progress < 70) return "Reading source volumes";
   if (job.progress < 85) return "Embedding passages";
   if (job.progress < 100) return "Qualifying retrieval";
   return "Activating index";
+}
+
+function isOcrRunning(scripture: Scripture) {
+  const job = scripture.current_indexing_job;
+  if (!job) return false;
+  const pageTotal = job.source_pages || scripture.total_pages;
+  return (
+    job.chunks_indexed > 0 && pageTotal > 0 && job.chunks_indexed < pageTotal
+  );
+}
+
+function indexingDisplayPercent(scripture: Scripture) {
+  const job = scripture.current_indexing_job;
+  if (!job) return scripture.is_indexed ? 100 : 0;
+  if (isOcrRunning(scripture) && job.source_pages > 0) {
+    return Math.max(
+      1,
+      Math.min(99, Math.round((job.chunks_indexed / job.source_pages) * 100)),
+    );
+  }
+  return job.progress;
 }
 
 function formatContextWindow(tokens: number) {
@@ -660,12 +679,12 @@ watch(
                   <span
                     v-if="scripture.current_indexing_job"
                     class="index-progress"
-                    :aria-label="`${scripture.name} indexing ${scripture.current_indexing_job.progress}%`"
+                    :aria-label="`${scripture.name} ${scriptureStatus(scripture)}`"
                   >
                     <span>
                       <b
                         :style="{
-                          width: `${scripture.current_indexing_job.progress}%`,
+                          width: `${indexingDisplayPercent(scripture)}%`,
                         }"
                       />
                     </span>

@@ -12,6 +12,7 @@ from scriptures.tasks import (
     candidate_can_retry,
     candidate_checkpoint,
     index_progress_floor,
+    ocr_page_progress,
     record_embedding_progress,
     source_text_quality,
 )
@@ -88,6 +89,12 @@ def test_resumed_index_progress_never_moves_backward() -> None:
     assert index_progress_floor(current=82, resuming=True) == 82
     assert index_progress_floor(current=59, resuming=True) == 70
     assert index_progress_floor(current=100, resuming=False) == 5
+
+
+def test_ocr_page_progress_uses_scanned_pages_not_resume_floor() -> None:
+    assert ocr_page_progress(completed_pages=8077, total_pages=15432) == 52
+    assert ocr_page_progress(completed_pages=1, total_pages=15432) == 1
+    assert ocr_page_progress(completed_pages=15432, total_pages=15432) == 69
 
 
 def test_source_text_quality_accepts_clean_devanagari_verse() -> None:
