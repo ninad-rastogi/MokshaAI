@@ -10,6 +10,17 @@ ENV UV_LINK_MODE=copy
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Install local OCR runtime for scripture PDFs. Keep OCR inside the private
+# container boundary; no scripture image/text leaves the host.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-hin \
+        tesseract-ocr-san \
+        tesseract-ocr-script-deva \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install the exact production dependency graph before copying application code.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \

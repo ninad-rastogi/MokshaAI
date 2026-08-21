@@ -1,6 +1,5 @@
-https://localhost:8443, https://127.0.0.1:8443 {
+(moksha_routes) {
 	encode zstd gzip
-	tls internal
 
 	handle /api/v1/* {
 		reverse_proxy django:8000
@@ -17,4 +16,13 @@ https://localhost:8443, https://127.0.0.1:8443 {
 	handle {
 		reverse_proxy nuxt:3000
 	}
+}
+
+https://localhost:8443, https://127.0.0.1:8443 {
+	tls internal
+	import moksha_routes
+}
+
+http://localhost:3057, http://127.0.0.1:3057 {
+	import moksha_routes
 }

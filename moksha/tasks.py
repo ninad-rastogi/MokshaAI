@@ -68,6 +68,10 @@ def monitor_disk_space() -> list[dict[str, object]]:
 @shared_task(queue="operations")
 def auto_discover_scripture_indexes() -> dict[str, int]:
     """Discover scripture folders and queue missing index builds."""
+    from chat.management.commands.discover_scriptures import (
+        prepare_failed_indexing_resume,
+        resumable_failed_indexing_job,
+    )
     from chat.rag.loader import ScriptureDocumentLoader
     from scriptures.models import IndexingJob, Scripture
 
@@ -107,10 +111,14 @@ def auto_discover_scripture_indexes() -> dict[str, int]:
                 if active.exists():
                     skipped += 1
                     continue
-                job = IndexingJob.objects.create(
-                    scripture=scripture,
-                    requested_by=operator,
-                )
+                job = resumable_failed_indexing_job(scripture)
+                if job is not None:
+                    prepare_failed_indexing_resume(job)
+                else:
+                    job = IndexingJob.objects.create(
+                        scripture=scripture,
+                        requested_by=operator,
+                    )
         except IntegrityError:
             skipped += 1
             continue

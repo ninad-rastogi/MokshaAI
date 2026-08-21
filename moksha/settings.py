@@ -3,6 +3,7 @@ Django settings for Moksha AI project.
 """
 
 import os
+import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -224,13 +225,19 @@ SCRIPTURE_OCR_ENGINE = os.getenv("SCRIPTURE_OCR_ENGINE", "tesseract")
 _default_tesseract_cmd = Path(r"D:\Softwares\Tesseract\tesseract.exe")
 if not _default_tesseract_cmd.exists():
     _default_tesseract_cmd = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+if not _default_tesseract_cmd.exists():
+    _tesseract_on_path = shutil.which("tesseract")
+    _default_tesseract_cmd = Path(_tesseract_on_path) if _tesseract_on_path else Path()
 SCRIPTURE_OCR_TESSERACT_CMD = os.getenv(
     "SCRIPTURE_OCR_TESSERACT_CMD",
     str(_default_tesseract_cmd),
 )
+_default_tessdata_prefix = Path(r"D:\Softwares\Tesseract\tessdata")
+if not _default_tessdata_prefix.exists():
+    _default_tessdata_prefix = Path(r"C:\Program Files\Tesseract-OCR\tessdata")
 SCRIPTURE_OCR_TESSDATA_PREFIX = os.getenv(
     "SCRIPTURE_OCR_TESSDATA_PREFIX",
-    r"D:\Softwares\Tesseract\tessdata",
+    str(_default_tessdata_prefix) if _default_tessdata_prefix.exists() else "",
 )
 SCRIPTURE_OCR_LANGUAGES = os.getenv("SCRIPTURE_OCR_LANGUAGES", "Devanagari+eng")
 SCRIPTURE_OCR_DPI = int(os.getenv("SCRIPTURE_OCR_DPI", "250"))

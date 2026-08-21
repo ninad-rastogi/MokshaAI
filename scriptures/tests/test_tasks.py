@@ -12,7 +12,9 @@ from scriptures.tasks import (
     candidate_can_retry,
     candidate_checkpoint,
     index_progress_floor,
+    monotonic_progress,
     ocr_page_progress,
+    ocr_resume_completed_pages,
     record_embedding_progress,
     record_ocr_progress,
     source_text_quality,
@@ -98,8 +100,22 @@ def test_ocr_page_progress_uses_scanned_pages_not_resume_floor() -> None:
     assert ocr_page_progress(completed_pages=15432, total_pages=15432) == 69
 
 
+def test_ocr_resume_completed_pages_never_moves_backward() -> None:
+    assert ocr_resume_completed_pages(reported_pages=30, checkpoint_pages=9608) == 9608
+    assert (
+        ocr_resume_completed_pages(reported_pages=9609, checkpoint_pages=9608) == 9609
+    )
+    assert ocr_resume_completed_pages(reported_pages=30, checkpoint_pages=0) == 30
+
+
+def test_monotonic_progress_never_moves_backward() -> None:
+    assert monotonic_progress(current_progress=70, proposed_progress=54) == 70
+    assert monotonic_progress(current_progress=62, proposed_progress=70) == 70
+    assert monotonic_progress(current_progress=84, proposed_progress=100) == 100
+
+
 @pytest.mark.django_db
-def test_record_ocr_progress_replaces_stale_resume_floor() -> None:
+def test_record_ocr_progress_preserves_visible_resume_floor() -> None:
     operator = User.objects.create_user(
         email="ocr-progress@example.test",
         password="StrongPass123!",
@@ -125,7 +141,7 @@ def test_record_ocr_progress_replaces_stale_resume_floor() -> None:
     )
 
     job.refresh_from_db()
-    assert job.progress == 54
+    assert job.progress == 70
     assert job.chunks_indexed == 8351
     assert job.volumes_processed == 2
     assert job.error_message == "ocr_fallback_running"

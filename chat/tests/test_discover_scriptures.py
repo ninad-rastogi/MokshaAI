@@ -196,6 +196,7 @@ def test_discovery_resumes_failed_build_candidate(scripture_folder, django_user_
         embedding_model="test-embedding",
         status=ScriptureIndexVersion.Status.FAILED,
         failure_code=INDEX_FAILURE_BUILD,
+        source_manifest=[{"file_name": "volume.pdf", "sha256": "a", "pages": 1}],
     )
     job = IndexingJob.objects.create(
         scripture=scripture,
@@ -252,6 +253,7 @@ def test_discovery_resumes_failed_ocr_unavailable_candidate(
         embedding_model="test-embedding",
         status=ScriptureIndexVersion.Status.FAILED,
         failure_code=INDEX_FAILURE_OCR_UNAVAILABLE,
+        source_manifest=[{"file_name": "volume.pdf", "sha256": "a", "pages": 1}],
     )
     job = IndexingJob.objects.create(
         scripture=scripture,
@@ -290,6 +292,70 @@ def test_discovery_resumes_failed_ocr_unavailable_candidate(
         "version_failure": "",
     }
     apply.assert_called_once_with(args=[job.pk], throw=True)
+
+
+@pytest.mark.django_db
+def test_discovery_resumes_best_failed_ocr_checkpoint(
+    scripture_folder, django_user_model
+):
+    operator = django_user_model.objects.create_user(
+        email="operator@example.com",
+        password="test-password",
+        is_staff=True,
+    )
+    scripture = Scripture.objects.create(
+        name=scripture_folder.name,
+        folder_path=str(scripture_folder),
+    )
+    empty_version = ScriptureIndexVersion.objects.create(
+        scripture=scripture,
+        embedding_model="test-embedding",
+        status=ScriptureIndexVersion.Status.FAILED,
+        failure_code=INDEX_FAILURE_OCR_UNAVAILABLE,
+        source_manifest=[{"file_name": "volume.pdf", "sha256": "a", "pages": 1}],
+    )
+    empty_job = IndexingJob.objects.create(
+        scripture=scripture,
+        requested_by=operator,
+        index_version=empty_version,
+        status=IndexingJob.Status.FAILED,
+        progress=70,
+        chunks_indexed=0,
+        error_message=INDEX_FAILURE_OCR_UNAVAILABLE,
+    )
+    checkpoint_version = ScriptureIndexVersion.objects.create(
+        scripture=scripture,
+        embedding_model="test-embedding",
+        status=ScriptureIndexVersion.Status.FAILED,
+        failure_code=INDEX_FAILURE_OCR_UNAVAILABLE,
+        source_manifest=[{"file_name": "volume.pdf", "sha256": "b", "pages": 1}],
+    )
+    checkpoint_job = IndexingJob.objects.create(
+        scripture=scripture,
+        requested_by=operator,
+        index_version=checkpoint_version,
+        status=IndexingJob.Status.FAILED,
+        progress=62,
+        chunks_indexed=9608,
+        error_message=INDEX_FAILURE_OCR_UNAVAILABLE,
+    )
+
+    def complete_recovered_job(**_kwargs):
+        IndexingJob.objects.filter(pk=checkpoint_job.pk).update(
+            status=IndexingJob.Status.SUCCEEDED
+        )
+
+    with patch(
+        "chat.management.commands.discover_scriptures.index_scripture.apply"
+    ) as apply:
+        apply.side_effect = complete_recovered_job
+        call_command("discover_scriptures", resume_failed=True)
+
+    empty_job.refresh_from_db()
+    checkpoint_job.refresh_from_db()
+    assert empty_job.status == IndexingJob.Status.FAILED
+    assert checkpoint_job.status == IndexingJob.Status.SUCCEEDED
+    apply.assert_called_once_with(args=[checkpoint_job.pk], throw=True)
 
 
 @pytest.mark.django_db

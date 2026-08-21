@@ -28,7 +28,46 @@ logger = logging.getLogger("chat.management.discover")
 RESUMABLE_FAILURE_CODES = {
     INDEX_FAILURE_BUILD,
     INDEX_FAILURE_OCR_UNAVAILABLE,
+    "index_interrupted_for_progress_fix",
+    "index_interrupted_for_resume_fix",
+    "worker_restarted",
 }
+
+
+def resumable_failed_indexing_job(scripture: Scripture) -> IndexingJob | None:
+    """Return the best failed candidate that can safely continue from a checkpoint."""
+    return (
+        IndexingJob.objects.select_related("index_version")
+        .filter(
+            scripture=scripture,
+            status=IndexingJob.Status.FAILED,
+            index_version__isnull=False,
+        )
+        .exclude(index_version__source_manifest=[])
+        .filter(
+            error_message__in=RESUMABLE_FAILURE_CODES,
+            index_version__status__in=[
+                ScriptureIndexVersion.Status.BUILDING,
+                ScriptureIndexVersion.Status.FAILED,
+            ],
+        )
+        .order_by("-chunks_indexed", "-progress", "-created_at")
+        .first()
+    )
+
+
+def prepare_failed_indexing_resume(job: IndexingJob) -> None:
+    """Move a failed candidate back to pending without losing its checkpoint."""
+    with transaction.atomic():
+        version = job.index_version
+        assert version is not None
+        version.status = ScriptureIndexVersion.Status.BUILDING
+        version.failure_code = ""
+        version.save(update_fields=["status", "failure_code"])
+        job.status = IndexingJob.Status.PENDING
+        job.error_message = ""
+        job.finished_at = None
+        job.save(update_fields=["status", "error_message", "finished_at"])
 
 
 def run_index_task(job_id: int) -> None:
@@ -147,30 +186,9 @@ class Command(BaseCommand):
                 continue
             job = active_job
             if job is None and options["resume_failed"]:
-                job = (
-                    IndexingJob.objects.select_related("index_version")
-                    .filter(
-                        scripture=scripture,
-                        status=IndexingJob.Status.FAILED,
-                        error_message__in=RESUMABLE_FAILURE_CODES,
-                        index_version__status=ScriptureIndexVersion.Status.FAILED,
-                        index_version__failure_code__in=RESUMABLE_FAILURE_CODES,
-                    )
-                    .first()
-                )
+                job = resumable_failed_indexing_job(scripture)
                 if job is not None:
-                    with transaction.atomic():
-                        version = job.index_version
-                        assert version is not None
-                        version.status = ScriptureIndexVersion.Status.BUILDING
-                        version.failure_code = ""
-                        version.save(update_fields=["status", "failure_code"])
-                        job.status = IndexingJob.Status.PENDING
-                        job.error_message = ""
-                        job.finished_at = None
-                        job.save(
-                            update_fields=["status", "error_message", "finished_at"]
-                        )
+                    prepare_failed_indexing_resume(job)
             if job is None:
                 job = IndexingJob.objects.create(
                     scripture=scripture,

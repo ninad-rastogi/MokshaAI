@@ -11,6 +11,8 @@ import fitz
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Value
+from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from chat.models import DocumentChunk
@@ -61,7 +63,7 @@ def record_embedding_progress(job_id: int, completed: int, total: int) -> None:
     fraction = completed / total if total else 0
     progress = 70 + min(14, int(fraction * 14))
     IndexingJob.objects.filter(pk=job_id).update(
-        progress=progress,
+        progress=Greatest("progress", Value(progress)),
         chunks_indexed=completed,
         heartbeat_at=timezone.now(),
     )
@@ -93,6 +95,16 @@ def ocr_page_progress(completed_pages: int, total_pages: int) -> int:
     return max(1, min(69, percentage))
 
 
+def ocr_resume_completed_pages(reported_pages: int, checkpoint_pages: int) -> int:
+    """Keep OCR resume display monotonic while cached pages are replayed."""
+    return max(reported_pages, checkpoint_pages)
+
+
+def monotonic_progress(current_progress: int, proposed_progress: int) -> int:
+    """Never move visible indexing progress backward."""
+    return max(current_progress, proposed_progress)
+
+
 def record_ocr_progress(
     job_id: int,
     completed_pages: int,
@@ -101,8 +113,9 @@ def record_ocr_progress(
     volumes_processed: int | None = None,
 ) -> None:
     """Persist page-based OCR progress, even when resuming from a stale floor."""
+    progress = ocr_page_progress(completed_pages, total_pages)
     updates: dict[str, object] = {
-        "progress": ocr_page_progress(completed_pages, total_pages),
+        "progress": Greatest("progress", Value(progress)),
         "chunks_indexed": completed_pages,
         "error_message": "ocr_fallback_running",
         "heartbeat_at": timezone.now(),
@@ -174,9 +187,14 @@ def index_scripture(self, job_id: int) -> None:
             volumes.append((pdf_path, stat, page_count, compute_file_hash(pdf_path)))
             chunks.extend(loader._load_pdf(pdf_path, scripture.name, scripture_path))
             IndexingJob.objects.filter(pk=job.pk).update(
-                progress=max(
-                    progress_floor,
-                    min(70, 5 + int(number / len(pdf_files) * 65)),
+                progress=Greatest(
+                    "progress",
+                    Value(
+                        max(
+                            progress_floor,
+                            min(70, 5 + int(number / len(pdf_files) * 65)),
+                        )
+                    ),
                 ),
                 heartbeat_at=timezone.now(),
             )
@@ -214,9 +232,13 @@ def index_scripture(self, job_id: int) -> None:
                 if ocr_engine is None:
                     raise OcrUnavailableError("ocr_disabled")
                 ocr_engine.assert_available()
+                ocr_checkpoint_pages = job.chunks_indexed if resuming else 0
                 record_ocr_progress(
                     job.pk,
-                    job.chunks_indexed,
+                    ocr_resume_completed_pages(
+                        job.chunks_indexed,
+                        ocr_checkpoint_pages,
+                    ),
                     version.page_count or sum(volume[2] for volume in volumes),
                 )
                 ocr_chunks = []
@@ -231,7 +253,10 @@ def index_scripture(self, job_id: int) -> None:
                         pages_before: int = pages_before_volume,
                         volume_number: int = number,
                     ) -> None:
-                        completed_pages = pages_before + page_number
+                        completed_pages = ocr_resume_completed_pages(
+                            pages_before + page_number,
+                            ocr_checkpoint_pages,
+                        )
                         record_ocr_progress(
                             job.pk,
                             completed_pages,
@@ -251,7 +276,10 @@ def index_scripture(self, job_id: int) -> None:
                     pages_before_volume += volumes[number - 1][2]
                     record_ocr_progress(
                         job.pk,
-                        pages_before_volume,
+                        ocr_resume_completed_pages(
+                            pages_before_volume,
+                            ocr_checkpoint_pages,
+                        ),
                         total_ocr_pages,
                         volumes_processed=number,
                     )
@@ -302,7 +330,7 @@ def index_scripture(self, job_id: int) -> None:
             ),
         )
         IndexingJob.objects.filter(pk=job.pk).update(
-            progress=85,
+            progress=Greatest("progress", Value(85)),
             heartbeat_at=timezone.now(),
         )
         smoke_query = str(chunks[0]["text"])[:500]
