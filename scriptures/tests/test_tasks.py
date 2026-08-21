@@ -135,17 +135,32 @@ def test_record_ocr_progress_preserves_visible_resume_floor() -> None:
 
     record_ocr_progress(
         job.pk,
-        completed_pages=8351,
+        completed_pages=1200,
         total_pages=15432,
+        checkpoint_pages=8351,
         volumes_processed=2,
     )
 
     job.refresh_from_db()
     assert job.progress == 70
     assert job.chunks_indexed == 8351
+    assert job.ocr_pages_processed == 1200
+    assert job.ocr_checkpoint_pages == 8351
     assert job.volumes_processed == 2
     assert job.error_message == "ocr_fallback_running"
     assert job.heartbeat_at is not None
+
+    record_ocr_progress(
+        job.pk,
+        completed_pages=300,
+        total_pages=15432,
+        checkpoint_pages=8351,
+    )
+
+    job.refresh_from_db()
+    assert job.chunks_indexed == 8351
+    assert job.ocr_pages_processed == 1200
+    assert job.ocr_checkpoint_pages == 8351
 
 
 def test_source_text_quality_accepts_clean_devanagari_verse() -> None:

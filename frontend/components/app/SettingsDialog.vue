@@ -127,6 +127,9 @@ function scriptureDetail(scripture: Scripture) {
     const pageTotal = job.source_pages || scripture.total_pages;
     const pagesScanned = job.chunks_indexed;
     const ocrStillRunning = job.phase === "ocr";
+    if (job.is_replaying_checkpoint && job.ocr_checkpoint_pages > 0) {
+      return `${volumeText} · replaying cached OCR ${job.ocr_pages_processed.toLocaleString()} of ${job.ocr_checkpoint_pages.toLocaleString()} pages before resume checkpoint`;
+    }
     if (pagesScanned > 0) {
       if (job.source_pages > 0) {
         const suffix =
@@ -182,6 +185,9 @@ function scriptureStatus(scripture: Scripture) {
 }
 
 function ocrStatusLabel(job: NonNullable<Scripture["current_indexing_job"]>) {
+  if (job.is_replaying_checkpoint && job.ocr_checkpoint_pages > 0) {
+    return `OCR cache ${job.ocr_pages_processed.toLocaleString()} / ${job.ocr_checkpoint_pages.toLocaleString()}`;
+  }
   if (job.source_pages > 0) {
     return `OCR ${job.chunks_indexed.toLocaleString()} / ${job.source_pages.toLocaleString()} pages`;
   }
@@ -215,7 +221,7 @@ function indexingDisplayPercent(scripture: Scripture) {
   if (!job) return scripture.is_indexed ? 100 : 0;
   if (isOcrRunning(scripture) && job.source_pages > 0) {
     return Math.max(
-      1,
+      job.progress,
       Math.min(99, Math.round((job.chunks_indexed / job.source_pages) * 100)),
     );
   }

@@ -228,9 +228,20 @@ const scriptureProgressLabel = computed(() => {
     return `${scriptures.value.filter((scripture) => scripture.is_indexed).length}/${scriptures.value.length} ready`;
   }
   const ocrPages = activeOcrJobs.value.reduce((sum, entry) => {
-    return sum + entry.job.chunks_indexed;
+    return (
+      sum +
+      (entry.job.is_replaying_checkpoint
+        ? entry.job.ocr_pages_processed
+        : entry.job.chunks_indexed)
+    );
   }, 0);
   if (ocrPages > 0) {
+    const replaying = activeOcrJobs.value.find(
+      (entry) => entry.job.is_replaying_checkpoint,
+    );
+    if (replaying && replaying.job.ocr_checkpoint_pages > 0) {
+      return `OCR cache ${replaying.job.ocr_pages_processed.toLocaleString()}/${replaying.job.ocr_checkpoint_pages.toLocaleString()} pages`;
+    }
     const ocrTotal = activeOcrJobs.value.reduce((sum, entry) => {
       return sum + entry.job.source_pages;
     }, 0);
@@ -253,9 +264,23 @@ const scriptureProgressCompactLabel = computed(() => {
     return `${scriptures.value.filter((scripture) => scripture.is_indexed).length}/${scriptures.value.length}`;
   }
   const ocrPages = activeOcrJobs.value.reduce((sum, entry) => {
-    return sum + entry.job.chunks_indexed;
+    return (
+      sum +
+      (entry.job.is_replaying_checkpoint
+        ? entry.job.ocr_pages_processed
+        : entry.job.chunks_indexed)
+    );
   }, 0);
   if (ocrPages > 0) {
+    const replaying = activeOcrJobs.value.find(
+      (entry) => entry.job.is_replaying_checkpoint,
+    );
+    if (replaying && replaying.job.ocr_checkpoint_pages > 0) {
+      return `Cache ${Intl.NumberFormat("en", {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(replaying.job.ocr_pages_processed)}`;
+    }
     return `OCR ${Intl.NumberFormat("en", {
       notation: "compact",
       maximumFractionDigits: 1,
@@ -276,6 +301,13 @@ const scriptureProgressDetail = computed(() => {
   }
   return activeIndexingJobs.value
     .map((entry) => {
+      if (
+        entry.job.phase === "ocr" &&
+        entry.job.is_replaying_checkpoint &&
+        entry.job.ocr_checkpoint_pages > 0
+      ) {
+        return `${entry.scripture.name} replaying cached OCR ${entry.job.ocr_pages_processed.toLocaleString()} of ${entry.job.ocr_checkpoint_pages.toLocaleString()} pages`;
+      }
       if (
         entry.job.phase === "ocr" &&
         entry.job.chunks_indexed > 0 &&

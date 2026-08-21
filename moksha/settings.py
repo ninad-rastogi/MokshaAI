@@ -276,11 +276,11 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_BEAT_SCHEDULE = {
     "auto-discover-scripture-indexes": {
         "task": "moksha.tasks.auto_discover_scripture_indexes",
-        "schedule": float(os.getenv("SCRIPTURE_AUTO_DISCOVER_SECONDS", "300")),
+        "schedule": float(os.getenv("SCRIPTURE_AUTO_DISCOVER_SECONDS", "60")),
     },
     "recover-stale-jobs": {
         "task": "moksha.tasks.recover_stale_jobs",
-        "schedule": 300.0,
+        "schedule": float(os.getenv("JOB_RECOVERY_SECONDS", "60")),
     },
     "monitor-disk-space": {
         "task": "moksha.tasks.monitor_disk_space",
@@ -292,7 +292,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 GENERATION_MAX_ACTIVE_PER_USER = int(os.getenv("GENERATION_MAX_ACTIVE_PER_USER", "2"))
-JOB_STALE_MINUTES = int(os.getenv("JOB_STALE_MINUTES", "20"))
+JOB_STALE_MINUTES = int(os.getenv("JOB_STALE_MINUTES", "3"))
 DISK_MIN_FREE_BYTES = int(os.getenv("DISK_MIN_FREE_BYTES", str(5 * 1024 * 1024 * 1024)))
 MODEL_PART_MAX_AGE_HOURS = int(os.getenv("MODEL_PART_MAX_AGE_HOURS", "24"))
 METRICS_TOKEN = os.getenv("MOKSHA_METRICS_TOKEN", "")

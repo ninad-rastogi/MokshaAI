@@ -109,6 +109,9 @@ export type Scripture = {
       | "activating";
     progress: number;
     chunks_indexed: number;
+    ocr_pages_processed: number;
+    ocr_checkpoint_pages: number;
+    is_replaying_checkpoint: boolean;
     volumes_processed: number;
     source_volumes: number;
     source_pages: number;

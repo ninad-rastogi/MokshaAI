@@ -81,6 +81,8 @@ describe("app shell", () => {
       "entry.job.chunks_indexed < entry.job.source_pages",
     );
     expect(appPage).not.toContain("entry.job.progress >= 70) return sum");
+    expect(appPage).toContain("is_replaying_checkpoint");
+    expect(appPage).toContain("replaying cached OCR");
     expect(appPage).toContain('@section="settingsSection = $event"');
     expect(settingsComponent).toContain("indexingPhase");
     expect(settingsComponent).toContain("indexingDisplayPercent");
@@ -90,6 +92,9 @@ describe("app shell", () => {
     expect(settingsComponent).toContain(
       "OCR ${job.chunks_indexed.toLocaleString()} / ${job.source_pages.toLocaleString()} pages",
     );
+    expect(settingsComponent).toContain("OCR cache");
+    expect(settingsComponent).toContain("job.ocr_pages_processed");
+    expect(settingsComponent).toContain("job.ocr_checkpoint_pages");
     expect(settingsComponent).toContain(
       "job.chunks_indexed / job.source_pages",
     );

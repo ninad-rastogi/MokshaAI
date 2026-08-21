@@ -20,7 +20,7 @@ def indexing_display_progress(job: IndexingJob) -> int:
         and job.chunks_indexed < source_pages
     ):
         percentage = round(job.chunks_indexed / source_pages * 100)
-        return max(1, min(69, percentage))
+        return max(job.progress, max(1, min(69, percentage)))
     return job.progress
 
 
@@ -59,6 +59,9 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
 
     source_volumes = serializers.IntegerField(read_only=True)
     source_pages = serializers.IntegerField(read_only=True)
+    ocr_pages_processed = serializers.IntegerField(read_only=True)
+    ocr_checkpoint_pages = serializers.IntegerField(read_only=True)
+    is_replaying_checkpoint = serializers.SerializerMethodField()
     progress = serializers.SerializerMethodField()
     phase = serializers.SerializerMethodField()
 
@@ -68,6 +71,13 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
     def get_phase(self, job: IndexingJob) -> str:
         return indexing_phase(job)
 
+    def get_is_replaying_checkpoint(self, job: IndexingJob) -> bool:
+        return (
+            indexing_phase(job) == "ocr"
+            and job.ocr_checkpoint_pages > 0
+            and job.ocr_pages_processed < job.ocr_checkpoint_pages
+        )
+
     class Meta:
         model = IndexingJob
         fields = (
@@ -75,6 +85,9 @@ class IndexingProgressSerializer(serializers.ModelSerializer):
             "phase",
             "progress",
             "chunks_indexed",
+            "ocr_pages_processed",
+            "ocr_checkpoint_pages",
+            "is_replaying_checkpoint",
             "volumes_processed",
             "source_volumes",
             "source_pages",
@@ -149,12 +162,20 @@ class IndexingJobSerializer(serializers.ModelSerializer):
     scripture_name = serializers.CharField(source="scripture.name", read_only=True)
     progress = serializers.SerializerMethodField()
     phase = serializers.SerializerMethodField()
+    is_replaying_checkpoint = serializers.SerializerMethodField()
 
     def get_progress(self, job: IndexingJob) -> int:
         return indexing_display_progress(job)
 
     def get_phase(self, job: IndexingJob) -> str:
         return indexing_phase(job)
+
+    def get_is_replaying_checkpoint(self, job: IndexingJob) -> bool:
+        return (
+            indexing_phase(job) == "ocr"
+            and job.ocr_checkpoint_pages > 0
+            and job.ocr_pages_processed < job.ocr_checkpoint_pages
+        )
 
     class Meta:
         model = IndexingJob
@@ -168,6 +189,9 @@ class IndexingJobSerializer(serializers.ModelSerializer):
             "progress",
             "error_message",
             "chunks_indexed",
+            "ocr_pages_processed",
+            "ocr_checkpoint_pages",
+            "is_replaying_checkpoint",
             "volumes_processed",
             "created_at",
             "started_at",

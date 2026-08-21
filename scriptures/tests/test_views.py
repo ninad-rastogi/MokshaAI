@@ -45,6 +45,9 @@ def test_scripture_list_exposes_bounded_active_indexing_progress() -> None:
         "phase": "embedding",
         "progress": 71,
         "chunks_indexed": 6720,
+        "ocr_pages_processed": 0,
+        "ocr_checkpoint_pages": 0,
+        "is_replaying_checkpoint": False,
         "volumes_processed": 6,
         "source_volumes": 6,
         "source_pages": 128,
@@ -75,6 +78,8 @@ def test_scripture_list_derives_ocr_progress_from_scanned_pages() -> None:
         status=IndexingJob.Status.RUNNING,
         progress=70,
         chunks_indexed=8351,
+        ocr_pages_processed=1200,
+        ocr_checkpoint_pages=8351,
         volumes_processed=3,
         error_message="ocr_fallback_running",
     )
@@ -86,8 +91,11 @@ def test_scripture_list_derives_ocr_progress_from_scanned_pages() -> None:
     assert response.status_code == 200
     progress = response.data["results"][0]["current_indexing_job"]
     assert progress["phase"] == "ocr"
-    assert progress["progress"] == 54
+    assert progress["progress"] == 70
     assert progress["chunks_indexed"] == 8351
+    assert progress["ocr_pages_processed"] == 1200
+    assert progress["ocr_checkpoint_pages"] == 8351
+    assert progress["is_replaying_checkpoint"] is True
     assert progress["source_pages"] == 15432
 
 

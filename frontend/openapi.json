@@ -45,6 +45,18 @@
             "readOnly": true,
             "type": "string"
           },
+          "is_replaying_checkpoint": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "ocr_checkpoint_pages": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "ocr_pages_processed": {
+            "readOnly": true,
+            "type": "integer"
+          },
           "phase": {
             "readOnly": true,
             "type": "string"
@@ -347,6 +359,18 @@
           "current_indexing_job": {
             "properties": {
               "chunks_indexed": {
+                "readOnly": true,
+                "type": "integer"
+              },
+              "is_replaying_checkpoint": {
+                "readOnly": true,
+                "type": "string"
+              },
+              "ocr_checkpoint_pages": {
+                "readOnly": true,
+                "type": "integer"
+              },
+              "ocr_pages_processed": {
                 "readOnly": true,
                 "type": "integer"
               },

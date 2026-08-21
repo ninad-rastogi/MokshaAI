@@ -140,6 +140,8 @@ class IndexingJob(models.Model):
     celery_task_id = models.CharField(max_length=255, blank=True)
     error_message = models.TextField(blank=True)
     chunks_indexed = models.PositiveIntegerField(default=0)
+    ocr_pages_processed = models.PositiveIntegerField(default=0)
+    ocr_checkpoint_pages = models.PositiveIntegerField(default=0)
     volumes_processed = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)

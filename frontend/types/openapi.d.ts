@@ -707,6 +707,9 @@ export interface components {
       readonly finished_at?: string | null;
       readonly id?: number;
       readonly index_version?: string | null;
+      readonly is_replaying_checkpoint?: string;
+      readonly ocr_checkpoint_pages?: number;
+      readonly ocr_pages_processed?: number;
       readonly phase?: string;
       readonly progress?: string;
       readonly scripture?: string;
@@ -810,6 +813,9 @@ export interface components {
       readonly created_at?: string;
       readonly current_indexing_job?: {
         readonly chunks_indexed?: number;
+        readonly is_replaying_checkpoint?: string;
+        readonly ocr_checkpoint_pages?: number;
+        readonly ocr_pages_processed?: number;
         readonly phase?: string;
         readonly progress?: string;
         readonly source_pages?: number;

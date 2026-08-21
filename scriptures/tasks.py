@@ -110,13 +110,18 @@ def record_ocr_progress(
     completed_pages: int,
     total_pages: int,
     *,
+    checkpoint_pages: int = 0,
     volumes_processed: int | None = None,
 ) -> None:
     """Persist page-based OCR progress, even when resuming from a stale floor."""
     progress = ocr_page_progress(completed_pages, total_pages)
     updates: dict[str, object] = {
         "progress": Greatest("progress", Value(progress)),
-        "chunks_indexed": completed_pages,
+        "chunks_indexed": Greatest("chunks_indexed", Value(completed_pages)),
+        "ocr_pages_processed": Greatest("ocr_pages_processed", Value(completed_pages)),
+        "ocr_checkpoint_pages": Greatest(
+            "ocr_checkpoint_pages", Value(checkpoint_pages)
+        ),
         "error_message": "ocr_fallback_running",
         "heartbeat_at": timezone.now(),
     }
@@ -235,11 +240,9 @@ def index_scripture(self, job_id: int) -> None:
                 ocr_checkpoint_pages = job.chunks_indexed if resuming else 0
                 record_ocr_progress(
                     job.pk,
-                    ocr_resume_completed_pages(
-                        job.chunks_indexed,
-                        ocr_checkpoint_pages,
-                    ),
+                    0,
                     version.page_count or sum(volume[2] for volume in volumes),
+                    checkpoint_pages=ocr_checkpoint_pages,
                 )
                 ocr_chunks = []
                 total_ocr_pages = sum(volume[2] for volume in volumes)
@@ -253,14 +256,12 @@ def index_scripture(self, job_id: int) -> None:
                         pages_before: int = pages_before_volume,
                         volume_number: int = number,
                     ) -> None:
-                        completed_pages = ocr_resume_completed_pages(
-                            pages_before + page_number,
-                            ocr_checkpoint_pages,
-                        )
+                        completed_pages = pages_before + page_number
                         record_ocr_progress(
                             job.pk,
                             completed_pages,
                             total_ocr_pages,
+                            checkpoint_pages=ocr_checkpoint_pages,
                             volumes_processed=volume_number - 1,
                         )
 
@@ -276,11 +277,9 @@ def index_scripture(self, job_id: int) -> None:
                     pages_before_volume += volumes[number - 1][2]
                     record_ocr_progress(
                         job.pk,
-                        ocr_resume_completed_pages(
-                            pages_before_volume,
-                            ocr_checkpoint_pages,
-                        ),
+                        pages_before_volume,
                         total_ocr_pages,
+                        checkpoint_pages=ocr_checkpoint_pages,
                         volumes_processed=number,
                     )
             except OcrUnavailableError as exc:
