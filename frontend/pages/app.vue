@@ -330,7 +330,12 @@ onMounted(async () => {
   shellReady.value = true;
 
   try {
-    userProfile.value = await api.me();
+    const session = await api.sessionStatus();
+    if (!session.authenticated || !session.user) {
+      await navigateTo("/");
+      return;
+    }
+    userProfile.value = session.user;
     colorMode.preference = userProfile.value.preferred_theme;
   } catch {
     await navigateTo("/");
@@ -1045,6 +1050,16 @@ async function scrollToLatest(behavior: ScrollBehavior) {
               {{ scriptureProgressCompactLabel }}
             </span>
           </button>
+          <UTooltip text="Settings">
+            <button
+              class="header-icon mobile-settings"
+              type="button"
+              aria-label="Open settings"
+              @click="settingsOpen = true"
+            >
+              <UIcon name="i-lucide-settings-2" aria-hidden="true" />
+            </button>
+          </UTooltip>
           <UTooltip v-if="streamDisconnected" text="Reconnect response stream">
             <button
               class="header-icon"
@@ -1401,6 +1416,10 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 }
 
 .mobile-menu {
+  display: none;
+}
+
+.mobile-settings {
   display: none;
 }
 
@@ -1845,6 +1864,10 @@ async function scrollToLatest(behavior: ScrollBehavior) {
 
   .desktop-settings {
     display: none;
+  }
+
+  .mobile-settings {
+    display: inline-flex;
   }
 
   .message-viewport {

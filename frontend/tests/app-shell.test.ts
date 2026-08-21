@@ -189,6 +189,7 @@ describe("app shell", () => {
     expect(appPage).toContain(
       "`${connectionLabel.value} · ${activeModelDetail.value}`",
     );
+    expect(appPage).toContain("mobile-settings");
   });
 
   it("uses live runtime readiness for the selected local model", () => {
@@ -233,7 +234,8 @@ describe("app shell", () => {
   });
 
   it("keeps refresh auth separate from workspace loading failures", () => {
-    expect(appPage).toContain("await api.me()");
+    expect(appPage).toContain("await api.sessionStatus()");
+    expect(appPage).toContain("if (!session.authenticated || !session.user)");
     expect(indexPage).toContain("checkingSession.value = false");
     expect(indexPage).toContain('useRoute().path === "/"');
     expect(appPage).toContain("Promise.allSettled");

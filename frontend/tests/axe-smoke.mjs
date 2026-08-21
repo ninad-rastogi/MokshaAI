@@ -61,6 +61,8 @@ async function installMockApi(page) {
       });
     } else if (path.endsWith("/auth/me/")) {
       await fulfill(route, user);
+    } else if (path.endsWith("/auth/session/")) {
+      await fulfill(route, { authenticated: true, user });
     } else if (path.endsWith("/chats/") && method === "GET") {
       await fulfill(route, { next: null, previous: null, results: [chat] });
     } else if (path.endsWith("/messages/")) {
